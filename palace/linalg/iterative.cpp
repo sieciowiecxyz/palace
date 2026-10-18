@@ -19,6 +19,11 @@ namespace palace
 namespace
 {
 
+bool UseStoredBasis()
+{
+  return std::getenv("PALACE_GMRES_FP32_BASIS");
+}
+
 template <typename T>
 inline void CheckDot(T dot, const char *msg)
 {
@@ -483,7 +488,7 @@ void GmresSolver<OperType>::Initialize() const
   }
   constexpr int init_size = 5;
   V.resize(max_dim + 1);
-  for (int j = 0; j < std::min((std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) ? 1 : init_size, max_dim + 1); j++)
+  for (int j = 0; j < std::min(UseStoredBasis() ? 1 : init_size, max_dim + 1); j++)
   {
     V[j].SetSize(A->Height());
     V[j].UseDevice(true);
@@ -501,7 +506,7 @@ void GmresSolver<OperType>::Update(int j) const
 {
   // Add storage for basis vectors, Hessenberg columns, and rotations in increments.
   constexpr int add_size = 10;
-  for (int k = j + 1; !(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) && k < std::min(j + 1 + add_size, max_dim + 1); k++)
+  for (int k = j + 1; !UseStoredBasis() && k < std::min(j + 1 + add_size, max_dim + 1); k++)
   {
     V[k].SetSize(A->Height());
     V[k].UseDevice(true);
@@ -532,7 +537,7 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   r.SetSize(A->Height());
   r.UseDevice(true);
   Initialize();
-  const bool compressed_basis = std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS");
+  const bool compressed_basis = UseStoredBasis();
   MFEM_VERIFY(!compressed_basis || gs_orthog == Orthogonalization::MGS,
               "FP32 basis pilot currently supports MGS GMRES only!");
   std::vector<StoredBasisVector> packed_basis(compressed_basis ? max_dim + 1 : 0);
@@ -541,9 +546,8 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   {
     basis_read.SetSize(A->Height());
     basis_read.UseDevice(true);
-    MFEM_VERIFY(!(std::getenv("PALACE_GMRES_FP32_BASIS") && std::getenv("PALACE_GMRES_FP64_DISK_BASIS")), "Select one basis storage mode!");
-    Mpi::Print(comm, "PALACE_STORED_BASIS: storage={}, FP64 arithmetic; K={:d}\n",
-               std::getenv("PALACE_GMRES_FP64_DISK_BASIS") ? "FP64 disk" : "FP32", max_dim);
+    Mpi::Print(comm, "PALACE_STORED_BASIS: storage=FP32 RAM/VRAM, FP64 arithmetic; K={:d}\n",
+               max_dim);
   }
 
   // Begin iterations.
@@ -782,7 +786,7 @@ void FgmresSolver<OperType>::Initialize() const
   GmresSolver<OperType>::Initialize();
   constexpr int init_size = 5;
   Z.resize(max_dim + 1);
-  for (int j = 0; j < std::min((std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) ? 1 : init_size, max_dim + 1); j++)
+  for (int j = 0; j < std::min(UseStoredBasis() ? 1 : init_size, max_dim + 1); j++)
   {
     Z[j].SetSize(A->Height());
     Z[j].UseDevice(true);
@@ -795,7 +799,7 @@ void FgmresSolver<OperType>::Update(int j) const
   // Add storage for basis vectors in increments.
   GmresSolver<OperType>::Update(j);
   constexpr int add_size = 10;
-  for (int k = j + 1; !(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) && k < std::min(j + 1 + add_size, max_dim + 1); k++)
+  for (int k = j + 1; !UseStoredBasis() && k < std::min(j + 1 + add_size, max_dim + 1); k++)
   {
     Z[k].SetSize(A->Height());
     Z[k].UseDevice(true);
@@ -805,7 +809,7 @@ void FgmresSolver<OperType>::Update(int j) const
 template <typename OperType>
 void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 {
-  MFEM_VERIFY(!(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")),
+  MFEM_VERIFY(!UseStoredBasis(),
               "FP32 basis pilot does not support FGMRES!");
   // Set up workspace.
   RealType beta = 0.0, true_beta, eps = 0.0;

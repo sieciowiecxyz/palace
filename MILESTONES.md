@@ -1,5 +1,7 @@
 # Kryteria akceptacji optymalizacji Palace
 
+Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
+
 Postęp jest w [PLAN](PLAN.md), dowody i checkpoint w [PROGRESS](PROGRESS.md). Ten plik definiuje bramki; nie zmieniać progów po zobaczeniu wyniku, aby zaliczyć eksperyment. M1 zamraża proponowane niżej tolerancje i ich sposób pomiaru przed nową optymalizacją.
 
 ## Wspólny kontrakt K

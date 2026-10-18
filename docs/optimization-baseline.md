@@ -1,6 +1,8 @@
 # M1 — pierwsze pomiary i audyt
 
-Data: 2026-10-18. Status: M1 ACTIVE, referencja pełnej anteny i kontrola pól nadal otwarte. To pomiary diagnostyczne, nie nowa kwalifikacja projektu ani przyspieszenia.
+**Korekta 2026-10-18:** wszystkie opisane niżej próby z bazą na SSD są historyczne i odrzucone przez użytkownika. Kod disk basis został usunięty; nie stanowią dopuszczalnego baseline wydajności. Dalsze dane robocze wyłącznie RAM/VRAM, bez swap/offloadu na SSD/NVMe. Zachowane pola mogą pozostać archiwalnym wynikiem diagnostycznym.
+
+Data: 2026-10-18. Status: M1 ACTIVE. Historyczna referencja i porównanie pól pełnej anteny istnieją wyłącznie dla odrzuconego disk basis; kwalifikacja pełnej anteny przy wymaganiu RAM/VRAM pozostaje otwarta. To pomiary diagnostyczne, nie nowa kwalifikacja projektu ani przyspieszenia.
 
 ## Co wykonano
 
@@ -144,3 +146,9 @@ CUDA_UVM raportuje peak logicznych aktywnych alokacji managed44,95GiB; cuDSS pea
 Kandydat miał narastający spadek MemAvailable: około20,6GiB przy183s,15,6GiB przy549s,10,8GiB przy915s i4,7GiB przed guardem. Przy11,2mln DOF każdy zespolony wektor bazyFP32 to~85,6MiB;141wektorów to~11,8GiB dodatkowego logicznego storage, które referencja trzymała na SSD. To uzasadnia audyt alokacji i limitu working set, lecz nie dowodzi jeszcze dokładnego podziału całej pamięci ani opłacalności konkretnej kompresji.
 
 Dowody: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. M1 pozostaje otwarty: przed ponownym pełnym kandydatem potrzebny jest budżet UVM/RAM i ścieżka, która kończy solve bez osłabienia progu jakości.
+
+## EXP07 — zakończony i wycofany disk basis
+
+FP32-disk anteny (artifacts/m1-antenna-fields-fp32-disk-20261018/) ukończył1solve po1563,128s/151iteracjach, stopping9,960824e−7; field comparison7wpisówPASS, maxE2,754895e−5/B3,657975e−3. Cgrouppeak52871852032B=49,24GiB, min globalMemAvailable18,39GiB, logicalmanagedpeak~45,17GiB, cuDSSpeak7,52GiB. Telemetria1536próbek ze scope cgroup, duże alokacje mają stosy. Użytkownik w międzyczasie zwolnił RAM; zmiana obciążenia hosta uniemożliwia przypisanie różnicy czasu/pamięci wyłącznie storage.
+
+Decyzja: **REJECT** — wymóg RAM/VRAM, bez dyskowej pamięci roboczej. Eksperyment nie jest optymalizacją do wdrożenia; nie powtarzać. Kod i CLI FP32/FP64-disk usunięte, legacy env odrzucane przed inicjalizacją solvera. Dane śladów mogą posłużyć do audytu właścicieli bez ponawiania pełnej symulacji. Dokładny całkowity wolumen I/O nie został zmierzony; nie deklarować wpływu na zużycie dysku na podstawie czasu lub rozmiaru scratch.

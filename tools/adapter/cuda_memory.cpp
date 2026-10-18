@@ -2,6 +2,7 @@
 #include <cudss.h>
 #include <cuda_runtime.h>
 #include <dlfcn.h>
+#include <execinfo.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
@@ -52,14 +53,24 @@ void reserve_memory() {
     std::fprintf(stderr,"CUDA_UVM_PRESSURE: reserved_device_bytes=%zu\n",s.reserved);
   });
 }
+void trace_managed(const char *event, void *p, size_t n, uint64_t live) {
+  if(!flag("PALACE_CUDA_ALLOC_TRACE") || n<16*1024*1024)return;
+  auto t=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  std::fprintf(stderr,"PALACE_ALLOC {\"event\":\"%s\",\"kind\":\"managed\",\"pointer\":\"%p\",\"bytes\":%zu,\"logical_live_bytes\":%llu,\"t_s\":%.9f}\n",
+               event,p,n,(unsigned long long)live,t);
+  if(std::string_view(event)=="alloc") {
+    void *frames[16];int count=backtrace(frames,16);
+    char **names=backtrace_symbols(frames,count);
+    if(names) {
+      for(int i=0;i<count;i++)std::fprintf(stderr,"PALACE_ALLOC_STACK %p %d %s\n",p,i,names[i]);
+      std::free(names);
+    }
+  }
+}
 void record_managed(void *p,size_t n) {
   auto &s=managed_state();std::lock_guard<std::mutex> guard(s.mutex);
   s.sizes[p]=n;s.live+=n;if(s.live>s.peak)s.peak=s.live;++s.allocations;
-  if(flag("PALACE_CUDA_ALLOC_TRACE") && n>=16*1024*1024) {
-    auto t=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    std::fprintf(stderr,"PALACE_ALLOC {\"kind\":\"managed\",\"bytes\":%zu,\"logical_live_bytes\":%llu,\"t_s\":%.9f}\n",
-      n,(unsigned long long)s.live,t);
-  }
+  trace_managed("alloc",p,n,s.live);
 }
 int dss_alloc(void *,void **p,size_t n,cudaStream_t) {
   // cuDSS owns host/device staging in hybrid mode: keep its device workspace
@@ -126,7 +137,7 @@ extern "C" cudaError_t cudaFree(void *p) {
   auto error=fn(p);
   if(error==cudaSuccess && managed()) {
     auto &s=managed_state();std::lock_guard<std::mutex> guard(s.mutex);
-    auto it=s.sizes.find(p);if(it!=s.sizes.end()){s.live-=it->second;s.sizes.erase(it);}
+    auto it=s.sizes.find(p);if(it!=s.sizes.end()){s.live-=it->second;trace_managed("free",p,it->second,s.live);s.sizes.erase(it);}
   }
   return error;
 }

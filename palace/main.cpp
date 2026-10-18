@@ -1,6 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -151,6 +153,13 @@ static void PrintPalaceInfo(MPI_Comm comm, int np, int nt, int ngpu, mfem::Devic
 
 int main(int argc, char *argv[])
 {
+  // Reject legacy launch scripts before MPI, CUDA or any solver allocation.
+  if (std::getenv("PALACE_GMRES_FP64_DISK_BASIS") ||
+      std::getenv("PALACE_GMRES_FP32_DISK_BASIS"))
+  {
+    std::fprintf(stderr, "Disk basis storage was removed. Working data must remain in RAM/VRAM.\n");
+    return EXIT_FAILURE;
+  }
   // Initialize MPI.
 #if defined(MFEM_USE_STRUMPACK) && \
     (defined(STRUMPACK_USE_PTSCOTCH) || defined(STRUMPACK_USE_SLATE_SCALAPACK))

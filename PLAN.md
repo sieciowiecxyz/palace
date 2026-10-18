@@ -1,5 +1,6 @@
 # Plan optymalizacji Palace
 
+Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
 Mode: goal
 Active: M1
 
@@ -30,9 +31,10 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 
 ### M1 — najpierw podstawa porównań
 
-- [x] Dodać i sprawdzić na tiny normę różnicy całych pól, detekcję kontrolowanego błędu i zgodność disk/resident.
-- [x] Zachować bieżącą referencję anteny FP64-disk i jej E/B; kandydatFP32 nie ukończył solve przez RAMguard.
-- [ ] Rozliczyć właścicieli UVM i host/cgroup peak przed nowym pełnym kandydatem; nie ponawiać bez zmiany.
+- [x] Dodać i sprawdzić na tiny normę różnicy całych pól, detekcję kontrolowanego błędu i kontrolę błędu (dawny disk/resident wycofany).
+- [x] Zachować historyczne E/B jako dane porównawcze; referencja korzystała z wycofanego storage dyskowego i nie jest dopuszczalnym nowym runem. Kandydat residentFP32 przerwany guardem przy obciążonym desktopie.
+- [x] Dodać ślady dużych alokacji i pomiar cgroup RAM; interpretacja właścicieli pozostaje otwarta.
+- [ ] Dalej wyłącznie RAM/VRAM: rozliczyć alokacje i zaplanować nowy kandydat przy znanym obciążeniu hosta; bez nowych pełnych runów na tym etapie.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.

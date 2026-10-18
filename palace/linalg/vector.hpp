@@ -5,7 +5,6 @@
 #define PALACE_LINALG_VECTOR_HPP
 
 #include <complex>
-#include <string>
 #include <vector>
 #include <mfem.hpp>
 #include "utils/communication.hpp"
@@ -354,12 +353,6 @@ void Cross3(const VecTypeA &A, const VecTypeB &B, VecTypeC &C, bool add = false)
 class StoredBasisVector
 {
   mfem::Memory<float> xr, xi;
-  int disk_fd = -1;
-  std::string disk_path;
-  int disk_size = 0;
-  bool disk_complex = false;
-  void OpenDisk(int n, bool complex);
-  void DiskIO(void *ptr, std::size_t bytes, std::size_t offset, bool write) const;
 public:
   StoredBasisVector() = default;
   StoredBasisVector(const StoredBasisVector &) = delete;

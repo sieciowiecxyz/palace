@@ -1,5 +1,6 @@
 # Architektura lokalnego forka Palace
 
+Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
 ## Zasady
 
 Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reużywaj infrastruktury upstream i bibliotek. Testuj realne ścieżki i regresje; nie dodawaj warstw ani zależności na zapas. Zmiana reprezentacji/precyzji nie może ukrywać zmiany równań.

@@ -12,6 +12,25 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_disk_basis_is_rejected_before_build_or_gpu(self):
+        with patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
+            for basis in ['fp32-disk', 'fp64-disk']:
+                with self.assertRaisesRegex(ValueError, 'RAM/VRAM'):
+                    dev.run('coax-tiny', '/unused', 60, basis=basis)
+
+    def test_cgroup_memory_samples_and_disappearance(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(dev.cgroup_memory(root), {})
+            (root/'memory.current').write_text('1024\n')
+            (root/'memory.peak').write_text('4096\n')
+            (root/'memory.stat').write_text('anon 512\nfile 256\nshmem 128\nother 10\n')
+            self.assertEqual(dev.cgroup_memory(root), {'current_bytes': 1024, 'peak_bytes': 4096,
+                                                     'anon_bytes': 512, 'file_bytes': 256, 'shmem_bytes': 128})
+            (root/'memory.current').write_text('invalid')
+            self.assertEqual(dev.cgroup_memory(root), {})
+        self.assertEqual(dev.cgroup_memory(None), {})
+
     def test_field_reference_rejects_wrong_physics_corruption_and_unfinished_run(self):
         _, info, config = dev.fixture('coax-tiny')
         build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}

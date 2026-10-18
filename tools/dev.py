@@ -362,8 +362,34 @@ def field_comparisons(work, config):
             'norm': 'sqrt(error energy/reference energy), epsilon/mu weighted, same mesh; no phase fitting'}
 
 
+def container_memory_path(pid):
+    """Resolve cgroup v2 host path from the running container's host PID."""
+    for line in Path(f'/proc/{pid}/cgroup').read_text().splitlines():
+        if line.startswith('0::'):
+            relative = Path(line[3:].lstrip('/'))
+            if '..' in relative.parts:
+                raise ValueError('Unexpected cgroup path')
+            return Path('/sys/fs/cgroup') / relative
+    return None
+
+
+def cgroup_memory(directory):
+    if directory is None:
+        return {}
+    try:
+        values = {'current_bytes': int((directory/'memory.current').read_text()),
+                  'peak_bytes': int((directory/'memory.peak').read_text())}
+        stats = dict(line.split() for line in (directory/'memory.stat').read_text().splitlines())
+        values.update({key + '_bytes': int(stats[key]) for key in ['anon', 'file', 'shmem'] if key in stats})
+        return values
+    except (OSError, ValueError):
+        return {}  # A container can start/exit between samples; absence is not completion.
+
+
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
-        save_fields=False, field_reference=None):
+        save_fields=False, field_reference=None, allocation_trace=False):
+    if basis not in ['fp32', 'fp64']:
+        raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
     manifest = verified_build()
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
@@ -393,9 +419,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
-    elif basis == 'fp64-disk':
-        (output/'basis').mkdir()
-        flags['PALACE_GMRES_FP64_DISK_BASIS'] = '/work/basis'
+    if allocation_trace:
+        flags['PALACE_CUDA_ALLOC_TRACE'] = '1'
     if coax_l2:
         flags['PALACE_COAX_TEM_DIAGNOSTIC'] = '1'
         flags['PALACE_COAX_TEM_LENGTH_M'] = str(coax_geometry(name)['length_mm']*1e-3)
@@ -407,6 +432,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
+            '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -421,7 +447,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     command(args, stdout=subprocess.DEVNULL)
     write(output / 'command.json', {'argv': args, 'environment': flags,
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
-                                                  'pc_side': pc_side, 'coax_l2': coax_l2},
+                                                  'pc_side': pc_side, 'coax_l2': coax_l2,
+                                                  'allocation_trace': allocation_trace},
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
@@ -429,16 +456,30 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         with (output / 'palace.log').open('w') as log, (output / 'telemetry.jsonl').open('w') as telemetry:
             proc = subprocess.Popen(['podman', 'start', '--attach', container], stdout=log, stderr=subprocess.STDOUT)
             low_memory = 0
+            memory_path = None
             while proc.poll() is None:
+                if memory_path is None:
+                    inspected = read_output(['podman', 'inspect', container])[0]
+                    pid = inspected['State'].get('Pid', 0)
+                    if pid:
+                        try:
+                            memory_path = container_memory_path(pid)
+                        except OSError:
+                            pass
+                memory = cgroup_memory(memory_path)
+                if memory:
+                    status['cgroup_memory_peak_bytes'] = max(status.get('cgroup_memory_peak_bytes', 0), memory['peak_bytes'])
                 free = available_memory()
                 low_memory = low_memory + 1 if free < 6 * 1024**3 else 0
                 gpu = subprocess.run(['nvidia-smi', '--query-gpu=memory.used,utilization.gpu', '--format=csv,noheader,nounits'],
                                      capture_output=True, text=True, timeout=5)
                 telemetry.write(json.dumps({'seconds': time.monotonic() - started,
-                                            'host_available_bytes': free, 'gpu': gpu.stdout.strip()}) + '\n')
+                                            'host_available_bytes': free, 'gpu': gpu.stdout.strip(),
+                                            'container_memory': memory}) + '\n')
                 telemetry.flush()
                 if low_memory >= 2 or time.monotonic() - started > seconds + 10:
                     status['host_guard_or_deadline'] = True
+                    status['stop_reason'] = 'host_memory_guard' if low_memory >= 2 else 'runner_deadline'
                     command(['podman', 'stop', '--time', '3', container], stdout=subprocess.DEVNULL)
                     break
                 time.sleep(1)
@@ -464,9 +505,6 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         status['elapsed_seconds'] = time.monotonic() - started
         if INTERRUPTED_SIGNAL is not None:
             status['interrupted_signal'] = INTERRUPTED_SIGNAL
-        if basis == 'fp64-disk':
-            shutil.rmtree(output/'basis')
-            status['disk_basis_scratch_cleaned'] = True
         write(output / 'result.json', status)
     print(json.dumps(status, indent=2))
     if not status['complete']:
@@ -497,7 +535,8 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
-    r.add_argument('--basis', choices=['fp32', 'fp64', 'fp64-disk'], default='fp32',
+    r.add_argument('--allocation-trace', action='store_true', help='Trace large UVM allocations and caller stacks; diagnostic only')
+    r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
                    help='GMRES basis storage only; FP64 operators/factors unchanged')
     r.add_argument('--coax-fields', action='store_true', help='Diagnostic coax: 3.55 GHz, 18 field probes')
     r.add_argument('--coax-l2', action='store_true', help='Expensive opt-in volume L2 check for the TEM coax')
@@ -539,7 +578,7 @@ def main():
             print(json.dumps({'job': str(metadata), **job}, indent=2))
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
-            args.coax_l2, args.save_fields, args.field_reference)
+            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

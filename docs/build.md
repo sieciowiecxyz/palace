@@ -65,4 +65,8 @@ Nowe coax runy zapisują geometry.json i actual_config_sha256 po jawnych zmianac
 
 ## Zachowanie referencji i dłuższy run
 
---save-fields/--field-reference i --basis fp64-disk są opisane w [kontroli pól](field-validation.md). FP64-disk wymaga własnego katalogu scratch, runner tworzy i czyści go automatycznie. --background uruchamia ten sam bounded runner w nowej sesji procesu, zapisuje PID+birth i launcherlog; nie zmienia dokładności ani limitów. To opcja dla długiej anteny, nie dodatkowy serwis/kolejka. Domyślny szybki run działa dalej na pierwszym planie.
+--save-fields/--field-reference są opisane w [kontroli pól](field-validation.md). Pamięć robocza pozostaje w RAM/VRAM, --basis dopuszcza tylko fp32/fp64. Dawny disk basis jest usunięty i nie wolno go przywracać jako optymalizacji. UVM to GPU↔RAM, nie SSD. Kontener ma memory.swap.max=0 przez równy limit --memory/--memory-swap; nie zmieniamy globalnej konfiguracji swap użytkownika.
+
+--allocation-trace opcjonalnie zapisuje duże (≥16MiB) alloc/free UVM ze stosami. To diagnostyka, nie profil wszystkich drobnych alokacji; koszt trzeba oddzielić od benchmarku. Telemetria ma scope globalny host/GPU oraz memory.current/peak/anon/file/shmem konkretnego cgroup, gdy dostępne. Nie sumować szczytów z różnych chwil ani nie utożsamiać nativeRSS z całym UVM. Hostguard zapisuje stop_reason=host_memory_guard, deadline runnera=runner_deadline.
+
+--background uruchamia ten sam bounded runner w nowej sesji procesu, zapisuje PID+birth i launcherlog; nie zmienia dokładności ani limitów. To opcja dla długiej anteny, nie dodatkowy serwis/kolejka. Domyślny szybki run działa dalej na pierwszym planie.
