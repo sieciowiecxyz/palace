@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "name": "coax-tiny",
+  "mesh": "coax.msh",
+  "mesh_sha256": "c5275e605079bafc5ec1f24581026b9cac09d0495ab790ab139c4ff8cf38cd8d",
+  "mesh_bytes": 2129505,
+  "archive_parts": [
+    "coax.msh.zst"
+  ],
+  "archive_sha256": "eb7a8bcd184b036bdf40d05c8d663810bfec6fb07c6a4607d59a8ad57194bab0",
+  "config_sha256": "cf6f4e6cb368d8f2e88028cac092411d7df50b762b32e2ddf5a91ccff77d0c5a",
+  "scope": "2 mm analytical TEM filter; not the antenna or 20 mm reference",
+  "medium": {
+    "Order": 2,
+    "Tol": 1e-06,
+    "MaxIts": 1600,
+    "MaxSize": 240,
+    "PartialAssemblyOrder": 1
+  }
+}

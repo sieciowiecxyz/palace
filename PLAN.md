@@ -30,6 +30,9 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 
 ### M1 — najpierw podstawa porównań
 
+- [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
+- [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
+
 - [ ] Zinwentaryzować hash wejść, fizyczny wariant, build, ustawienia i dostępne wyniki referencyjne; odtworzyć brakujące minimum na obecnym forku.
 - [ ] Prześledzić definicje norm i skalowanie w kodzie; wyjaśnić historyczne raw residual 0,125 / 0,808 mimo małej różnicy S.
 - [ ] Ustalić niezależną kontrolę rozwiązania, pól i energii; zamrozić progi przed oceną nowych kandydatów.

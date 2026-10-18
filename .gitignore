@@ -17,6 +17,7 @@ artifacts/
 __pycache__/
 examples/tshaped-medium/mesh/pcb.msh
 examples/coax-medium/coax.msh
+examples/coax-tiny/coax.msh
 *.unpacking
 
 # Coverage files

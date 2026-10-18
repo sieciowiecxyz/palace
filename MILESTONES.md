@@ -14,7 +14,7 @@ Postęp jest w [PLAN](PLAN.md), dowody i checkpoint w [PROGRESS](PROGRESS.md). T
 ## Drabina walidacji W
 
 1. **W.1:** mały kernel/operator vs CPU/FP64, zespolony iloczyn hermitowski, nietypowe rozmiary, partycje/ownership oraz test wykrywający konkretny błąd.
-2. **W.2:** examples/coax-medium, trzy częstotliwości i oba porty, odniesienie TEM i complex S.
+2. **W.2:** najpierw examples/coax-tiny jako szybki analityczny TEM/L2 filtr, następnie zachowane examples/coax-medium, trzy częstotliwości i oba porty, odniesienie TEM i complex S.
 3. **W.3:** examples/tshaped-medium, 3,50 GHz/P2, identyczny mesh i fizyka, jedna para referencja/kandydat. To benchmark solvera, nie najlepsza antena produkcyjna.
 4. **W.4:** dla obiecującego kandydata 1,71 / 2,69 / 3,30 / 3,80 GHz, oba porty; odniesienie z tej samej geometrii. Przy zmianie operatora/precyzji także okolice 2,9 GHz: S/Z/pola zamiast źle uwarunkowanego VSWR.
 5. **W.5:** finalista, oba porty: 1,710 / 1,785 / 1,805 / 1,880 / 1,920 / 1,980 / 2,110 / 2,170 / 2,500 / 2,570 / 2,620 / 2,690 / 3,300 / 3,550 / 3,800 GHz. Zachować mesh medium; wygenerować i zahashować brakujące wejścia. To punkty kwalifikacji, nie dowód ciągłego pasma.

@@ -7,7 +7,7 @@ Linux x86-64, Python 3.11+, Podman, zstd. GPU run wymaga NVIDIA driver/CDI (`nvi
 ```sh
 python3 tools/dev.py build --jobs 8
 python3 tools/dev.py prepare tshaped-medium
-python3 tools/dev.py run coax-medium artifacts/coax-check --seconds 180
+python3 tools/dev.py run coax-tiny artifacts/coax-check --seconds 60
 ```
 
 Katalog wyniku musi być nowy. Pełny przykład, po zapewnieniu wolnego RAM:
@@ -56,3 +56,9 @@ Sprawdź IDs względem `tools/runtime.json`; tag nie jest dowodem zgodności. Bu
 Runner tworzy własny kontener i własny snapshot wejść. Limit 60 GiB RAM bez dodatkowego swap, 8 CPU, deadline Podmana oraz host-guard po dwóch próbkach poniżej 6 GiB dostępnego RAM. Kończy/usuwa tylko własny kontener, pozostawia logi, telemetrię i wynik. Brak wyników lub niezerowe wyjście to FAIL, nie rekord szybkości.
 
 Nie porównywać ślepo historycznych czasów z nowym buildem. Szczegóły zgodności i nierozstrzygniętej surowej reszty: [raport historyczny](local-optimization-results.md). To nadal benchmark 3,5 GHz/P2, nie nowy baseline produkcyjny anteny.
+
+## Szybka diagnostyka bez kompilacji
+
+coax-tiny to osobny2 mm filtr; większy coax-medium zachowuje20 mm odniesienie. --basis fp32/fp64 wybiera storage, --pc-side left/right jawnie zmienia stronę preconditionera. --coax-fields wybiera3,55 GHz i18 probes, --coax-l2 dodatkowo uruchamia kosztowniejszą całkę po wszystkich tetraedrach. Oba wymagają zweryfikowanej geometrii coaxa. Domyślne runy nie włączają tych diagnostyk.
+
+Nowe coax runy zapisują geometry.json i actual_config_sha256 po jawnych zmianach; nie nadpisują config fixture. Przykłady i generator: examples/coax-tiny/README.md. Zmiana tych opcji/runnera nie wymaga rekompilacji solvera.

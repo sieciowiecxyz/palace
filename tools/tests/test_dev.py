@@ -11,8 +11,20 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_tiny_diagnostic_keeps_medium_and_scales_probe_positions(self):
+        _, _, config = dev.fixture('coax-tiny')
+        linear = config['Solver']['Linear'].copy()
+        derived = dev.diagnostic_config('coax-tiny', config, True, 'right')
+        self.assertEqual(derived['Solver']['Linear'], {**linear, 'PCSide': 'Right'})
+        self.assertEqual(derived['Solver']['Driven']['Samples'], [{'Type': 'Point', 'Freq': [3.55]}])
+        probes = derived['Domains']['Postprocessing']['Probe']
+        self.assertEqual(len(probes), 18)
+        self.assertEqual(sorted(set(p['Center'][2] for p in probes)), [0.5, 1.0, 1.5])
+        with self.assertRaisesRegex(ValueError, 'coax fixture'):
+            dev.diagnostic_config('tshaped-medium', {}, True)
+
     def test_real_archives_and_medium_contract(self):
-        for name in ['coax-medium', 'tshaped-medium']:
+        for name in dev.CASES:
             directory, info, config = dev.fixture(name)
             self.assertEqual(config['Model']['Mesh'], info['mesh'])
             self.assertTrue(all((directory / part).stat().st_size < 100_000_000 for part in info['archive_parts']))

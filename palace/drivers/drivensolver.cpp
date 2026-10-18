@@ -26,6 +26,7 @@
 #include "models/surfacecurrentoperator.hpp"
 #include "models/waveportoperator.hpp"
 #include "utils/communication.hpp"
+#include "utils/coaxdiagnostic.hpp"
 #include "utils/iodata.hpp"
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
@@ -229,6 +230,13 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
       auto total_domain_energy =
           post_op.MeasureAndPrintAll(excitation_idx, int(omega_i), E, B, omega);
+      if (std::getenv("PALACE_COAX_TEM_DIAGNOSTIC"))
+      {
+        const char *length = std::getenv("PALACE_COAX_TEM_LENGTH_M");
+        MFEM_VERIFY(length, "Coax diagnostic requires its validated fixture length!");
+        CheckCoaxTEM(post_op.GetEGridFunction(), post_op.GetBGridFunction(), iodata.units,
+                     omega, excitation_idx, std::stod(length));
+      }
 
       // Calculate and record the error indicators.
       Mpi::Print(" Updating solution error estimates\n");

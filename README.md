@@ -4,7 +4,7 @@ Samodzielne źródła dotychczasowego forka, przykłady anteny i coaxa oraz przy
 
 ```sh
 python3 tools/dev.py build --jobs 8
-python3 tools/dev.py run coax-medium artifacts/coax-check --seconds 180
+python3 tools/dev.py run coax-tiny artifacts/coax-check --seconds 60
 ```
 
 Wymagane lokalne obrazy zależności: [build i przenoszenie środowiska](docs/build.md). Binariów/obrazów nie pobieramy obecnie z rejestru. Wyniki trafiają do `build/sm120/` i nowego katalogu `artifacts/`.

@@ -30,6 +30,6 @@ Po każdej próbie uzupełnij wpis EXP w PROGRESS: także porażki i brak danych
 
 ## Krótka pętla eksperymentalna
 
-Najpierw analiza źródeł i test algorytmu/operatora trwający sekundy, potem coax z limitem 180 s, pełny case tylko po tanich filtrach i z uzasadnioną hipotezą (limit 1800 s). Nie używaj 2-godzinnej anteny jako domyślnego przykładu do iteracji. Trzy powtórzenia/sweep dopiero dla finalisty. Licz także koszt przygotowania i czas developera.
+Najpierw analiza źródeł i test algorytmu/operatora trwający sekundy, potem coax-tiny (około11 s; limit60 s), większy coax w razie potrzeby (limit180 s), pełny case tylko po tanich filtrach i z uzasadnioną hipotezą (limit 1800 s). Nie używaj 2-godzinnej anteny jako domyślnego przykładu do iteracji. Trzy powtórzenia/sweep dopiero dla finalisty. Licz także koszt przygotowania i czas developera.
 
 Reużywaj tools/dev.py, stały builder, obiekty CMake i ccache. Zmieniony Markdown/runner/audyt nie wymaga rekompilacji C++; niezmienione zależności nie są przebudowywane. Nowa opcja precyzji powinna wybierać ścieżkę runtime, jeśli jest to możliwe. Zachowuj manifesty i kwalifikację każdej rzeczywiście zmienionej binarki; cache nie zastępuje sprawdzenia zgodności.

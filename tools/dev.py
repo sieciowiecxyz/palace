@@ -19,6 +19,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / 'build/sm120'
 SETTINGS = ROOT / 'tools/runtime.json'
+CASES = ['coax-tiny', 'coax-medium', 'tshaped-medium']
 
 
 def sha(path):
@@ -245,9 +246,41 @@ def validate_output(work, config, returncode):
             'scope': 'Execution completeness only; RF/precision qualification is separate'}
 
 
-def run(name, output, seconds, basis='fp32'):
+def coax_geometry(name):
+    if name not in ['coax-tiny', 'coax-medium']:
+        raise ValueError('TEM diagnostics require a verified coax fixture')
+    directory = ROOT / 'examples' / name
+    audit = read(directory / 'mesh-audit.json')
+    geometry = audit['geometry']
+    digest = hashlib.sha256(json.dumps(geometry, sort_keys=True).encode()).hexdigest()
+    if (digest != audit['source_model_sha256'] or
+            audit['mesh_sha256'] != read(directory / 'fixture.json')['mesh_sha256']):
+        raise ValueError('Coax geometry manifest does not match its fixture')
+    return geometry
+
+
+def diagnostic_config(name, config, coax_fields=False, pc_side=None):
+    """Explicit runtime diagnostics; never change a frozen fixture on disk."""
+    if coax_fields:
+        geometry = coax_geometry(name)
+        config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [3.55]}]
+        probes = []
+        for fraction in [0.25, 0.5, 0.75]:
+            z = fraction*geometry['length_mm']
+            for radius in [0.22, 0.32]:
+                for angle in [0.31, 1.37, 2.61]:
+                    probes.append({'Index': len(probes)+1,
+                                   'Center': [radius*math.cos(angle), radius*math.sin(angle), z]})
+        config['Domains']['Postprocessing'] = {'Probe': probes}
+    if pc_side:
+        config['Solver']['Linear']['PCSide'] = pc_side.title()
+    return config
+
+
+def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False):
     manifest = verified_build()
     directory, info, config = fixture(name)
+    config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
     mesh = prepare(name)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -257,6 +290,8 @@ def run(name, output, seconds, basis='fp32'):
     write(output / 'config.json', config)
     write(output / 'build-manifest.json', manifest)
     write(output / 'fixture.json', info)
+    if name in ['coax-tiny', 'coax-medium']:
+        write(output / 'geometry.json', coax_geometry(name))
     settings = read(SETTINGS)
     container = 'palace-run-' + hashlib.sha256(str(output).encode()).hexdigest()[:12]
     flags = {'MFEM_MEMORY': 'cuda', 'LD_PRELOAD': '/opt/precision/libcudss_fp32.so',
@@ -264,10 +299,15 @@ def run(name, output, seconds, basis='fp32'):
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
+    if coax_l2:
+        flags['PALACE_COAX_TEM_DIAGNOSTIC'] = '1'
+        flags['PALACE_COAX_TEM_LENGTH_M'] = str(coax_geometry(name)['length_mm']*1e-3)
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
+            '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
+            '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
@@ -275,7 +315,10 @@ def run(name, output, seconds, basis='fp32'):
         args.extend(['-e', f'{key}={value}'])
     args.extend(['--entrypoint', '/opt/palace-cudss/bin/palace-x86_64.bin', settings['runtime_image'], 'config.json'])
     command(args, stdout=subprocess.DEVNULL)
-    write(output / 'command.json', {'argv': args, 'environment': flags})
+    write(output / 'command.json', {'argv': args, 'environment': flags,
+                                   'diagnostic': {'coax_fields': coax_fields or coax_l2,
+                                                  'pc_side': pc_side, 'coax_l2': coax_l2},
+                                   'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
     try:
@@ -332,11 +375,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
     b = sub.add_parser('build'); b.add_argument('--jobs', type=int, default=8)
-    p = sub.add_parser('prepare'); p.add_argument('case', choices=['coax-medium', 'tshaped-medium'])
-    r = sub.add_parser('run'); r.add_argument('case', choices=['coax-medium', 'tshaped-medium'])
+    p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
+    r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
     r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
                    help='GMRES basis storage only; FP64 operators/factors unchanged')
+    r.add_argument('--coax-fields', action='store_true', help='Diagnostic coax: 3.55 GHz, 18 field probes')
+    r.add_argument('--coax-l2', action='store_true', help='Expensive opt-in volume L2 check for the TEM coax')
+    r.add_argument('--pc-side', choices=['left', 'right'], help='Explicit diagnostic preconditioning side')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
     args = parser.parse_args()
@@ -346,7 +392,7 @@ def main():
     elif args.action == 'prepare': print(prepare(args.case))
     elif args.action == 'run':
         if not 1 <= args.seconds <= 1800: parser.error('--seconds must be 1..1800')
-        run(args.case, args.output, args.seconds, args.basis)
+        run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side, args.coax_l2)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

@@ -1,0 +1,20 @@
+{
+  "solver_ready": true,
+  "tetrahedra": 13086,
+  "minimum_jacobian": 0.0002624868988316901,
+  "min_signed_quality": 0.09298739322871045,
+  "geometry": {
+    "inner_radius_mm": 0.12,
+    "shield_inner_radius_mm": 0.40179519190143026,
+    "length_mm": 2.0,
+    "epsilon_r": 2.1,
+    "geometry_order": 2,
+    "mesh_size_mm": 0.04,
+    "one_sided_ports": true
+  },
+  "gmsh_version": "4.13.1",
+  "mesh_sha256": "c5275e605079bafc5ec1f24581026b9cac09d0495ab790ab139c4ff8cf38cd8d",
+  "builder_sha256": "08d4eb459c45c079c7450fa2d0e3851f0597a120e38ca30121fb290cf1d72533",
+  "source_model_sha256": "0a7f877e13f7ae0045def2d8df606884a20c08a96b375d80d4b12bd54529454c",
+  "physics_validated": false
+}

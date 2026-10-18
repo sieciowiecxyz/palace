@@ -729,7 +729,7 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
         Mpi::Print(comm,
                    "PALACE_RAW_RESIDUAL: pc_side={} raw={:.12e} rhs={:.12e} "
                    "ax={:.12e} relative_rhs={:.12e} relative_action={:.12e}\n",
-                   B && pc_side == PreconditionerSide::LEFT ? "left" : "raw",
+                   !B ? "none" : (pc_side == PreconditionerSide::LEFT ? "left" : "right"),
                    raw_norm, rhs_norm, ax_norm, relative_rhs, relative_action);
       }
       if (compressed_basis)

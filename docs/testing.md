@@ -43,3 +43,11 @@ Zachowane testy C++/regresje upstream są w `test/` i opisane w dokumentacji ups
 PALACE_VERIFY_RESIDUAL emituje także PALACE_RAW_RESIDUAL: niezależne ponowne zastosowanie A w bieżącej precyzji, normy b/Ax/b−Ax i dwa ilorazy. Dodatkowy matvec i redukcje są kosztem diagnostyki. Norma relative_action nie jest normwise backward error, a status complete nadal oznacza tylko kompletność. Rezultaty nowych coax smoke FP32/FP64 storage i audyt geometrii: [raport M1](optimization-baseline.md). Nie rozstrzygają zgodności pól całej anteny.
 
 Audyt siatki: `python3 tools/mesh_cost.py examples/tshaped-medium/mesh/pcb.msh --output artifacts/mesh-cost.json`. Regresje sprawdzają różnicę udziału elementów/objętości, zamkniętą powierzchnię i odrzucenie nieobsługiwanych danych. Metoda używa geometrii narożników, nie dokładnej kwadratury zakrzywionych elementów.
+
+## Filtr pola TEM i L2
+
+Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke --seconds 60`. Większy coax i antena pozostają odrębnymi poziomami drabiny walidacji. Dla pola: --coax-fields, dla całości domeny: --coax-l2; analizator tools/coax_fields.py porównuje do analitycznego TEM, próbki nie są mylone z całką L2. Dane diagnostyczne nie kwalifikują dowolnego modelu anteny.
+
+L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
+
+Pierwszy20 mm run q6/10 nie zmieścił się w180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Narzędzia mają teraz10 regresji; cała kampania C++ upstream nadal NOT RUN.
