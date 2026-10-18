@@ -16,6 +16,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: właściciele alokacji](memory-audit.md)
   - Czytaj gdy: wybierasz następną optymalizację RAM/VRAM lub oceniasz cuda/gen
   - Opis: Reprodukowalny audyt zapisanych alloc/free, bufory libCEED i hipoteza współdzielenia workspace.
+- [M1: prototyp Q-workspace](ceed-qpool.md)
+  - Czytaj gdy: budujesz lub kwalifikujesz eksperymentalny pool aktywnych Q-wektorów
+  - Opis: Osobny cached build libCEED, pozytywny probe i nieukończona walidacja Maxwella.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

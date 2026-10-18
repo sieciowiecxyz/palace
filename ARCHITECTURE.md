@@ -17,6 +17,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `tools/coax_fields.py`: analityczne porównanie E/B/energii; opt-in native L2 w `palace/utils/coaxdiagnostic.hpp`, tylko znane jednorodne fixtures.
 - `tools/generate_coax_tiny.py`: jednorazowe generowanie mniejszego filtra przez opcjonalny gmsh, nie część runtime.
 - `tools/allocation_audit.py`: analiza zachowanego large-UVM alloc/free trace ze stosami, bez GPU i bez ponownego runu.
+- `tools/experiments/ceed_qpool.py`: izolowany, niezakwalifikowany backend workspace; osobne SO, cache jednego obiektu, manifest i opt-in runnera.
 - `tools/mesh_cost.py`: audyt domen Gmsh 2.2 i orientacyjnego kosztu powierzchniowego, bez bibliotek FEM/GPU.
 - `tools/tests/`: regresje narzędzi i mały natywny probe cuDSS.
 - `examples/tshaped-medium/`, `examples/coax-medium/`, `examples/coax-tiny/`: kompletne wejścia z archiwami siatek i sumami kontrolnymi.

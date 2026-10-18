@@ -386,11 +386,34 @@ def cgroup_memory(directory):
         return {}  # A container can start/exit between samples; absence is not completion.
 
 
+def require_host_memory():
+    free = available_memory()
+    if free < 6 * 1024**3:
+        raise ValueError(f'Host RAM below 6 GiB guard ({free / 1024**3:.2f} GiB available); GPU run not started')
+    return free
+
+
+def verified_qpool(native):
+    directory = ROOT/'build/ceed-qpool'
+    metadata = read(directory/'manifest.json')
+    recipe = {p.name: sha(p) for p in (ROOT/'tools/experiments').glob('ceed_qpool*') if p.is_file()}
+    if (metadata.get('recipe') != recipe or metadata.get('builder') != native['builder_image_id']
+            or metadata.get('runtime') != native['runtime_base_id']
+            or sha(directory/'libceed_qpool.so') != metadata.get('library_sha256')):
+        raise ValueError('Q-pool prototype stale/tampered; build tools/experiments/ceed_qpool.py')
+    destination = metadata.get('runtime_library_path', '')
+    if not destination.startswith('/opt/software/') or not destination.endswith('/lib/libceed.so'):
+        raise ValueError('Unexpected libCEED runtime path')
+    return directory, metadata
+
+
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
-        save_fields=False, field_reference=None, allocation_trace=False):
+        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
+    require_host_memory()
     manifest = verified_build()
+    qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -439,6 +462,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
+    if qpool:
+        location, metadata = qpool
+        args.extend(['-v', f'{location / "libceed_qpool.so"}:{metadata["runtime_library_path"]}:ro'])
+        write(output/'ceed-qpool-manifest.json', metadata)
     if reference:
         args.extend(['-v', f'{reference / "fields"}:/reference-fields:ro'])
     for key, value in flags.items():
@@ -448,7 +475,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     write(output / 'command.json', {'argv': args, 'environment': flags,
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
-                                                  'allocation_trace': allocation_trace},
+                                                  'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool},
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
@@ -487,6 +514,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if qpool:
+            checks = re.findall(r'PALACE_CEED_QPOOL: calls=(\d+) borrowed_vectors=(\d+)',
+                                (output/'palace.log').read_text())
+            status['qpool_executed'] = bool(checks) and all(int(a) > 0 and int(b) > 0 for a, b in checks)
+            status['complete'] = status['complete'] and status['qpool_executed']
         if status.get('host_guard_or_deadline'):
             status['complete'] = False
         status['interrupted'] = False
@@ -535,6 +567,7 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
+    r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
     r.add_argument('--allocation-trace', action='store_true', help='Trace large UVM allocations and caller stacks; diagnostic only')
     r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
                    help='GMRES basis storage only; FP64 operators/factors unchanged')
@@ -578,7 +611,7 @@ def main():
             print(json.dumps({'job': str(metadata), **job}, indent=2))
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
-            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace)
+            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

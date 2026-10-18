@@ -70,3 +70,7 @@ Nowe coax runy zapisują geometry.json i actual_config_sha256 po jawnych zmianac
 --allocation-trace opcjonalnie zapisuje duże (≥16MiB) alloc/free UVM ze stosami. To diagnostyka, nie profil wszystkich drobnych alokacji; koszt trzeba oddzielić od benchmarku. Telemetria ma scope globalny host/GPU oraz memory.current/peak/anon/file/shmem konkretnego cgroup, gdy dostępne. Nie sumować szczytów z różnych chwil ani nie utożsamiać nativeRSS z całym UVM. Hostguard zapisuje stop_reason=host_memory_guard, deadline runnera=runner_deadline.
 
 --background uruchamia ten sam bounded runner w nowej sesji procesu, zapisuje PID+birth i launcherlog; nie zmienia dokładności ani limitów. To opcja dla długiej anteny, nie dodatkowy serwis/kolejka. Domyślny szybki run działa dalej na pierwszym planie.
+
+## Osobny eksperyment libCEED
+
+[Q-pool](ceed-qpool.md) buduje jeden backend C z istniejącymi obiektami, nie cały toolchain. Opt-in --ceed-qpool ma osobny manifest i nie jest zawarty w normalnym package; brak kwalifikacji Maxwella. Domyślny runtime pozostaje bazowy. Preflight host RAM odrzuca start GPU poniżej6GiB, aktywny guard nadal działa podczas obliczeń.

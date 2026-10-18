@@ -12,6 +12,51 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_qpool_generator_rejects_unpinned_source(self):
+        spec = importlib.util.spec_from_file_location('qpool', Path(__file__).parents[1]/'experiments/ceed_qpool.py')
+        qpool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(qpool)
+        with self.assertRaisesRegex(ValueError, 'Pinned libCEED source changed'):
+            qpool.generate('unverified upstream source')
+
+    def test_low_host_memory_refuses_gpu_before_build(self):
+        with patch.object(dev, 'available_memory', return_value=5*1024**3), \
+             patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
+            with self.assertRaisesRegex(ValueError, 'GPU run not started'):
+                dev.run('coax-tiny', '/unused', 60)
+        with patch.object(dev, 'available_memory', return_value=6*1024**3):
+            self.assertEqual(dev.require_host_memory(), 6*1024**3)
+
+    def test_qpool_manifest_rejects_wrong_inputs_or_library(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root/'build/ceed-qpool'
+            directory.mkdir(parents=True)
+            (root/'tools/experiments').mkdir(parents=True)
+            recipe = root/'tools/experiments/ceed_qpool.py'
+            recipe.write_text('recipe')
+            library = directory/'libceed_qpool.so'
+            library.write_bytes(b'prototype')
+            native = dict(builder_image_id='builder', runtime_base_id='runtime')
+            metadata = dict(recipe={recipe.name: dev.sha(recipe)}, builder='builder', runtime='runtime',
+                            library_sha256=dev.sha(library), runtime_library_path='/opt/software/libceed/lib/libceed.so')
+            dev.write(directory/'manifest.json', metadata)
+            with patch.object(dev, 'ROOT', root):
+                self.assertEqual(dev.verified_qpool(native), (directory, metadata))
+                library.write_bytes(b'tampered')
+                with self.assertRaisesRegex(ValueError, 'stale/tampered'):
+                    dev.verified_qpool(native)
+                library.write_bytes(b'prototype')
+                recipe.write_text('changed')
+                with self.assertRaisesRegex(ValueError, 'stale/tampered'):
+                    dev.verified_qpool(native)
+                recipe.write_text('recipe')
+                with self.assertRaisesRegex(ValueError, 'stale/tampered'):
+                    dev.verified_qpool(dict(builder_image_id='wrong', runtime_base_id='runtime'))
+                dev.write(directory/'manifest.json', {**metadata, 'runtime_library_path': '/unexpected/libceed.so'})
+                with self.assertRaisesRegex(ValueError, 'Unexpected'):
+                    dev.verified_qpool(native)
+
     def test_disk_basis_is_rejected_before_build_or_gpu(self):
         with patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
             for basis in ['fp32-disk', 'fp64-disk']:

@@ -35,7 +35,9 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Zachować historyczne E/B jako dane porównawcze; referencja korzystała z wycofanego storage dyskowego i nie jest dopuszczalnym nowym runem. Kandydat residentFP32 przerwany guardem przy obciążonym desktopie.
 - [x] Dodać ślady dużych alokacji i pomiar cgroup RAM; interpretacja właścicieli pozostaje otwarta.
 - [x] Rozliczyć duże alokacje w tej samej chwili i zaplanować hipotezę workspace w RAM/VRAM: docs/memory-audit.md; bez nowej pełnej symulacji.
-- [ ] Zbadać lifetime aktywnych Q-wektorów libCEED przed prototypem współdzielenia/porcjowania; zachować trwałe dane i synchronizację strumienia.
+- [x] Zbadać lifetime i przygotować izolowany Q-pool: oryginalne assembly/passive zachowane, sync przed/po, mały probe PASS; docs/ceed-qpool.md.
+- [ ] Zakwalifikować Q-pool w coax/TEM po dostępnej pamięci: baseline przerwany przed solve; pełna antena NOT RUN.
+- [ ] Osobno zbadać mniejszy seed puli HYPRE/Umpire (domyślnie4GiB), bez zmiany numeryki; nie mieszać z porównaniem Q-pool.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
