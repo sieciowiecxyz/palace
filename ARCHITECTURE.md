@@ -22,6 +22,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `docs/native-complex-coarse.md`: opcjonalny natywny complex FP64 coarse solver, zakwalifikowany dla jednego punktu anteny; brak promocji defaultu; późniejszy profil UVM/kerneli w docs/profiling-window.md.
 - `tools/experiments/ceed_qpool.py`: izolowany, niezakwalifikowany backend workspace; osobne SO, cache jednego obiektu, manifest i opt-in runnera.
 - `tools/mesh_cost.py`: audyt domen Gmsh 2.2, opcjonalne rzeczywiste DOF/material incidence wRAM i koszt powierzchniowy, bez bibliotek FEM/GPU.
+- `tools/maxwell_reference.py`, `tools/experiments/bempp_{oracle,sphere}.py`: izolowany CPU Maxwell/Mie oracle z prywatnymi przypiętymi zależnościami/cache; brak zależności Bempp w Palace. `maxwell_hmatrix.py`: exact-near/low-rank-far complex probe i CUDA apply; PEC PASS, per-block apply niepromowany wydajnościowo. Brak sprzężenia FEM–BEM.
 - `tools/nsight_window.py`/`tools/host_phases.py`: przypięty CUDA-only profiler, RAM/tmpfs na trace/SQLite, afiniczna kalibracja zegara z niezależnym markerem i quality gate. `--nsys-window` kończy native diagnostycznie po kilku iteracjach; nigdy nie kwalifikuje RF. Aktualny krótki W.3 profile PASS; stare NVTX trace odrzucone.
 - `tools/tests/`: regresje narzędzi i mały natywny probe cuDSS.
 - `examples/tshaped-medium/`, `examples/coax-medium/`, `examples/coax-tiny/`: kompletne wejścia z archiwami siatek i sumami kontrolnymi.

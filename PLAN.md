@@ -58,6 +58,7 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [ ] Porównać FEM–BEM, powierzchniowy MoM i akcelerację FMM/MLFMA/H²; sprawdzić Maxwell, dielektryki, otwarte cienkie metale, zasilanie i promieniowanie.
 - [ ] Przejrzeć istniejące biblioteki, źródła i licencje; oddzielić GPU assembly od GPU matvec/FMM/solve. Nie zakładać CUDA/TC na podstawie etykiety GPU.
 - [ ] Przygotować rzeczywisty mały prototyp Maxwell: kula PEC z odniesieniem, potem dielektryk i sprzężony interfejs FEM–BEM. Porównać do FEM przy porównywalnym błędzie.
+- [x] Część PEC: niezależny Miecomplex, zbieżność i1%PASS; pierwszy CPUH-matrix/CUDAapply poprawny, ale9%oszczędności/53×wolniej — bezpromocji. docs/maxwell-oracle.md. Dielektryk/interfejs i skalowalny apply otwarte.
 - [ ] Zmierzyć setup+solve, macierz/kompresję/workspace i przewidywany koszt docelowej anteny; gęsta macierz BEM bez kompresji może przegrać.
 - [ ] Jeśli prototyp daje przewagę i poprawne pola/energię, przygotować izolowaną integrację operatora blokowego w Palace i porównać reprezentatywny case. Inaczej zapisać odrzucenie/ograniczenie; wynik Helmholtz nie kwalifikuje Maxwell.
 

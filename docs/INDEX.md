@@ -13,6 +13,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M2: Maxwell FEM–BEM/MoM](milestones/M2.md)
   - Czytaj gdy: planujesz bieżący prototyp zmniejszenia domeny powietrza
   - Opis: Hipoteza, mała drabina walidacji Maxwell, wstępne repozytoria i warunki odrzucenia.
+- [M2: Maxwell oracle i kompresja](maxwell-oracle.md)
+  - Czytaj gdy: uruchamiasz PEC/Mie lub oceniasz pierwszy H-matrix CUDA apply
+  - Opis: Przypięte źródła/cache, zbieżność PEC PASS oraz mała oszczędność i wolny per-block apply; brak dielektryka/interfejsu.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-18. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -13,7 +13,9 @@ Aktualizacja: 2026-10-18. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP21: rzeczywiste DOF zgodne z Palace, AIR-exclusive57,586%ND2. Pełny net-release bilans55,148GBmanaged. docs/topology-memory.md.
 - EXP22: aktualny residentallocaudit49,583GBpeak,99,616%przypisane dościeżek; cuDSS25,008GB, libCEEDduże bufory18,495GB. docs/memory-audit.md. Nieutożsamiać wczesnegopeaku4iter z35iterpełnego solve.
 - CUDA-only+afinicznyhostclock krótki profil W.3PASS, bezwarnings:2iteracje17,665s, P16,278sinclusive,295,472GBUVMmigrations. Held-out1,127µs<10µsmarginesu;1/4939kerneli nieprzypisany przygranicy. docs/profiling-window.md. Historyczne NVTX i failedclock zachowaneREJECT.
-- Praca wyłącznie RAM/VRAM, cap60GiB/guard6GiB bezswap. Ostatniminhost8,855GiB, noOOM/guard. Bezpaidcompute/closedapps; zwykłe danewejściowe/wyniki i cachedbuildosobno. 47testówPASS; kodnumeryczny/medium bez zmian.
+- EXP23: PEC Maxwell/Mie zbieżność i1%PASS na1920RWGDOF/33,89s; Bempp/H2Opus przypięte, izolowany Python/JITcache. docs/maxwell-oracle.md.
+- EXP24: rzeczywisty H-matrix exact-near/complexSVDfar iCUDAapply jakościowoPASS; macierz−9,16%, ale52,68×wolniejszy apply na małej kuli. Niepromowany; brak peakRAMoszczędności, dielektryka/interfejsu ianteny.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.55testówPASS, kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -33,7 +35,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: porównać istniejące MaxwellFEM–BEM/MoM/FMM implementacje i przygotować mały test PECsphere, dielektryka, potem interfejsu. Bez płatnego compute.
+2. M2: PECMie iCUDAapplygotowe; najpierw grupowane/natywne apply i sensowna kompresja bezdenseassembly, potem dielectricMie/interfejs oraz skalowanie/porównywalnyFEM. M2nadalotwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -275,3 +277,15 @@ Fullshort `artifacts/m1-cuda-affine-antenna-20261018` **profilePASS**: nativeexi
 
 
 DomknięcieM1: normalpath m1-cuda-affine-normal-regression-20261018 complete/fields/releasePASS,6solve13,674s,raw9,10045e−7,E3,0631e−15/B1,5036e−13,ΔS7,813e−16.47tests/docschecker/diffcheckPASS; docs-gardenLuna i rootreview. Brakpromocjidefaultów, brakpełnegosweepa. M1gates zestawione wdocs/milestones/M1.md; aktywnyM2, goalcałośćnieukończony.
+
+## EXP23 — niezależny Maxwell PEC/Mie oracle
+
+Przypięto Bempp-cl a1eaaef9…/MIT i H2Opus cbc7985d…/BSD3; API i granice w docs/maxwell-oracle.md. BemppCPUoracle, nie nativeCUDA; H2Opusreal-onlytypedef, complexintegracja niepotwierdzona. ExaFMMwrapper używa.tmp — nieaktywny, przyszłybackend wymagaRAMaudytu. Prywatny Python3.12.15/uv/JITcache, braknative/dependencyrebuild.
+
+Pierwszylaunch m2-pec-sphere-level1-cold-20261018 FAILexit127/Pid0/0,19s: brakmountaliasuuvPython, fizykaNOTRUN. Rootnaprawiłmount+regresję. Luna wykonała3CPUruny120/480/1920RWGDOF,19,32/19,81/33,89s,exit0/noOOM. PoleMiecomplex8,899/2,254/0,5643%;scatter14,855/3,838/0,96565%;raw≤8,77e−15. Level1/2analyticFAIL,level3PASS, niezmienny1%próg, bezfitufazy/amplitudy. Phase/opticaltheorem/Rayleigh/BesselSciPychecks. Level3RSS452MB/matrix58,98MB; wzorzecCPU, nieantena/ports/interface.
+
+## EXP24 — complex H-matrix i CUDA apply (jakośćPASS, bezpromocji)
+
+Root: geometricalcluster wsparćRWG/exactnear/complexSVDfar, Frobenius1e−6/leaf64/eta2. Przedrunem progiaction1e−5/rawOriginal1e−6/Δsolution1e−3/Δfar-field1e−4. Pierwszargv z kropką kończącą zdanie: argparseFAIL, nicnieuruchomione. Jawnaargvlista→m2-pec-hmatrix-cuda-level3-20261019 ukończony40,868s/noOOM.984bloki/248compressed, compression0,1556s, CPUGMRES170iter/0,6423s. Matrix58,9824→53,5795MB(−9,16%), originalraw1,591e−9/Δsolution2,275e−8/Δfar-field1,096e−11, analyticfield0,5643%; qualitygatesPASS.
+
+CUDAcomplex128cublasZgemvapplyonly: explicitalloc59,0439→53,6414MB;8warmroundtrips0,1010→5,3194ms,52,68×wolniej. Python/PCIe/sync+CUDA, niekernel-only; brakTC/UVM. Denseoracle/kopiepozostająwRAM,RSS1,404GB; brakpeakRAMsaving. Nieintegrowaćper-blockdispatch jako speedupu i nieekstrapolowaćnaantenę. Dalej batch/nativeapply, kompresja/scalableassembly, dielectricMie/FEM–BEMinterface. M2.1–M2.4 nadalniepełne,M3nieaktywny.55unitPASS, bezpaidcompute/closedapps/diskworkspace; Palace/mediumdefaultsbez zmian. Docs-gardenLuna/checker/diffcheckPASS; rootpoprawiłstarylicznik47→55 wtesting i sprawdziłkod/źródła/SHAartefaktów. Lokalnycommitbezpush; goal/M2aktywne.
