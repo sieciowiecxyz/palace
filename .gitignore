@@ -18,7 +18,6 @@ __pycache__/
 examples/tshaped-medium/mesh/pcb.msh
 examples/coax-medium/coax.msh
 *.unpacking
-!.github/upstream-workflows/build-*.yml
 
 # Coverage files
 *.profraw
@@ -32,3 +31,4 @@ docs/src/config/reference.md
 
 # Spack develop build symlinks.
 build-*
+!.github/upstream-workflows/build-*.yml
