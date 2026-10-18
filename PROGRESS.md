@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-18. Mode: goal, Active: M1. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-18. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -8,12 +8,12 @@ Aktualizacja: 2026-10-18. Mode: goal, Active: M1. [PLAN](PLAN.md), [MILESTONES](
 
 ## Bieżący checkpoint
 
-- M0 zamknięty, M1 otwarty; lokalna5070Ti16GB+96GBRAM, medium, bez płatnego compute. Nie aktywowaćM2 przed końcemM1.
-- EXP18–19 native complex coarse FP64: probe/coax/TEM/fallbackPASS. Pełny W.3 (3,50GHz/P2) zakwalifikowany numerycznie względem ostrzejszej referencji FP64RIGHT1e−9:35iteracji/447,462s bez phase-trace, raw8,36e−7, maxE/B9,89e−8, K.3/K.4PASS. Snapshoty/SHA i rootanaliza w artifacts/m1-native-complex-coarse-antenna-qualified-20261018; referencja tight-r2,raw7,28e−10. docs/native-complex-coarse.md.
-- Dane robocze wyłącznieRAM/VRAM; cuDSSlive0porelease,peakcuDSS25,008GB/UVM55,148GB/cgroup58,899GB, sampledGPU-process2GiB. Nowe defaulty i mixed precision niepromowane. Czas używa warmstartuEXP12; nie zgłaszać447/1089jako kontrolowanegospeedupu.
-- Historyczne diskreference/candidate REJECT; ichwyniki nie są baseline. ResidentEXP12 ukończył151iter/1089,964s,ale LEFTstopping przyraw0,125 i lokalneB>1%vsnowaref niekwalifikujągojako referencji dokładności. EXP13/14deadline,EXP15CPUOOM,EXP17exactrealblockguard zachowaneFAIL.
-- EXP21: rzeczywista topologia/DOF zgodna z Palace, AIR-exclusive57,586% ND2; audyt17,349s/633MiB RAM. Bilans net-release rozlicza55,148GBmanaged, ale semantyczna atrybucja wszystkich buforów nadal otwarta. docs/topology-memory.md.
-- PozostajeM1.4: wiarygodna atrybucja kerneli/UVM i pełny operator/workspace. EXP20 tiny r5 ma czyste zakończenie i brak CUDA-loss warning, lecz nadal NVTX-loss warning: profil REJECT. Nie uruchomiono pełnej anteny z tym profilerem. docs/profiling-window.md.
+- M1 COMPLETE: referencja/normy/topologia/bieżącealokacje/krótkiprofil i końcowy normalpathPASS; M2ACTIVE. Goal pozostaje aktywny, bez promocji nowych defaultów.
+- EXP18–19: W.3FP64nativecomplex kwalifikacja35iter/447,462sbezprofilera, raw8,36e−7, maxΔS6,70e−9/E-B9,89e−8 względemtight-r2. To3,50GHz/P2fixturemedium, nie najlepsza geometria produkcyjna. docs/native-complex-coarse.md.
+- EXP21: rzeczywiste DOF zgodne z Palace, AIR-exclusive57,586%ND2. Pełny net-release bilans55,148GBmanaged. docs/topology-memory.md.
+- EXP22: aktualny residentallocaudit49,583GBpeak,99,616%przypisane dościeżek; cuDSS25,008GB, libCEEDduże bufory18,495GB. docs/memory-audit.md. Nieutożsamiać wczesnegopeaku4iter z35iterpełnego solve.
+- CUDA-only+afinicznyhostclock krótki profil W.3PASS, bezwarnings:2iteracje17,665s, P16,278sinclusive,295,472GBUVMmigrations. Held-out1,127µs<10µsmarginesu;1/4939kerneli nieprzypisany przygranicy. docs/profiling-window.md. Historyczne NVTX i failedclock zachowaneREJECT.
+- Praca wyłącznie RAM/VRAM, cap60GiB/guard6GiB bezswap. Ostatniminhost8,855GiB, noOOM/guard. Bezpaidcompute/closedapps; zwykłe danewejściowe/wyniki i cachedbuildosobno. 47testówPASS; kodnumeryczny/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -32,9 +32,9 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-1. Zachować referencję tight-r2 i zakwalifikowany W.3; tolerancje bez zmian. EXP18–19 zapisane lokalnie w0b689c3.
-2. Nie powtarzać wariantu wyzwalanego capture ani pełnego antena profilu z obecnym NVTX warning. Najpierw ustalić źródło ostrzeżenia/zgodność kolektora lub użyć niezależnej metody pomiaru. Pozostałe zadanie M1: semantyczne rozbicie operator/workspace na aktualnej referencji. Topologia i bilans net-release EXP21 gotowe.
-3. Domknąć pozostałe bramki M1 i dopiero aktywować M2 FEM–BEM/MoM. Kierunek M2 ma wynikać z kosztu powietrza/interfejsu, nie z samego udziału objętości. Mixed precision/TC pozostają w przyszłych etapach.
+1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
+2. M2: porównać istniejące MaxwellFEM–BEM/MoM/FMM implementacje i przygotować mały test PECsphere, dielektryka, potem interfejsu. Bez płatnego compute.
+3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
 
@@ -263,3 +263,15 @@ Bilans na tym samymEXP19gmrespeak55147611962B: cuDSS25008217684 + netVrelease646
 
 
 EXP20 normalpath regression (profiling OFF):6/6coaxsolvePASS,12,545s,rawmax9,10045e−7; maxΔcomplexS9,09e−16,E3,18e−15/B1,51e−13względemnativetiny-r2. Profilemarkerynieobecne; releasememorygatesPASS. Artefakty artifacts/m1-nsys-normal-regression-20261018 oraz root-analysis.json. 41testsPASS; docs-gardenLuna/rootreview: przywrócono właściwy opis --trace=cuda-sw,nvtx (r5jawnysoftwaretrace, niehistorycznyHWfallback). Dodano gateexit0/noOOM i cleanupRAMtakże przy wyjątkach runnera. M1/goal pozostająaktywne.
+
+
+## EXP22 — domknięcie bieżącego profilu i alokacji
+
+Directenvr6 i filtrCCCLr7 nieusunęłyNVTXwarning; hipotezy odrzucone. CUDA-only+hostclocktiny r8PASS, ale fullshort z identycznymczasem w hostclockcallee FAILkalibracji; jegoRAMreport216MB/SQLite660MB zostały usunięte zgodnie z limitemretencji64MiB. Nie rekonstruowaćprzyczyny bez surowychdanych. Run267,39s dostarczył aktualnytracealloc,któryniezależyodNsightclock: peak49583124858B,duże49392771376B,unknownsmall190353482B. TriggerComplexParOperatorMult/GMRES,20buforów538043520B; tabelawdocs/memory-audit.md, raportartifactm1-native-current-allocation-audit-20261018.json.
+
+Nativecached8,813s/9,851s/8,619s bezdependencyrebuild. Dodanohostscopes i3labeledCUDAmarkers. Affinefitendpoints/held-outmid+10µsexplicituncertainty, ambiguitymarked zamiastwymuszonejatrybucji. CaptureCUDAProfilerAPIr9tinywarning→REJECT; wholeprocessCUDA-onlyr10tinyPASS9,43s, heldout553ns,6boundarykernels.47testówPASS obejmuje offset/niezgodnyczas/nieliniowymarker i uncertaintyboundaries; progifizyki bez zmian.
+
+Fullshort `artifacts/m1-cuda-affine-antenna-20261018` **profilePASS**: nativeexit0/noOOM/noGuard, cleanpartial4iter, scope2:2@3,50GHz/P2. Clockscale1,00000012239,heldout1127,2ns,containment667,25ns,margines10000ns;4939ROIkernele/1ambiguous/0unmatched,25hostranges. P16,278s(coarse5,490s),orthog0,156s,window17,665s. UVMHtoDpagefault11,549GB,prefetch136,977GB,DtoHeviction146,945GB;D2D15,186GB. Migracjesum295472009216B,nieunikatowepages;czasówGPU/UM/hostniesumować. Reports214MB/SQLite652MBRAMonly,JSON+SHAzachowane. Całyprofil269,94s niejestbenchmarkiemRFspeedup;managed49,583GB,cgroup56,856GB,minhost8,855GiB. Rootanaliza/SHAwm1-cuda-affine-antenna.../root-analysis.json.
+
+
+DomknięcieM1: normalpath m1-cuda-affine-normal-regression-20261018 complete/fields/releasePASS,6solve13,674s,raw9,10045e−7,E3,0631e−15/B1,5036e−13,ΔS7,813e−16.47tests/docschecker/diffcheckPASS; docs-gardenLuna i rootreview. Brakpromocjidefaultów, brakpełnegosweepa. M1gates zestawione wdocs/milestones/M1.md; aktywnyM2, goalcałośćnieukończony.

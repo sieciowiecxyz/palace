@@ -668,8 +668,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     target = '/opt/palace-cudss/bin/palace-x86_64.bin'
     if profile:
         args.extend(['--unsetenv', 'LD_PRELOAD', '--entrypoint', '/profile-tools/'+profiler.BINARY,
-                     settings['runtime_image'], *profiler.arguments(profile), 'env',
-                     'LD_PRELOAD='+flags['LD_PRELOAD'], target, 'config.json'])
+                     settings['runtime_image'], *profiler.arguments(profile),
+                     '--env-var=LD_PRELOAD='+flags['LD_PRELOAD'], target, 'config.json'])
     else:
         args.extend(['--entrypoint', target, settings['runtime_image'], 'config.json'])
     try:
@@ -858,7 +858,7 @@ def main():
     r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
     r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex FP64 cuDSS coarse, without real 2N block; implies --complex-coarse')
-    r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Intentional partial CUDA/NVTX trace; native solver exits cleanly after selected GMRES iterations')
+    r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Partial CUDA trace with calibrated host phases; FIRST=0..32, COUNT=2..8; no RF qualification')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')

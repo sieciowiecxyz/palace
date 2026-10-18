@@ -2,9 +2,9 @@
 
 Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
 Mode: goal
-Active: M1
+Active: M2
 
-Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. Trwa M1: referencja, diagnostyka i audyt kosztu FEM. Compute lokalny; bez najmu chmury.
+Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; aktywny M2: prototyp Maxwell FEM–BEM. Compute lokalny; bez najmu chmury.
 
 ## Cel
 
@@ -17,7 +17,7 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 ## Milestones
 
 - [x] M0 — Research i samodzielny fork z cache; zakres dowodów w docs/migration.md.
-- [ ] M1 — Referencja, niezależna jakość, profil i koszt powietrza w FEM.
+- [x] M1 — Referencja, niezależna jakość, profil i koszt powietrza w FEM; docs/milestones/M1.md.
 - [ ] M2 — FEM–BEM/MoM: research, prototyp Maxwell i pomiar opłacalności.
 - [ ] M3 — GMRES, kompresja bazy i ograniczenie migracji RAM↔GPU.
 - [ ] M4 — Reuse operatorów, preconditionera i faktorów między portami.
@@ -45,16 +45,16 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
 
 - [x] Hash/fizyka/build zinwentaryzowane; silniejsza resident FP64 referencja tight-r2 i W.3qualified mają snapshoty/SHA i rootanalizę. Stary EXP12 pozostaje tylko referencją wykonania.
-- [ ] Prześledzić definicje norm i skalowanie w kodzie; wyjaśnić historyczne raw residual 0,125 / 0,808 mimo małej różnicy S.
-- [x] Raw RHS niezależne od PC + TEM/L2; W.3medium względem FP64RIGHT1e−9 przechodzi zamrożone K.3/K.4. M1 jako całość nadal otwarty, szersze pasma i geometria produkcyjna niezakwalifikowane.
-- [x] Rzeczywiste DOF/material incidence zgodne z Palace i bilans net-release EXP21; docs/topology-memory.md. Semantyczni właściciele wszystkich workspace nadal otwarci.
-- [ ] Zmapować czas: assembly, preconditioner/faktoryzacja, matvec, ortogonalizacja, transfery, postprocessing. Dodać tylko brakujące logi/NVTX. EXP20 tiny profile REJECT przez NVTX warning, bez pełnej anteny; docs/profiling-window.md.
-- [ ] Rozliczyć udział powietrza i granicy zewnętrznej oraz operator/q-data, bazę V/Z, faktory, workspace i kopie; odróżnić alokację, rezydencję GPU oraz peak RAM.
-- [ ] Krótki profil reprezentatywnej fazy plus pełny run bez profilera; ustalić największy koszt i następny jeden eksperyment.
+- [x] Prześledzić normy/scaling i wyjaśnić LEFT vs RAW; niezależne Ax−b/TEM oraz nowa RIGHTreferencja z kontrolą całych pól. docs/milestones/M1.md.
+- [x] Raw RHS niezależne od PC + TEM/L2; W.3medium względem FP64RIGHT1e−9 przechodzi zamrożone K.3/K.4. M1 zamknięty w zakresie W.3; szersze pasma i geometria produkcyjna niezakwalifikowane.
+- [x] Rzeczywiste DOF/material incidence zgodne z Palace i bilans net-release EXP21; docs/topology-memory.md. Bieżący audyt EXP22 przypisuje99,616%peaku dościeżek; drobnyremainder jawny.
+- [x] Hostphase + bieżący CUDA-onlyprofile na pełnej siatce, niezależniekalibrowany zegar i margines10µs; stareNVTX/clockFAIL zachowane. docs/profiling-window.md.
+- [x] DOF/air/interface, PA/coarseCSR/qdata/V/Z/faktory/workspace/kopie rozliczone z jawnym remainder i rozdzieleniemmanaged/cgroup/sampledGPU; docs/topology-memory.md, memory-audit.md.
+- [x] Krótki W.3profilePASS i pełnyEXP19bezprofilera. P92%wczesnegookna/UVM295GB→następnyprototypM2 i później rezydencja/workspace; bezpromocjispeedupu.
 
 ### M2 — metoda dopasowana do otwartej anteny
 
-- [ ] W M1 policzyć udział powietrza w elementach/DOF i budżecie pamięci oraz powierzchnię potencjalnego interfejsu; nie utożsamiać objętości z kosztem solvera.
+- [x] M1: AIRexclusive57,586%DOF, granica94200ND2trace, denseblok132GiB; nieutożsamiać tego ze speedupem.
 - [ ] Porównać FEM–BEM, powierzchniowy MoM i akcelerację FMM/MLFMA/H²; sprawdzić Maxwell, dielektryki, otwarte cienkie metale, zasilanie i promieniowanie.
 - [ ] Przejrzeć istniejące biblioteki, źródła i licencje; oddzielić GPU assembly od GPU matvec/FMM/solve. Nie zakładać CUDA/TC na podstawie etykiety GPU.
 - [ ] Przygotować rzeczywisty mały prototyp Maxwell: kula PEC z odniesieniem, potem dielektryk i sprzężony interfejs FEM–BEM. Porównać do FEM przy porównywalnym błędzie.

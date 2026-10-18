@@ -2,7 +2,7 @@
 
 **Korekta 2026-10-18:** wszystkie opisane niżej próby z bazą na SSD są historyczne i odrzucone przez użytkownika. Kod disk basis został usunięty; nie stanowią dopuszczalnego baseline wydajności. Dalsze dane robocze wyłącznie RAM/VRAM, bez swap/offloadu na SSD/NVMe. Zachowane pola mogą pozostać archiwalnym wynikiem diagnostycznym.
 
-Data: 2026-10-18. Status: M1 ACTIVE. Ten raport zachowuje pierwsze pomiary, w tym niezakwalifikowany EXP12 (raw0,1253) i timeouty EXP13/14. Późniejsza silniejsza referencja FP64 i kwalifikacja numeryczna pojedynczego W.3 są w [native complex coarse](native-complex-coarse.md); nie zastępują pomiaru fizycznego ani innych pasm. Historyczne disk basis pozostają REJECT. Szczegóły wcześniejszych prób: [korekta referencji](reference-correction.md); fazy EXP12: [raport resident](memory-phases.md).
+Data: 2026-10-18. Status: archiwalny raport wczesnych prób M1; późniejszy checkpoint [M1](milestones/M1.md) jest COMPLETE, a aktywny jest M2. Raport zachowuje niezakwalifikowany EXP12 (raw0,1253) i timeouty EXP13/14. Późniejsza silniejsza referencja FP64 i kwalifikacja numeryczna pojedynczego W.3 są w [native complex coarse](native-complex-coarse.md); nie zastępują pomiaru fizycznego ani innych pasm. Historyczne disk basis pozostają REJECT. Szczegóły wcześniejszych prób: [korekta referencji](reference-correction.md); fazy EXP12: [raport resident](memory-phases.md).
 
 ## Co wykonano
 
@@ -89,7 +89,7 @@ Domyślny tiny (3 częstotliwości ×2 porty, bez L2/probes) trwał **11,25 s**,
 
 Dowody: artifacts/m1-tem-fields-{left-fp64,left-fp32,right-fp64}-20261018/, artifacts/m1-tiny-l2-{left-fp32,final-right-fp64}-20261018/, artifacts/m1-tiny-fast-smoke-20261018/; manifesty, komendy, logi, S, energie, próbki i tem-fields.json. Zbiorczy wynik: artifacts/m1-tem-validation-20261018.json. Ostatni przyrostowy build wyniósł 7,013 s i zawierał hit ccache; nie był cold buildem.
 
-**M1 pozostaje otwarty.** Wyjaśniono związek norm i zweryfikowano forward error kontrolnego coaxa. Pełna antena ma ukończony resident FP64 single-point run i snapshoty pól, lecz brakuje niezależnej, jakościowo zakwalifikowanej referencji do porównania pól i oceny raw residual. Pomiar pamięci fazami jest opisany w [raporcie resident](memory-phases.md). Nie przenosimy kwalifikacji coaxa na antenę ani prototyp FEM–BEM.
+W chwili sporządzenia tej części M1 pozostawał otwarty: brakowało niezależnej, jakościowo zakwalifikowanej referencji dla pełnej anteny. Późniejsza korekta referencji i kwalifikacja jednego punktu W.3 są opisane w [native complex coarse](native-complex-coarse.md) oraz w aktualnym [checkpoint M1](milestones/M1.md). Wyniki coaxa nie są przenoszone na antenę ani prototyp FEM–BEM.
 
 Generator odtworzył tiny mesh z identycznym SHA w osobnym artifacts/coax-tiny-reproduced-20261018, bez nadpisywania fixture; generowanie z cache uv zajęło ułamek sekundy.
 
@@ -145,7 +145,7 @@ CUDA_UVM raportuje peak logicznych aktywnych alokacji managed44,95GiB; cuDSS pea
 
 Kandydat miał narastający spadek MemAvailable: około20,6GiB przy183s,15,6GiB przy549s,10,8GiB przy915s i4,7GiB przed guardem. Przy11,2mln DOF każdy zespolony wektor bazyFP32 to~85,6MiB;141wektorów to~11,8GiB dodatkowego logicznego storage, które referencja trzymała na SSD. To uzasadnia audyt alokacji i limitu working set, lecz nie dowodzi jeszcze dokładnego podziału całej pamięci ani opłacalności konkretnej kompresji.
 
-Dowody historyczne: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. Późniejszy resident FP64 execution run jest opisany w [raporcie faz](memory-phases.md). M1 pozostaje otwarty: dalsza kwalifikacja wymaga niezależnej oceny jakości pełnej anteny oraz kontroli budżetu UVM/RAM, bez osłabiania progu jakości.
+Dowody historyczne: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. Późniejszy resident FP64 execution run jest opisany w [raporcie faz](memory-phases.md), a ostateczne kryteria zamknięcia M1 i ograniczenia kwalifikacji w aktualnym [checkpoint M1](milestones/M1.md). M2 pozostaje aktywny; ta archiwalna analiza nie rozszerza kwalifikacji poza udokumentowany punkt W.3.
 
 ## EXP07 — zakończony i wycofany disk basis
 

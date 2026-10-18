@@ -3,7 +3,7 @@
 2026-10-18. Jeden GPU, jeden rank. Ten raport opisuje historyczny EXP12,
 referencję **wykonania** FP64 w RAM/VRAM. Późniejsza silniejsza referencja
 i numeryczna kwalifikacja W.3 są w [native complex coarse](native-complex-coarse.md).
-M1 pozostaje otwarty; bez promocji mixed precision.
+Ten raport powstał przed zamknięciem M1 i zachowuje wyniki faz historycznego EXP12. Aktualny status bramki oraz granice kwalifikacji są w [checkpoint M1](milestones/M1.md). Raport nie promuje mixed precision.
 
 ## Mechanizm i odtwarzanie
 
@@ -96,12 +96,11 @@ oba pomiary używają FP64. Ich iloraz≈125815 pokazuje, dlaczego stopping
 norm nie wystarcza do oceny pierwotnego równania. Raw nie jest bezpośrednio
 procentem błędu pola, ale również nie można go zignorować przez zgodność VSWR.
 
-Pozostają M1.2/M1.3: kontrola niezależna od preconditionera i porównanie
-całych pól względem lepiej rozstrzygniętego rozwiązania. Następna hipoteza to
-RIGHT albo jawna korekta rezydualna. Potrzebny mały filtr i rachunek pamięci
-przed pełną próbą: RIGHT może wymagać więcej iteracji; 240 dużych wektorów
-może przekroczyć obecny budżet. Nie promować FP32/TF32 na podstawie samej
-kompletności obecnego runu ani nie pomijać M2 FEM–BEM.
+W chwili tego historycznego runu pozostawały M1.2/M1.3: kontrola niezależna
+od preconditionera i porównanie całych pól względem lepiej rozstrzygniętego
+rozwiązania. Późniejsza referencja RIGHT i kwalifikowany solve W.3 zamknęły M1
+w zakresie [checkpointu](milestones/M1.md). Nie promować FP32/TF32 na podstawie
+samej kompletności dawnego runu ani nie pomijać aktywnego M2 FEM–BEM.
 
 Nie wyliczać speedup względem historycznych disk runów: inne polityki
 pamięci i tracing nie tworzą pary porównawczej. Pełny wynik jest pierwszym

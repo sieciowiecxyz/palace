@@ -68,10 +68,10 @@ def setup():
 
 def parse_window(value):
     if not isinstance(value, str) or not re.fullmatch(r'(0|[1-9]\d*):([1-9]\d*)', value):
-        raise ValueError('Profile window requires FIRST:COUNT (FIRST=0..32, COUNT=1..8)')
+        raise ValueError('Profile window requires FIRST:COUNT (FIRST=0..32, COUNT=2..8)')
     first, count = map(int, value.split(':'))
-    if not 0 <= first <= 32 or not 1 <= count <= 8:
-        raise ValueError('Profile window requires FIRST=0..32 and COUNT=1..8')
+    if not 0 <= first <= 32 or not 2 <= count <= 8:
+        raise ValueError('Profile window requires FIRST=0..32 and COUNT=2..8')
     return first, count
 
 
@@ -87,7 +87,8 @@ def prepare(value, output):
 
 
 def arguments(profile):
-    return ['profile', '--trace=cuda-sw,nvtx', '--sample=none', '--cpuctxsw=none',
+    return ['profile', '--trace=cuda-sw', '--sample=none', '--cpuctxsw=none',
+            '--cuda-trace-all-apis=true',
             '--cuda-um-cpu-page-faults=false', '--cuda-um-gpu-page-faults=false',
             '--kill=none', '--wait=all',
             '--export=sqlite', '--output=/profile/window', '--force-overwrite=false']
@@ -113,47 +114,78 @@ def target_pid(root, proc=Path('/proc')):
     return None
 
 
-def sqlite_summary(path):
+def launch_phase(t,tid,selected,uncertainty):
+    enclosing = [r for r in selected if r[2]==tid and r[0]<=t<=r[1]]
+    if not enclosing: return 'other thread inside selected window'
+    nearest = min(enclosing,key=lambda r:r[1]-r[0])
+    return 'phase boundary uncertainty' if min(t-nearest[0],nearest[1]-t)<uncertainty else nearest[3]
+
+
+def sqlite_summary(path, host_log=None):
     with sqlite3.connect(f'file:{Path(path).resolve()}?mode=ro', uri=True) as db:
         tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        required = {'CUPTI_ACTIVITY_KIND_KERNEL', 'CUPTI_ACTIVITY_KIND_RUNTIME', 'NVTX_EVENTS', 'StringIds'}
+        required = {'CUPTI_ACTIVITY_KIND_KERNEL', 'CUPTI_ACTIVITY_KIND_RUNTIME', 'StringIds'}
+        required |= {'NVTX_EVENTS'} if host_log is None else {'ANALYSIS_DETAILS','PROCESSES'}
         if not required <= tables:
-            raise ValueError('Profiler schema missing CUDA/runtime/NVTX records')
+            raise ValueError('Profiler schema missing required CUDA/clock/range records')
         out = dict(tables=sorted(tables), scope='Totals cover entire bounded process; phase attribution selects Krylov sample by CPU launch thread/time. GPU sums may overlap.')
         out['kernel_count'], out['kernel_sum_seconds'] = db.execute(
             'SELECT count(*),coalesce(sum(end-start),0)*1e-9 FROM CUPTI_ACTIVITY_KIND_KERNEL').fetchone()
         out['top_kernels'] = [dict(name=n, calls=c, seconds=s) for n,c,s in db.execute(
             'SELECT s.value,count(*),sum(k.end-k.start)*1e-9 FROM CUPTI_ACTIVITY_KIND_KERNEL k '
             'JOIN StringIds s ON s.id=k.demangledName GROUP BY k.demangledName ORDER BY 3 DESC LIMIT 20')]
-        ranges = [(a,b,tid,n.strip()) for a,b,tid,n in db.execute(
-            'SELECT n.start,n.end,n.globalTid,coalesce(n.text,s.value) FROM NVTX_EVENTS n '
-            'LEFT JOIN StringIds s ON s.id=n.textId WHERE n.end IS NOT NULL AND n.end>=n.start') if n]
+        if host_log is not None:
+            from host_phases import ranges as host_ranges, CalibrationError
+            try:
+                ranges,out['host_clock'] = host_ranges(db,host_log)
+            except CalibrationError as error:
+                ranges = []
+                out['host_clock'] = dict(error.diagnostics,error=str(error))
+        else:
+            ranges = [(a,b,tid,n.strip()) for a,b,tid,n in db.execute(
+                'SELECT n.start,n.end,n.globalTid,coalesce(n.text,s.value) FROM NVTX_EVENTS n '
+                'LEFT JOIN StringIds s ON s.id=n.textId WHERE n.end IS NOT NULL AND n.end>=n.start') if n]
         windows = [r for r in ranges if r[3]=='Krylov sample']
         selected = [r for r in ranges if any(w[2]==r[2] and w[0]<=r[0] and r[1]<=w[1] for w in windows)]
         out['window_count'] = len(windows)
-        out['nvtx_ranges'] = [dict(name=n, calls=sum(r[3]==n for r in selected),
+        out['phase_ranges'] = [dict(name=n, calls=sum(r[3]==n for r in selected),
                                   inclusive_seconds=sum((r[1]-r[0])*1e-9 for r in selected if r[3]==n))
                               for n in sorted({r[3] for r in selected})]
         # Nsight serialized process bits occupy globalTid/globalPid above the low 24 bits.
         launches = {(c,tid//16777216):(t,tid) for c,tid,t in db.execute(
             'SELECT correlationId,globalTid,start FROM CUPTI_ACTIVITY_KIND_RUNTIME')}
         phases = defaultdict(lambda: dict(calls=0, seconds=0.0))
-        for corr,pid,duration in db.execute('SELECT correlationId,globalPid,end-start FROM CUPTI_ACTIVITY_KIND_KERNEL'):
+        selected_names = defaultdict(lambda: dict(calls=0,seconds=0.0))
+        uncertainty = out.get('host_clock',{}).get('boundary_uncertainty_ns',0)
+        names = dict(db.execute('SELECT id,value FROM StringIds'))
+        for corr,pid,duration,kernel in db.execute('SELECT correlationId,globalPid,end-start,demangledName FROM CUPTI_ACTIVITY_KIND_KERNEL'):
             launch = launches.get((corr,pid//16777216))
             name = 'unmatched CUDA launch'
             if launch:
                 t,tid = launch
-                enclosing = [r for r in selected if r[2]==tid and r[0]<=t<=r[1]]
-                name = min(enclosing,key=lambda r:r[1]-r[0])[3] if enclosing else 'outside NVTX ranges'
+                inside = any(w[2]//16777216==pid//16777216 and w[0]<=t<=w[1] for w in windows)
+                if inside:
+                    name = launch_phase(t,tid,selected,uncertainty)
+                    selected_names[names.get(kernel,str(kernel))]['calls'] += 1
+                    selected_names[names.get(kernel,str(kernel))]['seconds'] += duration*1e-9
+                else: name = 'outside selected window'
             phases[name]['calls'] += 1
             phases[name]['seconds'] += duration*1e-9
         out['kernel_seconds_by_launch_phase'] = dict(phases)
+        out['top_kernels_in_window'] = [dict(name=name,**values) for name,values in
+                                        sorted(selected_names.items(),key=lambda r:r[1]['seconds'],reverse=True)[:20]]
+        out['selected_kernel_count'] = sum(v['calls'] for v in selected_names.values())
         out['copies'] = []
+        out['copies_in_window'] = []
         if 'CUPTI_ACTIVITY_KIND_MEMCPY' in tables:
             columns = {r[1] for r in db.execute('PRAGMA table_info(CUPTI_ACTIVITY_KIND_MEMCPY)')}
             keys = ['copyKind'] + [x for x in ['srcKind','dstKind','migrationCause'] if x in columns]
             query = 'SELECT '+','.join(keys)+',count(*),sum(bytes),sum(end-start)*1e-9 FROM CUPTI_ACTIVITY_KIND_MEMCPY GROUP BY '+','.join(keys)
             out['copies'] = [dict(zip(keys+['calls','bytes','seconds'],row)) for row in db.execute(query)]
+            if len(windows)==1:
+                query = query.replace(' GROUP BY ', ' WHERE start>=? AND end<=? GROUP BY ')
+                out['copies_in_window'] = [dict(zip(keys+['calls','bytes','seconds'],row))
+                                            for row in db.execute(query,windows[0][:2])]
         # Preserve relevant labels, never guess numeric enum values for UVM.
         out['cuda_enums'] = {t: [dict(zip([r[1] for r in db.execute('PRAGMA table_info('+t+')')],row))
                                 for row in db.execute('SELECT * FROM '+t)]
@@ -181,16 +213,17 @@ def collect(profile, output):
         if native.exists() and native.stat().st_size <= 64*1024**2:
             shutil.copy2(native, output/'profile.nsys-rep')  # Ordinary final diagnostic result.
         sql = ram/'window.sqlite'
-        if sql.exists(): report['summary'] = sqlite_summary(sql)
+        if sql.exists(): report['summary'] = sqlite_summary(sql,text)
         for rows in report.get('summary',{}).get('diagnostics',{}).values():
             for row in rows:
                 report['collector_warnings'] += [v for v in row.values() if isinstance(v,str) and loss.search(v)]
                 if isinstance(row.get('severity'),int) and row['severity'] >= 2:
                     report['collector_warnings'].append(str(row.get('text',row)))
         report['collector_warnings'] = sorted(set(report['collector_warnings']))
-        calls = {r['name']:r['calls'] for r in report.get('summary',{}).get('nvtx_ranges',[])}
+        calls = {r['name']:r['calls'] for r in report.get('summary',{}).get('phase_ranges',[])}
         report['iteration_coverage_passed'] = (report.get('summary',{}).get('window_count')==1 and calls.get('Preconditioner')==count and calls.get('Krylov orthogonalization')==count)
-        report['complete'] = bool(report['window_markers_passed'] and report['clean_stop_passed'] and not report['collector_warnings']
+        report['clock_calibration_passed'] = report.get('summary',{}).get('host_clock',{}).get('clock_calibration_passed',False)
+        report['complete'] = bool(report['window_markers_passed'] and report['clean_stop_passed'] and report['clock_calibration_passed'] and not report['collector_warnings']
                                   and report['iteration_coverage_passed'] and 'summary' in report)
         return report
     finally:

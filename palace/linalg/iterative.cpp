@@ -49,9 +49,9 @@ public:
     auto a = std::from_chars(begin, begin + colon, first);
     auto b = std::from_chars(begin + colon + 1, end, count);
     MFEM_VERIFY(a.ec == std::errc() && a.ptr == begin + colon && b.ec == std::errc() &&
-                    b.ptr == end && first >= 0 && first <= 32 && count >= 1 && count <= 8 &&
+                    b.ptr == end && first >= 0 && first <= 32 && count >= 2 && count <= 8 &&
                     Mpi::Size(comm) == 1,
-                "Profile requires one rank, FIRST=0..32 and COUNT=1..8!");
+                "Profile requires one rank, FIRST=0..32 and COUNT=2..8!");
     domain = nvtxDomainCreateA("palace");
     message = nvtxDomainRegisterStringA(domain, "Krylov sample");
   }
@@ -69,16 +69,17 @@ public:
       event.messageType = NVTX_MESSAGE_TYPE_REGISTERED;
       event.message.registered = message;
       nvtxDomainRangePushEx(domain, &event);
+      ProfileHostRange("begin", "Krylov sample");
       active = true;
     }
   }
 
   void End(int iteration)
   {
+    if (active) PalaceProfileSynchronize();
     if (active && iteration + 1 == first + count)
     {
-      MFEM_VERIFY(PalaceProfileSynchronize, "Profile window requires the CUDA adapter sync hook!");
-      PalaceProfileSynchronize();
+      ProfileHostRange("end", "Krylov sample");
       Mpi::Print("PALACE_PROFILE_WINDOW: end first={} count={}\n", first, count);
       nvtxDomainRangePop(domain);
       active = false;
@@ -740,7 +741,11 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 
       ScalarType *Hj = H.data() + j * (max_dim + 1);
       const bool trace_orthog = std::getenv("PALACE_PHASE_TRACE") != nullptr;
-      if (trace_orthog) nvtxRangePushA("Krylov orthogonalization");
+      if (trace_orthog)
+      {
+        nvtxRangePushA("Krylov orthogonalization");
+        ProfileHostRange("begin", "Krylov orthogonalization");
+      }
       if (compressed_basis)
       {
         for (int k = 0; k <= j; k++)
@@ -751,7 +756,11 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
         }
       }
       else linalg::OrthogonalizeColumn(gs_orthog, comm, V, w, Hj, j + 1);
-      if (trace_orthog) nvtxRangePop();
+      if (trace_orthog)
+      {
+        ProfileHostRange("end", "Krylov orthogonalization");
+        nvtxRangePop();
+      }
       Hj[j + 1] = linalg::Norml2(comm, w);
       w *= 1.0 / Hj[j + 1];
       if (compressed_basis) packed_basis[j + 1].Pack(w);

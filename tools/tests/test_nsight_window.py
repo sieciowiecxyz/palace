@@ -11,15 +11,22 @@ spec.loader.exec_module(nsight)
 
 
 class NsightTests(unittest.TestCase):
-    def test_whole_process_capture_waits_for_native_cleanup(self):
+    def test_launch_near_phase_boundary_is_explicitly_unassigned(self):
+        scopes = [(0,100000,3,'Krylov sample'),(10000,80000,3,'Preconditioner')]
+        self.assertEqual(nsight.launch_phase(50000,3,scopes,10000),'Preconditioner')
+        self.assertEqual(nsight.launch_phase(11000,3,scopes,10000),'phase boundary uncertainty')
+        self.assertEqual(nsight.launch_phase(50000,4,scopes,10000),'other thread inside selected window')
+
+    def test_whole_process_cuda_capture_waits_for_native_cleanup(self):
         args = nsight.arguments({})
         self.assertIn('--wait=all', args)
         self.assertIn('--kill=none', args)
         self.assertFalse(any(arg.startswith('--capture-range') for arg in args))
+        self.assertIn('--trace=cuda-sw',args)
 
     def test_window_rejects_oversized_and_ambiguous_values(self):
         self.assertEqual(nsight.parse_window('2:3'), (2,3))
-        for value in [None, True, '', '1', '1:0', '-1:2', '33:2', '0:9', '01:2', '1:2:3', ' 1:2']:
+        for value in [None, True, '', '1', '1:0', '1:1', '-1:2', '33:2', '0:9', '01:2', '1:2:3', ' 1:2']:
             with self.assertRaises(ValueError): nsight.parse_window(value)
 
     def test_subtree_pid_is_native_target_not_collector_or_user_app(self):
@@ -65,10 +72,10 @@ class NsightTests(unittest.TestCase):
             result = nsight.sqlite_summary(path)
             phases = result['kernel_seconds_by_launch_phase']
             self.assertEqual(phases['Coarse Solve']['calls'],1)
-            self.assertEqual(phases['outside NVTX ranges']['calls'],1)
+            self.assertEqual(phases['outside selected window']['calls'],1)
             self.assertEqual(phases['unmatched CUDA launch']['calls'],1)
             self.assertNotIn('wrong thread', phases)
-            self.assertNotIn('setup', {r['name'] for r in result['nvtx_ranges']})
+            self.assertNotIn('setup', {r['name'] for r in result['phase_ranges']})
             self.assertEqual(result['copies'][0]['bytes'],4096)
             self.assertEqual(result['diagnostics']['DIAGNOSTIC_EVENT'][0]['severity'],2)
 
@@ -88,7 +95,7 @@ class NsightTests(unittest.TestCase):
                 log = 'PALACE_PROFILE_WINDOW: begin first=1 count=2\nPALACE_PROFILE_WINDOW: end first=1 count=2\n'
                 if clean: log += 'PALACE_PROFILE_STOP: clean diagnostic stop; no RF qualification\n'
                 (output/'palace.log').write_text(log)
-                summary = dict(window_count=1,nvtx_ranges=[dict(name=name, calls=2) for name in
+                summary = dict(window_count=1,host_clock=dict(clock_calibration_passed=True),phase_ranges=[dict(name=name, calls=2) for name in
                                            ['Preconditioner','Krylov orthogonalization']],
                                diagnostics={'DIAGNOSTIC_EVENT': ([dict(message='Not all NVTX events might have been collected.')] if warning=='loss' else
                                                                 [dict(severity=3,text='Unexpected collector failure')] if warning=='error' else [])})

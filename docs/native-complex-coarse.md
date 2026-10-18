@@ -1,7 +1,7 @@
 # Native complex coarse — M1 / EXP18–19
 
 2026-10-18. Opcjonalna ścieżka FP64 dla jednego ranka CUDA.
-**W.3 przeszedł kontrolę numeryczną; M1 jako całość pozostaje otwarty.**
+**W.3 przeszedł kontrolę numeryczną. M1 zamknięty później po EXP22; [dowody](milestones/M1.md).**
 Nie zmieniono defaultów, siatki medium, materiałów ani portów.
 
 ## Co zmienia kod
@@ -107,7 +107,7 @@ Bez phase-trace:setup93,545s,GMRES259,460s,post+fields11,896s.
 Exclusive timery GMRES:KSP29,165s,P158,248s,coarse72,105s;
 nie dodawać ich ponownie do GMRESinclusive. Trace pełnego runu ma176
 sparowanych zdarzeń hostowych, bez braków. Nie mierzy kerneli ani
-transferów UVM; M1.4 i pełne rozliczenie pamięci pozostają otwarte.
+transferów UVM w tym eksperymencie. Późniejsze EXP22 domknęło M1.4: [profil](profiling-window.md), [alokacje](memory-audit.md).
 
 Źródła API: pinnedMFEM4.9 oraz archiwum cuDSS/CUDA12.9.1,
 [functions](https://docs.nvidia.com/cuda/archive/12.9.1/cudss/functions.html),

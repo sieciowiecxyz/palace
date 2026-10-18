@@ -1,7 +1,9 @@
 # M1: próby niezależnej kontroli referencji
 
-2026-10-18. Status: **otwarta jakość pełnej anteny**. EXP13/14 nie zamykają
-M1.2/M1.3. Medium przestrzenne, materiały i mesh pozostają bez zmian.
+2026-10-18. Archiwalny raport prób EXP13/14: same te próby nie zamykają
+M1.2/M1.3. Późniejszy kwalifikowany punkt W.3 zamknął M1 w zakresie
+[checkpointu](milestones/M1.md). Medium przestrzenne, materiały i mesh
+pozostają bez zmian w opisanych eksperymentach.
 
 ## Wznowienie i kontrolowane parametry
 
@@ -68,8 +70,8 @@ Lokalny runner jawnie ustawia `PALACE_LINE_BUFFERED_LOG=1`.
 Oddzielne stdout/stderr nadal zapobiegają przecinaniu diagnostyki.
 Końcowy `palace.log` nadal jest konkatenacją, nie wspólną chronologią.
 
-Historyczny replay build8,298 s; wówczas 25 unittestów PASS. Bieżący
-checkpoint raportuje 33 unittesty narzędzi PASS. Replay
+Historyczny replay build8,298 s; wówczas 25 unittestów PASS. Aktualna kontrola
+narzędzi ma 47 testów PASS. Replay
 `artifacts/m1-line-buffered-replay-tiny-20261018/`: complete=true,
 11,437 s, sześć zerowych iteracji i pełne checks/coverage/porównania pól.
 Potwierdza nowe logowanie i wznowienie; nie ustanawia nowego benchmarku anteny.
@@ -81,8 +83,10 @@ referencją wykonania, nie dokładności (raw≈0,125). Późniejszy W.3 native
 complex coarse wyznaczył resident FP64 RIGHT referencję Tol1e−9 i osobny
 medium run przeszedł bramki numeryczne przy tej samej geometrii i siatce;
 szczegóły są w [raporcie native complex coarse](native-complex-coarse.md).
-To nie zamyka M1: profilowanie kerneli/UVM, pamięć i szersza kwalifikacja
-anteny nadal są otwarte.
+W chwili tych prób M1 pozostawał otwarty. Został później zamknięty po
+kwalifikacji pojedynczego punktu W.3 i audycie pamięci; patrz
+[checkpoint M1](milestones/M1.md). Profil pełnego pasma, enclosure i walidacja
+produkcyjna pozostają poza tym zakresem.
 
 Historyczne profile CPU/cuDSS, dokładnego real-block coarse solve i zwalniania
 finalnego solvera są w [reference-profiles.md](reference-profiles.md).

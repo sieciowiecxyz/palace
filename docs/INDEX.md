@@ -7,9 +7,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M0: dowody zamknięcia](milestones/M0.md)
   - Czytaj gdy: weryfikujesz zakończenie researchu i migracji
   - Opis: Powiązanie kryteriów M0 z raportami oraz granice dowodów.
-- [M1: aktywny checkpoint](milestones/M1.md)
+- [M1: dowody zamknięcia](milestones/M1.md)
   - Czytaj gdy: wznawiasz bieżącą kwalifikację referencji i profilowanie
-  - Opis: Status bramek M1 i granice obecnych dowodów; M1 pozostaje otwarty.
+  - Opis: Bramki M1, aktualna referencja/profil/pamięć i granice kwalifikacji jednego fixture.
+- [M2: Maxwell FEM–BEM/MoM](milestones/M2.md)
+  - Czytaj gdy: planujesz bieżący prototyp zmniejszenia domeny powietrza
+  - Opis: Hipoteza, mała drabina walidacji Maxwell, wstępne repozytoria i warunki odrzucenia.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.
@@ -39,7 +42,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP21, zgodność topologii z Palace, shared DOF i bilans netto tej samej fazy; ograniczenia BEM.
 - [M1: krótkie profilowanie CUDA](profiling-window.md)
   - Czytaj gdy: używasz --nsys-window lub diagnozujesz niekompletne ślady Nsight
-  - Opis: EXP20, RAM/tmpfs, bounded stop, jakość raportów i nierozwiązane ostrzeżenie NVTX; brak promocji.
+  - Opis: CUDA-only i kalibrowany hostclock, currentW.3PASS, historia odrzuconych trace oraz ograniczenia pomiaru.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

@@ -1,6 +1,6 @@
 # Eksperyment M1: aktywne Q-wektory libCEED
 
-Status 2026-10-18: **filtr poprawności Palace/TEM PASS, brak promocji pamięci ani szybkości**. Po pierwszym przerwaniu bazy wykonano porównanie z jednakowym seedem HYPRE 256 MiB. W tym małym teście wariant nie oszczędza VRAM, ma większy logical UVM peak i nieco dłuższy zwykły run. Pełna antena NOT RUN. M1 pozostaje otwarty, a obowiązkowy M2 FEM–BEM/MoM nadal jest przed nami. Dane robocze pozostają w RAM/VRAM.
+Status 2026-10-18: **filtr poprawności Palace/TEM PASS, brak promocji pamięci ani szybkości**. Po pierwszym przerwaniu bazy wykonano porównanie z jednakowym seedem HYPRE 256 MiB. W tym małym teście wariant nie oszczędza VRAM, ma większy logical UVM peak i nieco dłuższy zwykły run. Pełna antena NOT RUN. M1 został później zamknięty w zakresie [checkpointu](milestones/M1.md); obowiązkowy M2 FEM–BEM/MoM jest obecnie aktywny. Dane robocze pozostają w RAM/VRAM.
 
 ## Co dokładnie zmieniono
 

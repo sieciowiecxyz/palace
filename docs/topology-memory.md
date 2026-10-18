@@ -1,7 +1,7 @@
 # M1: rzeczywiste DOF i bilans pamięci
 
 EXP21, 2026-10-18. Audyt offline obecnego medium W.3; bez uruchamiania GPU,
-zmiany modelu i dyskowego workspace. M1 pozostaje otwarty.
+zmiany modelu i dyskowego workspace. Audyt był częścią M1; po EXP22 M1 zamknięty, dowody w [M1](milestones/M1.md).
 
 ## Odtworzenie i kontrola
 
@@ -87,5 +87,5 @@ całej logicznej pojemności od fizycznej rezydencji.
 
 `artifacts/m1-topology-memory-balance-20261018.json` zawiera wartości,
 porównania runtime, sprawdzenie sumy oraz SHA źródłowych raportów/logów.
-Następne otwarte zadania M1: atrybucja operator/workspace i wiarygodny
-[profil kerneli/transferów](profiling-window.md). TF32 ani M2 nie są jeszcze promowane.
+Późniejszy EXP22 dostarczył aktualną atrybucję ścieżek alokacji i wiarygodny
+[profil kerneli/transferów](profiling-window.md). Aktywny M2; TF32 ani nowa metoda nie są promowane.

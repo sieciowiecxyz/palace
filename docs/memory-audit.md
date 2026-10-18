@@ -1,6 +1,38 @@
 # M1 — właściciele alokacji i następny eksperyment
 
-Data: 2026-10-18. Status: pomiar diagnostyczny, M1 otwarty. Pamięć robocza kolejnych prób wyłącznie RAM/VRAM; zakaz dyskowego offloadu pozostaje bez wyjątków.
+Data: 2026-10-18. Status: historyczny audyt diagnostyczny; M1 został później zamknięty. Pamięć robocza kolejnych prób wyłącznie RAM/VRAM; zakaz dyskowego offloadu pozostaje bez wyjątków. Aktualny zakres i wnioski M1 opisuje [checkpoint](milestones/M1.md).
+
+## Aktualny audyt resident native complex FP64 — EXP22
+
+`artifacts/m1-cuda-hostclock-antenna-20261018/` zatrzymał się diagnostycznie po4iteracjach W.3. Nie był pełnym solveRF. Daje aktualny tracealloc/free zgodny z medium i native complex, bez historycznego disk storage. Odtworzenie analizy:
+
+```sh
+python3 tools/allocation_audit.py artifacts/m1-cuda-hostclock-antenna-20261018/palace.stderr.log --output artifacts/current-allocation-audit.json
+```
+
+Raport zachowany w `artifacts/m1-native-current-allocation-audit-20261018.json`.
+Szczyt49 583 124 858B, duże alokacje49 392 771 376B (**99,616%**); pozostałe190 353 482B to nieprzypisane drobne bufory. Ten sam stan, bez dodawania osobnego cuDSSpeak.
+
+| Ścieżka alokacji | B w tym samym maksimum |
+| --- | ---: |
+| cuDSS factors/workspace | 25 008 217 680 |
+| MFEM/Palace vectors/workspace | 5 889 957 512 |
+| libCEED QFunction assembly | 5 071 206 720 |
+| libCEED QFunction evaluation | 4 999 822 592 |
+| libCEED basis evaluation | 2 263 841 984 |
+| libCEED geometry construction | 2 155 878 272 |
+| libCEED other workspace | 2 031 020 376 |
+| libCEED element restriction | 1 972 826 240 |
+
+20buforów po538 043 520B daje10,761GB w assembly/basis/QFunction. Nie są automatycznie jedną współdzieloną pulą. Największy pojedynczy bufor cuDSS24,031GB. Triggerpeaku to alokacja89 749 792B w ComplexParOperator::Mult podczas GMRES; nie postprocessing pól. Samo rozpoznanie ścieżki nie rozstrzyga unikatowego semantycznego właściciela każdego bufora.
+
+Native coarse CSR N=2196005/nnz=32284067 ma32-bitowe indeksy i complexFP64 values:4(N+1)+4nnz+16nnz=654465364Bprzed kopiami/stagingiem. Ten logiczny rozmiar jest częścią operator/workspace, nie dodatkowym składnikiem ponad sumę managed. Fineoperator jestPA, nie pełnymCSR11mln×11mln.
+
+To wczesny stan, nie55,148GBpeaku całego35-iteracyjnego solve. Pełny bilansnet-release V/pozostałego solvera jest w [DOF/pamięć](topology-memory.md); GMRESbezZ (osobna bazaZ dotyczy FGMRES, nie tego profilu). Nie utożsamiać logicznej pojemności45V z fizycznymi stronami36Voddanymi po clear. Brak aktywnego audytu każdej drobnej alokacji pozostaje jawną granicą, nie brakującą pamięcią w sumie.
+
+Obecny [profil kerneli/UVM](profiling-window.md) wskazuje295GBmigracji/17,665s i przewagę czasu preconditionera. Hipoteza dla późniejszej pracy FEM: ograniczyć spekulacyjne migracje dużych faktorów i aktywnego workspace przez mniejszą reprezentację/politykę dostępu; porównać całkowityczas+pamięć i K.3/K.4. Nie wdrażać optymalizacji opierającej się tylko na mniejszej rezydencji GPU. Obowiązkowa ocena FEM–BEM poprzedza kolejne promowane zmiany.
+
+## Historyczny audyt — poniżej nie jest aktualnym baseline
 
 ## Dowód bez ponownej symulacji
 
@@ -54,13 +86,13 @@ Warunki prototypu:
 4. Test analitycznego tiny TEM i dwa różne operatory naprzemiennie, także transpose/diagonal. Limit 60 s zwykłego smoke, do 120 s diagnostyki. Najpierw Δcomplex S, pola E/B, energia i stopping/raw norm. Dopiero po pozytywnym filtrze ograniczony fragment setup/solve i ewentualny pełny case.
 5. Promocja wymaga rzeczywistej redukcji peak RAM/VRAM oraz zmierzonego czasu całego zadania; oszczędzenie części 24 GiB to hipoteza. Alokacje wykorzystywane jednocześnie nie mogą zostać połączone. Nie podawać tej liczby jako obietnicy odzyskania 24 GiB.
 
-To kierunek wynikający z M1; nie zamyka M1 i nie pomija obowiązkowego M2 FEM–BEM/MoM. Jakość odniesienia pełnej anteny oraz budżet resident bazy nadal wymagają rozstrzygnięcia.
+To hipoteza do dalszej pracy wynikająca z M1; nie jest promowaną optymalizacją i nie pomija aktywnego, obowiązkowego M2 FEM–BEM/MoM. M1 został zamknięty na podstawie późniejszej kwalifikacji jednego punktu W.3 oraz audytu pamięci; walidacja fizyczna całego pasma i enclosure pozostaje poza tym checkpointem.
 
 ## Dlaczego mała norma LEFT nie rozstrzyga jakości
 
 W `InitialResidual` lewostronny GMRES mierzy `||B(b−Ax)|| / ||Bb||`. RAW sprawdza `||b−Ax|| / ||b||`. Przeliczany po rekonstrukcji warunek LEFT usuwa błąd samej rekurencji Arnoldiego, ale nie zmienia metryki na RAW.
 
-Historyczne antenowe dane: FP64 ma LEFT `9,9564e−7`, RAW `0,12527`; FP32 storage ma LEFT `9,9608e−7`, RAW `0,80769`. Ta duża różnica istnieje pomimo małej różnicy pól ważonych energią. Nie wolno uznać FP32 za równoważne rozwiązanie tylko na podstawie portów albo LEFT. Nierównomierne ważenie residuum przez preconditioner jest potwierdzone kodem i kontrolnym TEM (RIGHT schodzi z RAW poniżej 1e−6), lecz rozkład błędu pełnej anteny pozostaje otwarty. To nie dowód wadliwej fizyki ani rozwiązany problem jakości pełnej anteny.
+Historyczne antenowe dane: FP64 ma LEFT `9,9564e−7`, RAW `0,12527`; FP32 storage ma LEFT `9,9608e−7`, RAW `0,80769`. Ta duża różnica istnieje pomimo małej różnicy pól ważonych energią. Nie wolno uznać FP32 za równoważne rozwiązanie tylko na podstawie portów albo LEFT. Nierównomierne ważenie residuum przez preconditioner jest potwierdzone kodem i kontrolnym TEM (RIGHT schodzi z RAW poniżej 1e−6). Późniejsza niezależna referencja RIGHT i solve W.3 przeszły zamrożone bramki M1; nie jest to jednak walidacja fizyczna całego pasma ani enclosure. To nie dowód wadliwej fizyki.
 
 ## Doprecyzowanie fazy maksimum
 
@@ -68,6 +100,6 @@ Rozszerzony parser zachowuje `peak_trigger_event` i jego stos. Dla historycznego
 
 Kolejność historycznego zmieszanego stdout solvera i stderr alokacji nie jest wiarygodnym zegarem faz: buforowanie pozostawiło ostatnią wydrukowaną iterację 140 przed alokacją diagnostyki wykonywanej po solve. Późniejszy run FP64 resident użył znaczników monotonicznych wprowadzonych przez `--memory-marks`; zmierzone fazy i ograniczenia interpretacji zapisano w [raporcie faz](memory-phases.md). Oddzielne stdout/stderr zachowują kompletne linie, ale końcowy `palace.log` konkatenowany stdout→stderr nie ma globalnej chronologii. Nie wyznaczać kolejności między strumieniami z tego pliku.
 
-Fazy wykazały największy logiczny peak managed podczas GMRES (54,74 GiB), a nie przy późniejszej diagnostyce pól. Jest to licznik alokacji managed, nie pomiar fizycznej rezydencji VRAM/RAM. Ukończenie resident runu FP64 nie rozstrzyga jakości anteny: raw relative residual i niezależna referencja pól nadal wymagają oceny. Szczegóły wyniku, stopping check, pola i ograniczenia są w [raporcie faz](memory-phases.md); nie sumować peaków z różnych faz ani nie dodawać osobno cuDSS do managed peak.
+Fazy wykazały największy logiczny peak managed podczas GMRES (54,74 GiB), a nie przy późniejszej diagnostyce pól. Jest to licznik alokacji managed, nie pomiar fizycznej rezydencji VRAM/RAM. Sam historyczny resident run FP64 nie rozstrzygał jakości anteny; późniejsza referencja i kwalifikowany solve W.3 są zebrane w [checkpoint M1](milestones/M1.md). Nie rozszerzają one wyniku na całe pasmo ani enclosure. Szczegóły historycznego wyniku, stopping check, pól i ograniczeń są w [raporcie faz](memory-phases.md); nie sumować peaków z różnych faz ani nie dodawać osobno cuDSS do managed peak.
 
 Późniejszy Q-pool przeszedł kontrolny Maxwell/TEM, ale na coax-tiny zwiększył logical UVM peak o 5,8% i nie zmniejszył sampled VRAM; [wyniki](ceed-qpool.md). Nie promować tej wersji. Osobne zmniejszenie seedu HYPRE dało 3,75 GiB mniej sampled VRAM procesu na coax-tiny, bez istotnej zmiany portów/energii, a known-TEM L2 pozostał poniżej 1%; [dowody](hypre-pool.md).

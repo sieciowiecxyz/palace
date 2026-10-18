@@ -5,7 +5,7 @@ Plan przeniesiony z repo antenowego. Historyczne ścieżki `infra/palace`, STATE
 
 Bieżąca kolejka i stan wykonania w tym forku: [PLAN](../PLAN.md), [MILESTONES](../MILESTONES.md), [PROGRESS](../PROGRESS.md). Aktualizacja celu 2026-10-18: jedna 5070 Ti; obowiązkowa ocena FEM–BEM/MoM; multi-GPU poza obecnym zakresem.
 
-Data opracowania: 2026-10-18. Status: **goal aktywny, etap M1; stan dowodów w PROGRESS.md**.
+Data opracowania: 2026-10-18. Status: **goal aktywny, etap M2; M1 zamknięty w ograniczonym zakresie opisanym w checkpointach. Stan bieżący w PROGRESS.md**.
 Dokument zbiera cele użytkownika, wyniki wcześniejszych prób, weryfikację załącznika i plan dalszej pracy.
 Liczby historyczne niżej nie są nowymi benchmarkami; bieżące uruchomienia rejestruje PROGRESS.md.
 

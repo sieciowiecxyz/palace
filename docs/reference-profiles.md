@@ -3,7 +3,9 @@
 2026-10-18. Historyczne eksperymenty EXP15–17; opcje były opt-in i nie
 zmieniły defaultów. Medium przestrzenne i równanie A pozostały bez zmian.
 Późniejszy native complex coarse EXP18–19 oraz W.3 anteny opisano osobno w
-[raporcie native complex](native-complex-coarse.md). M1 nadal otwarty.
+[raporcie native complex](native-complex-coarse.md). M1 został później
+zamknięty w zakresie [checkpointu](milestones/M1.md); ten raport nie rozszerza
+kwalifikacji poza opisane próby. Aktywny jest M2.
 
 ## Opcje i granice
 
@@ -64,4 +66,6 @@ konfigurację.
 API cuDSS nie należy utożsamiać z najnowszą wersją dokumentacji.
 
 Pamięć robocza wyłącznie RAM/VRAM, bez scratch/offload/swap na dysk.
-Cała niezależna kontrola jakości anteny pozostaje otwarta.
+Te historyczne profile same nie kwalifikują jakości anteny. Późniejszy pojedynczy
+punkt W.3 przeszedł bramki M1 opisane w [checkpointcie](milestones/M1.md);
+walidacja produkcyjna pozostałych pasm i enclosure nadal nie jest wykonana.

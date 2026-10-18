@@ -14,8 +14,16 @@
 #include <chrono>
 
 extern "C" void PalaceProfileSynchronize() {
+  int version;
+  const auto marker=cudaRuntimeGetVersion(&version);
+  if(marker!=cudaSuccess){std::fprintf(stderr,"Profile version marker failed\n");std::abort();}
+  const auto begin=std::chrono::steady_clock::now().time_since_epoch();
   const auto error=cudaDeviceSynchronize();
+  const auto end=std::chrono::steady_clock::now().time_since_epoch();
   if(error!=cudaSuccess){std::fprintf(stderr,"Profile window synchronization failed: %s\n",cudaGetErrorString(error));std::abort();}
+  std::fprintf(stderr,"PALACE_PROFILE_SYNC {\"begin_ns\":%lld,\"end_ns\":%lld}\n",
+               static_cast<long long>(std::chrono::duration_cast<std::chrono::nanoseconds>(begin).count()),
+               static_cast<long long>(std::chrono::duration_cast<std::chrono::nanoseconds>(end).count()));
 }
 
 namespace {
