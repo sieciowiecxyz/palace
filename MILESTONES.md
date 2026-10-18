@@ -21,6 +21,8 @@ Postęp jest w [PLAN](PLAN.md), dowody i checkpoint w [PROGRESS](PROGRESS.md). T
 
 W.4/W.5 wymagają przygotowania osobnych konfiguracji; obecny fixture anteny obejmuje tylko W.3. Zmiana samych częstotliwości/portów musi zachować fizyczne terminacje. Trzy powtórzenia bez profilera tylko dla finalisty; mediana, rozrzut i kontrola tła. Profile diagnostyczne raportować osobno.
 
+Dla zmiany metody FEM → FEM–BEM/MoM zachować geometrię, materiały, porty i porównywalny błąd; dyskretyzacje mogą się różnić i mają osobne hashe. Wymóg identycznego mesh dotyczy zmian precyzji/implementacji w tej samej metodzie.
+
 ## M0 - Wiedza, fork i cache
 
 - M0.1: zachowana historia/licencje i rzeczywiste patche; samodzielne przykłady z hashami.
@@ -34,65 +36,57 @@ Wymaga M0. Blokuje wszystkie dalsze optymalizacje.
 - M1.1: zachowana odtwarzalna referencja na obecnym forku, hash i medium zgodne z benchmarkiem; historyczna konfiguracja odróżniona od najlepszego projektu anteny.
 - M1.2: udokumentowana przyczyna lub diagnostycznie rozstrzygnięty błąd historycznych raw residual 0,125/0,808. Kontrola Ax−b/scaling/preconditioning potwierdzona niezależnie; nie wystarcza zmiana etykiety normy.
 - M1.3: zamrożony kontrakt K.3/K.4, zaakceptowane pola/energie i miara niezależna od preconditionera. Nierozstrzygnięta referencja oznacza BLOCKED, nie zgodę na obniżanie precyzji.
-- M1.4: tabela czasu faz i pamięci V/Z/operator/faktory/workspace/kopie, krótki wiarygodny profil oraz pełny run bez profilera. Utracone zdarzenia profilera i błąd pomiaru opisane.
-- M1.5: wybrana jedna hipoteza M2 na podstawie dominującego kosztu, z przewidywanym efektem i warunkiem odrzucenia.
+- M1.4: audyt powietrza/interfejsu i tabela czasu faz oraz pamięci V/Z/operator/faktory/workspace/kopie, krótki wiarygodny profil oraz pełny run bez profilera. Utracone zdarzenia profilera i błąd pomiaru opisane.
+- M1.5: wybrana hipoteza FEM–BEM/MoM do M2 i kierunek optymalizacji pamięci FEM na podstawie profilu; oba mają przewidywany efekt i warunek odrzucenia.
 
-## M2 - GMRES i pamięć
+## M2 - FEM–BEM/MoM dla otwartej anteny
 
-Wymaga M1.
+Wymaga M1. Obowiązkowy research i prototyp, integracja zależy od zmierzonych korzyści.
 
-- M2.1: bezpośrednie operacje FP32 storage/FP64 accumulation sprawdzone wg W.1; MGS, ortogonalność i reliable stopping zachowane. Nie ogłaszać obsługi FGMRES bez osobnej implementacji/kwalifikacji.
-- M2.2: osobne wyniki usunięcia rozpakowania, polityki migracji/porcjowania i ewentualnego restartu. Zmierzone bytes/iteration, peak i całkowity solve, także stagnacja/restarty.
-- M2.3: W.2/W.3 oraz kontrakt K przechodzą dla promowanego wariantu; wariant ma flagę/fallback. Przy braku zysku udokumentowane odrzucenie i zachowana referencja.
+- M2.1: porównano istniejące implementacje Maxwell/FEM–BEM/MoM i akcelerację FMM/H²: CUDA/OpenCL, rzeczywiste GPU matvec/solve, licencja, ślady H(curl), konwencja fazy, porty, dielektryk i cienkie przewodniki. Źródła/rewizje i koszty integracji zapisane.
+- M2.2: rzeczywisty mały prototyp elektromagnetyczny przechodzi odniesienie analityczne kuli PEC oraz kontrolę dielektryka i interfejsu FEM–BEM. Kontrola pól, promieniowania, pasywności/energii i zbieżności; benchmark skalarny to wyłącznie smoke.
+- M2.3: dla porównywalnego błędu policzono pamięć (w tym gęste bloki, kompresję i workspace), setup+solve i koszt rosnącego rozmiaru. Redukcja liczby niewiadomych sama nie dowodzi oszczędności; badanie lokalne, bez chmury.
+- M2.4: decyzja integracja/odrzucenie z dowodami. Obiecujący prototyp jest izolowany za operatorem/flagą, a promocja dla anteny wymaga K i zgodnego odniesienia fizycznego. Zachować FEM jako fallback; dokumentować nieobsługiwane porty/metale zamiast upraszczać je po cichu.
 
-## M3 - Reuse setup
+## M3 - GMRES i pamięć
 
 Wymaga M2.
 
-- M3.1: wykazano kiedy A/P i terminacje są identyczne dla portów; zmierzona liczba setup/faktoryzacji przed/po.
-- M3.2: oba porty tej samej częstotliwości spełniają K, poprawne wyjścia/wznowienia; krótszy koszt kompletnego zadania albo udokumentowane odrzucenie.
-- M3.3: symbolic reuse/warm start ocenione oddzielnie, jeśli uzasadnione pomiarem. Numeryczne faktory nie są bez dowodu przenoszone między różnymi A(f).
+- M3.1: bezpośrednie operacje FP32 storage/FP64 accumulation sprawdzone wg W.1; MGS, ortogonalność i reliable stopping zachowane. Nie ogłaszać obsługi FGMRES bez osobnej implementacji/kwalifikacji.
+- M3.2: osobne wyniki usunięcia rozpakowania, polityki migracji/porcjowania i ewentualnego restartu. Zmierzone bytes/iteration, peak i całkowity solve, także stagnacja/restarty.
+- M3.3: W.2/W.3 oraz kontrakt K przechodzą dla promowanego wariantu; wariant ma flagę/fallback. Przy braku zysku udokumentowane odrzucenie i zachowana referencja.
 
-## M4 - Preconditioner/cuDSS
+## M4 - Reuse setup
 
 Wymaga M3.
 
-- M4.1: przypięta macierz zgodności wersji/trybów; hybrid memory, hybrid execute i UVM rozróżnione, minimalny oraz rzeczywisty budżet zmierzone.
-- M4.2: co najmniej jeden uzasadniony prototyp lub wykazana niezgodność w źródłach/API; AMS na właściwym operatorze i rzeczywiste wykonanie GPU sprawdzone, jeśli próba wykonalna.
-- M4.3: powrót do FP32 faktorów wymaga nowego mechanizmu scaling/korekcji/fallback, nie powtórki odrzuconego runu. Zmienny preconditioner wymaga zgodnego solvera i uwzględnienia dodatkowej pamięci.
-- M4.4: W.2/W.3/K, koszt setup + wszystkie iteracje i pamięć kwalifikują promotowany wariant; cuDSS FP64 pozostaje dostępnym fallbackiem. Brak poprawy ma raport odrzucenia.
+- M4.1: wykazano kiedy A/P i terminacje są identyczne dla portów; zmierzona liczba setup/faktoryzacji przed/po.
+- M4.2: oba porty tej samej częstotliwości spełniają K, poprawne wyjścia/wznowienia; krótszy koszt kompletnego zadania albo udokumentowane odrzucenie.
+- M4.3: symbolic reuse/warm start ocenione oddzielnie, jeśli uzasadnione pomiarem. Numeryczne faktory nie są bez dowodu przenoszone między różnymi A(f).
 
-## M5 - Tensor Cores
+## M5 - Preconditioner/cuDSS
 
 Wymaga M4.
 
-- M5.1: profil wskazuje kernel i rzeczywiste wymiary; oszacowany limit zysku całego runu. Jeżeli brak sensownego kandydata, wynik analizy i odrzucenie są jawne.
-- M5.2: dla wykonalnego kandydata prototyp FP32/TF32 vs FP64 obejmuje packing, konwersje, scatter, transfer i workspace; backend biblioteczny oceniony przed własnym CUTLASS.
-- M5.3: deklaracja TC wymaga instrukcji/liczników potwierdzających użycie. TF32 nie jest przedstawiane jako format zmniejszający storage FP32; sprzęt bez TC/TF32 ma fallback.
-- M5.4: promocja wyłącznie po K i W.1–W.3 oraz zysku całego runu z uwzględnieniem iteracji. Negatywny wynik zamyka hipotezę, nie uzasadnia wymuszania TF32/BF16.
+- M5.1: przypięta macierz zgodności wersji/trybów; hybrid memory, hybrid execute i UVM rozróżnione, minimalny oraz rzeczywisty budżet zmierzone.
+- M5.2: co najmniej jeden uzasadniony prototyp lub wykazana niezgodność w źródłach/API; AMS na właściwym operatorze i rzeczywiste wykonanie GPU sprawdzone, jeśli próba wykonalna.
+- M5.3: powrót do FP32 faktorów wymaga nowego mechanizmu scaling/korekcji/fallback, nie powtórki odrzuconego runu. Zmienny preconditioner wymaga zgodnego solvera i uwzględnienia dodatkowej pamięci.
+- M5.4: W.2/W.3/K, koszt setup + wszystkie iteracje i pamięć kwalifikują promotowany wariant; cuDSS FP64 pozostaje dostępnym fallbackiem. Brak poprawy ma raport odrzucenia.
 
-## M6 - Multi-GPU
+## M6 - Tensor Cores
 
-Wymaga M5. Brak sprzętu pozostawia etap otwarty.
+Wymaga M5.
 
-- M6.1: zgodny build Palace/MFEM/cuDSS/MPI i istniejący wrapper MGMN; ownership, komunikator, podział macierzy i brak ukrytej pełnej replikacji sprawdzone.
-- M6.2: rzeczywisty mały i pełny test 1 → 2 GPU tej samej symulacji przechodzi K; pomiary peak per GPU/rank, sumy/max, transferów i czasu komunikacji.
-- M6.3: osobne wyniki resident i kontrolowanego overflow do hosta. Działanie przez PCIe udokumentowane; NVLink/4 GPU tylko po fizycznym teście albo jawnie NOT RUN (opcjonalne rozszerzenia).
-- M6.4: porównane latency pojedynczego solve oraz throughput farmingu; raport skalowania/kosztu bez twierdzenia, że więcej GPU zawsze przyspiesza. Sam build lub MPI na CPU nie zamyka etapu.
+- M6.1: profil wskazuje kernel i rzeczywiste wymiary; oszacowany limit zysku całego runu. Jeżeli brak sensownego kandydata, wynik analizy i odrzucenie są jawne.
+- M6.2: dla wykonalnego kandydata prototyp FP32/TF32 vs FP64 obejmuje packing, konwersje, scatter, transfer i workspace; backend biblioteczny oceniony przed własnym CUTLASS.
+- M6.3: deklaracja TC wymaga instrukcji/liczników potwierdzających użycie. TF32 nie jest przedstawiane jako format zmniejszający storage FP32; sprzęt bez TC/TF32 ma fallback.
+- M6.4: promocja wyłącznie po K i W.1–W.3 oraz zysku całego runu z uwzględnieniem iteracji. Negatywny wynik zamyka hipotezę, nie uzasadnia wymuszania TF32/BF16.
 
-## M7 - Finalista do używania
+## M7 - Finalista na jednej 5070 Ti do używania
 
 Wymaga M6.
 
 - M7.1: finalista przechodzi W.2–W.5/K na zintegrowanym buildzie; wariant odniesienia zachowany, progi nie zostały poluzowane po wyniku.
-- M7.2: trzy poprawne pomiary finalisty/referencji na tym samym sprzęcie, mediana/rozrzut, pamięć i jakość. Tabela Pareto uwzględnia czasy/koszt/VRAM/RAM; raport podaje osiągnięty zysk i lukę do ambicji ≥1,5×/≥25%.
+- M7.2: trzy poprawne pomiary finalisty/referencji na tym samym sprzęcie, mediana/rozrzut, pamięć i jakość. Tabela Pareto uwzględnia czasy/koszt/VRAM/RAM; raport podaje osiągnięty zysk i lukę do ambicji ≥1,5×/≥25%, osobno VRAM/RAM i rozmiar danych.
 - M7.3: pakiet z manifestem i przypiętymi zależnościami odtwarza przykład; konfiguracja precision/memory/GPU jawna, niewspierane kombinacje odrzucane, cleanup i deadline sprawdzone.
-- M7.4: regresje adekwatne do zmian, docs-garden i przegląd końcowy; znane ograniczenia, źródła i wybrane ustawienia zapisane. Goal nie jest osiągnięty wyłącznie dlatego, że zakończono eksperymenty; musi istnieć zmierzona użyteczna poprawa oraz przetestowane 2 GPU. Wynik TC może być uczciwie negatywny.
-
-## R — Warunkowy FEM–BEM
-
-Osobna decyzja po raporcie głównej ścieżki; nie służy obejściu błędu poprawności M1 ani braku sprzętu M6.
-
-- **R.1:** audyt DOF powietrza i przewidywanej pamięci uzasadnia zmianę metody; wybrane biblioteki, licencje i koszt integracji zapisane.
-- **R.2:** prototyp FP64 kuli PEC vs rozwiązanie analityczne, potem dipol i dielektryk; poprawne operatory/singularne całki i zbieżność.
-- **R.3:** CUDA/kompresja/TF32 dopiero po R.2; przewaga czasu i pamięci wraz z setup/near interactions uzasadnia integrację. W przeciwnym razie zamknąć próbę bez integracji.
+- M7.4: regresje adekwatne do zmian, docs-garden i przegląd końcowy; znane ograniczenia, źródła i wybrane ustawienia zapisane. Goal nie jest osiągnięty wyłącznie dlatego, że zakończono eksperymenty; musi istnieć zmierzona użyteczna poprawa na jednej RTX 5070 Ti oraz zakończona ocena prototypu FEM–BEM/MoM. Wynik TC może być uczciwie negatywny.

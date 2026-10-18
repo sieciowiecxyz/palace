@@ -37,3 +37,9 @@ Pierwszy smoke migracyjny z 2026-10-18 ukończył sześć rozwiązań, ale runne
 Pełny case `tshaped-medium`: 3,50 GHz/P2, P1 zakończony 50 Ω, ten sam mesh medium. Jego wykonanie kosztuje około kilkunastu minut na docelowym komputerze; nie uruchamiać przy każdej zmianie dokumentacji. Po zmianie numeryki stosować bramki z [planu](speedup.md).
 
 Zachowane testy C++/regresje upstream są w `test/` i opisane w dokumentacji upstream. Nie twierdzić, że cała ich kampania przeszła na podstawie lokalnych testów narzędzi lub smoke. Testy wymagające drugiego GPU oznaczać NOT RUN, jeśli go brak.
+
+## Diagnostyka M1
+
+PALACE_VERIFY_RESIDUAL emituje także PALACE_RAW_RESIDUAL: niezależne ponowne zastosowanie A w bieżącej precyzji, normy b/Ax/b−Ax i dwa ilorazy. Dodatkowy matvec i redukcje są kosztem diagnostyki. Norma relative_action nie jest normwise backward error, a status complete nadal oznacza tylko kompletność. Rezultaty nowych coax smoke FP32/FP64 storage i audyt geometrii: [raport M1](optimization-baseline.md). Nie rozstrzygają zgodności pól całej anteny.
+
+Audyt siatki: `python3 tools/mesh_cost.py examples/tshaped-medium/mesh/pcb.msh --output artifacts/mesh-cost.json`. Regresje sprawdzają różnicę udziału elementów/objętości, zamkniętą powierzchnię i odrzucenie nieobsługiwanych danych. Metoda używa geometrii narożników, nie dokładnej kwadratury zakrzywionych elementów.

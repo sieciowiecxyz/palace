@@ -16,6 +16,8 @@ Katalog wyniku musi być nowy. Pełny przykład, po zapewnieniu wolnego RAM:
 python3 tools/dev.py run tshaped-medium artifacts/antenna-check --seconds 1800
 ```
 
+Kontrolna baza FP64 bez rekompilacji: `python3 tools/dev.py run coax-medium artifacts/coax-fp64-check --seconds 180 --basis fp64`. Zmienia wyłącznie storage GMRES; nie jest to tryb dyskowy. Pełna antena FP64 może przekroczyć budżet pamięci, więc nie używaj tej opcji tam bez rachunku.
+
 Domyślnie: FP64 operator i faktory cuDSS, FP32 storage MGS GMRES, UVM przez adapter, niezależna kontrola normy zatrzymania, MAGMA, estymator wyłączony wyłącznie dla fixed mesh. Nie aktywujemy TF32 ani FP32 faktorów.
 
 ## Trzy poziomy cache

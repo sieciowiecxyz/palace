@@ -245,7 +245,7 @@ def validate_output(work, config, returncode):
             'scope': 'Execution completeness only; RF/precision qualification is separate'}
 
 
-def run(name, output, seconds):
+def run(name, output, seconds, basis='fp32'):
     manifest = verified_build()
     directory, info, config = fixture(name)
     mesh = prepare(name)
@@ -261,11 +261,13 @@ def run(name, output, seconds):
     container = 'palace-run-' + hashlib.sha256(str(output).encode()).hexdigest()[:12]
     flags = {'MFEM_MEMORY': 'cuda', 'LD_PRELOAD': '/opt/precision/libcudss_fp32.so',
              'PALACE_CUDA_MANAGED': '1', 'PALACE_CUDSS_TRACK': '1',
-             'PALACE_GMRES_FP32_BASIS': '1', 'PALACE_SKIP_ESTIMATOR': '1',
-             'PALACE_VERIFY_RESIDUAL': '1'}
+             'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
+    if basis == 'fp32':
+        flags['PALACE_GMRES_FP32_BASIS'] = '1'
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
+            '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
@@ -333,6 +335,8 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=['coax-medium', 'tshaped-medium'])
     r = sub.add_parser('run'); r.add_argument('case', choices=['coax-medium', 'tshaped-medium'])
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
+    r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
+                   help='GMRES basis storage only; FP64 operators/factors unchanged')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
     args = parser.parse_args()
@@ -342,7 +346,7 @@ def main():
     elif args.action == 'prepare': print(prepare(args.case))
     elif args.action == 'run':
         if not 1 <= args.seconds <= 1800: parser.error('--seconds must be 1..1800')
-        run(args.case, args.output, args.seconds)
+        run(args.case, args.output, args.seconds, args.basis)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

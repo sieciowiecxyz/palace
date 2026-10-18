@@ -1,7 +1,7 @@
 # Palace — zasady forka
 
 - Zacznij od `docs/INDEX.md`, `ARCHITECTURE.md`, Git status i kodu związanego z zadaniem. Czytaj dokumenty na żądanie; nie nadpisuj cudzej pracy.
-- Cel: wiarygodne medium na CUDA, mniej VRAM/RAM i krótszy czas, docelowo multi-GPU. Plan badań: `docs/speedup.md`; profilowanie nie jest dowodem poprawności fizycznej anteny.
+- Cel: wiarygodne medium na jednej 5070 Ti, mniej VRAM/RAM i krótszy czas; FEM–BEM/MoM, mixed precision i CUDA. Plan badań: `docs/speedup.md`; profilowanie nie jest dowodem poprawności fizycznej anteny.
 - Małe, testowalne zmiany, istniejące API i zależności; C++/CUDA dla solvera, Python stdlib dla lokalnych narzędzi. Zachowuj kod/licencje upstream. Bez refaktoryzacji na zapas.
 - Medium i fizykę zmieniaj jawnie. Raportuj faktyczne precyzje, normy residuum i zakres kwalifikacji. Build lub timeout nie oznacza poprawnego wyniku RF.
 - Build/testy: `docs/testing.md`; cache i eksporty: `docs/build.md`. Nie usuwaj cache/dependencies przy zwykłym rebuildzie. Nie modyfikuj źródłowego repo anten ani `.toolchain`.

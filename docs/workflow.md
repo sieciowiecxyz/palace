@@ -20,10 +20,16 @@ Stosuj zasady ograniczania kontekstu z context.md. Same pliki nie uruchamiają a
 
 ## Workflow badań wydajności
 
-PLAN.md jest checklistą i wskazuje aktywny etap; MILESTONES.md definiuje bramki; PROGRESS.md jest aktywnym checkpointem oraz rejestrem eksperymentów. Aktualizuj istniejący checkpoint po istotnym wyniku zamiast tworzyć nowy plik dla każdej sesji. docs/speedup.md zachowuje uzasadnienie i źródła; bieżących checkboxów nie dubluj w nim. Na razie Mode: normal, Active: none; przygotowanie dokumentów nie uruchamia obliczeń.
+PLAN.md jest checklistą i wskazuje aktywny etap; MILESTONES.md definiuje bramki; PROGRESS.md jest aktywnym checkpointem oraz rejestrem eksperymentów. Aktualizuj istniejący checkpoint po istotnym wyniku zamiast tworzyć nowy plik dla każdej sesji. docs/speedup.md zachowuje uzasadnienie i źródła; bieżących checkboxów nie dubluj w nim. Bieżący Mode/Active odczytuj z PLAN; goal został jawnie aktywowany przez użytkownika.
 
 Po rozpoczęciu pracy w goal ustaw Mode: goal i Active na pierwszy niezamknięty etap. Zachowaj krótkie dowody zamknięcia w docs/milestones/Mx.md; checkpoint aktywnego etapu utwórz i zaindeksuj przed jego aktywacją (wymagane przez kontrolę docs-garden). Bieżące wpisy EXP pozostają w PROGRESS, bez duplikowania checklist. Przed runem zapisz hipotezę, referencję, kryteria i limit. Research prowadź w kodzie i pierwotnych źródłach upstream: wersja/commit, URL, data, ograniczenia/licencja i konsekwencja dla projektu. Sprawdź istniejące API przed nową zależnością; brakującej funkcji nie zakładaj na podstawie samego README.
 
 Agent główny przygotowuje case/build i dokładne argv. Do tej samej GPT-6 Luna high przekazuje uruchomienie, oczekiwanie, deadline, cleanup i listę artefaktów. Luna nie wybiera modelu fizycznego ani solvera. Czekaj na raport bez cyklicznego odpytywania; potem sam przeanalizuj wynik i zdecyduj o promocji. Research i edycje dokumentów nie wymagają uruchamiania symulacji.
 
 Po każdej próbie uzupełnij wpis EXP w PROGRESS: także porażki i brak danych. Po przejściu wszystkich ID bramki odhacz etap w PLAN, zapisz dowody oraz najlepszy wariant i dopiero aktywuj kolejny etap. Zablokowany etap pozostaje otwarty. Nie zamykaj celu wyłącznie na podstawie zakończenia listy prób.
+
+## Krótka pętla eksperymentalna
+
+Najpierw analiza źródeł i test algorytmu/operatora trwający sekundy, potem coax z limitem 180 s, pełny case tylko po tanich filtrach i z uzasadnioną hipotezą (limit 1800 s). Nie używaj 2-godzinnej anteny jako domyślnego przykładu do iteracji. Trzy powtórzenia/sweep dopiero dla finalisty. Licz także koszt przygotowania i czas developera.
+
+Reużywaj tools/dev.py, stały builder, obiekty CMake i ccache. Zmieniony Markdown/runner/audyt nie wymaga rekompilacji C++; niezmienione zależności nie są przebudowywane. Nowa opcja precyzji powinna wybierać ścieżkę runtime, jeśli jest to możliwe. Zachowuj manifesty i kwalifikację każdej rzeczywiście zmienionej binarki; cache nie zastępuje sprawdzenia zgodności.

@@ -1,18 +1,18 @@
-# Palace: mniej pamięci, krótsze obliczenia, CUDA i wiele GPU
+# Palace: mniej pamięci, krótsze obliczenia i metody dla jednej GPU
 
 Plan przeniesiony z repo antenowego. Historyczne ścieżki `infra/palace`, STATE i polecenia odnoszą się do tamtego repo; aktualny build/runner tego forka opisuje [build.md](build.md).
 
-Bieżąca kolejka i stan wykonania w tym forku: [PLAN](../PLAN.md), [MILESTONES](../MILESTONES.md), [PROGRESS](../PROGRESS.md). Sekcja 8 poniżej zachowuje plan badawczy z chwili opracowania; jej checkboxy nie są aktualnym rejestrem postępu.
+Bieżąca kolejka i stan wykonania w tym forku: [PLAN](../PLAN.md), [MILESTONES](../MILESTONES.md), [PROGRESS](../PROGRESS.md). Aktualizacja celu 2026-10-18: jedna 5070 Ti; obowiązkowa ocena FEM–BEM/MoM; multi-GPU poza obecnym zakresem.
 
-Data opracowania: 2026-10-18. Status: **research i plan; nowe etapy wykonawcze nie są rozpoczęte**.
+Data opracowania: 2026-10-18. Status: **goal aktywny, etap M1; stan dowodów w PROGRESS.md**.
 Dokument zbiera cele użytkownika, wyniki wcześniejszych prób, weryfikację załącznika i plan dalszej pracy.
-Nie jest raportem z nowych benchmarków ani uruchomieniem nowego goal mode.
+Liczby historyczne niżej nie są nowymi benchmarkami; bieżące uruchomienia rejestruje PROGRESS.md.
 
 ## 1. Cel i decyzja
 
-**Cel użytkownika:** znacznie skrócić czas do wiarygodnego wyniku anteny i zmniejszyć pamięć roboczą, tak aby medium było praktyczne na RTX 5070 Ti 16 GB + 96 GB RAM. Ten sam rozwijany solver ma obsługiwać CUDA, przekroczenie VRAM przez pamięć hosta (CUDA Unified Memory, dalej UVM) oraz podział jednej symulacji na wiele GPU. Wykorzystać Tensor Cores/TF32 wszędzie, gdzie daje to rzeczywisty zysk przy zaakceptowanym błędzie. Zachować cuDSS jako wspieraną ścieżkę.
+**Cel użytkownika:** znacznie skrócić czas do wiarygodnego wyniku anteny i zmniejszyć pamięć roboczą, tak aby medium było praktyczne na RTX 5070 Ti 16 GB + 96 GB RAM. Ten sam rozwijany solver ma obsługiwać CUDA, przekroczenie VRAM przez pamięć hosta (CUDA Unified Memory, dalej UVM) na jednej dostępnej karcie. Multi-GPU zachowujemy jako przyszły kierunek poza kryteriami obecnego celu. Wykorzystać Tensor Cores/TF32 wszędzie, gdzie daje to rzeczywisty zysk przy zaakceptowanym błędzie. Zachować cuDSS jako wspieraną ścieżkę.
 
-**Moja rekomendacja:** małe, mierzalne rozszerzenia Palace/MFEM/libCEED w C++/CUDA. Najpierw pamięć GMRES i migracje danych, ponowne użycie przygotowania układu, potem preconditioner i wybrane operacje Tensor Core. Reużyć istniejącą integrację MPI/cuDSS. Nowy MoM/BEM pozostawić jako warunkowy eksperyment; przepisywanie solvera do Rust nie jest pierwszą inwestycją.
+**Moja rekomendacja:** małe, mierzalne rozszerzenia Palace/MFEM/libCEED w C++/CUDA. Najpierw wiarygodna referencja i koszt powietrza, potem obowiązkowy prototyp Maxwell FEM–BEM/MoM, pamięć GMRES/migracje, reuse setup, preconditioner i wybrane operacje Tensor Core. Reużyć istniejący kod; przepisywanie solvera do Rust nie jest pierwszą inwestycją.
 
 To wybór na podstawie dotychczasowych danych, a nie dowód globalnej optymalności. Kolejność zmieniamy po pomiarze wskazującym inne dominujące koszty.
 
@@ -200,90 +200,15 @@ Pomiar wydajności: identyczny sprzęt i obciążenie tła, mediana 3 poprawnych
 
 Cel ambitny, a nie obietnica: dodatkowe ≥1,5× przyspieszenie względem 955,176 s (około 637 s) i ≥25% spadku porównywalnego szczytu pamięci hosta. Osobno mierzyć całkowity RAM, VRAM i ruch PCIe — przeniesienie alokacji na host nie jest zmniejszeniem wszystkich danych. Mniejsze poprawy można przyjmować, jeśli są powtarzalne i nie pogarszają innych istotnych metryk; zapisywać kompromis na wykresie/tabeli Pareto.
 
-## 8. Plan wykonawczy — etapy z bramkami
+## 8. Aktualna kolejność wykonawcza
 
-Etapy prowadzić kolejno. Etap może zakończyć się odrzuceniem hipotezy z dowodami; nie trzeba wymuszać pozytywnego wyniku. Kolejny etap korzysta z najlepszego zaakceptowanego wariantu. Brak GPU do testu oznacza „niezweryfikowane”, nigdy „multi-GPU działa”.
+Kryteria i aktualne checkboxy są wyłącznie w [MILESTONES](../MILESTONES.md) i [PLAN](../PLAN.md), wyniki w [PROGRESS](../PROGRESS.md).
 
-### M0 — zebranie wiedzy
+M1: referencja/residuum/profil/powietrze → M2: research i prototyp Maxwell FEM–BEM/MoM → M3: GMRES/pamięć → M4: reuse setup → M5: preconditioner/mixed precision → M6: Tensor Cores/TF32/BF16 → M7: kwalifikacja na jednej GPU.
 
-- [x] Odczyt załącznika, rozmowy, lokalnego raportu i źródeł.
-- [x] Research repozytoriów i ograniczeń CUDA/mixed precision.
-- [x] Zapis tego planu oraz rozróżnienie faktów, hipotez i celów.
+FEM–BEM nie jest już odłożonym planem awaryjnym; wymaga rzeczywistego prototypu i pomiaru. Integracja docelowej anteny zależy od poprawności oraz opłacalności małego prototypu. Czysty FEM pozostaje odniesieniem i fallbackiem. Zmiana metody wymaga tej samej geometrii/fizyki, ale jej dyskretyzację dobieramy do porównywalnego błędu; nie wymagamy identycznej siatki objętościowej między FEM i BEM.
 
-### M1 — referencja, poprawność i rachunek pamięci
-
-- [ ] Zachować obecny obraz i dokładne manifesty. Zinwentaryzować fizyczny case i wyniki, żeby nie promować benchmarku jako nowej anteny.
-- [ ] Wyjaśnić różnicę raw residual 0,125/0,808: skalowanie, preconditioning, arytmetyka residuum, rozwiązanie referencyjne i zgodność pól. Ustalić kryterium niezależne od wybranego preconditionera.
-- [ ] Dodać brakujący podział high-water memory: operator/q-data, V-basis, dodatkowe Z-basis jeśli FGMRES, faktory/workspace, duplikaty i bufory.
-- [ ] Krótki poprawnie obsługiwany profil reprezentatywnej fazy; bez wielogigabajtowego śledzenia każdego faultu, jeśli zaciemnia pomiar.
-- [ ] Zamrozić progi i komplet wejść dla kolejnych porównań.
-
-**Bramka:** wiemy, co jest wiarygodną referencją, gdzie są koszty i jaki błąd akceptujemy. Nie rozpoczynać dalszej redukcji precyzji z nierozstrzygniętą kontrolą rozwiązania.
-
-### M2 — baza GMRES i polityka pamięci
-
-- [ ] Bezpośrednie operacje na FP32 storage z arytmetyką/redukcjami FP64; zachować MGS i dokładniejsze kontrolne zastosowanie A.
-- [ ] Usunąć zbędne rozpakowania/kopie; policzyć bytes/iteration i rzeczywisty szczyt pamięci.
-- [ ] Osobno porównać UVM i ograniczone porcjowanie bazy. Nie łączyć tej zmiany od razu z nową ortogonalizacją.
-- [ ] Jeden eksperyment restartu 120 względem 240, jeśli z pomiaru wynika sens. Nie robić szerokiego sweepa K.
-
-**Bramka:** poprawność i powtarzalna poprawa czasu/pamięci albo jawne odrzucenie. Dostarczyć opcję konfiguracji, test operacji i raport na pełnym case.
-
-### M3 — mniej powtarzanej pracy
-
-- [ ] Sprawdzić reuse A/P/faktorów dla obu portów tej samej częstotliwości. Lokalny `drivensolver.cpp` ma pętlę port→częstotliwość i `SetOperators` wewnątrz; zmierzyć faktyczne rebuildy.
-- [ ] Jeśli macierz i terminacje są identyczne, przygotować raz na częstotliwość i rozwiązać kolejne RHS. Zachować nazwy outputów, wznowienia i postprocessing.
-- [ ] Nie przenosić faktorów numerycznych między różnymi częstotliwościami bez uzasadnienia; symbolic reuse to inna możliwość.
-- [ ] Warunkowo przetestować warm start/recycling lub istniejący adaptive sweep dla wielu częstotliwości, z niezależnymi checkpointami. Nie przypisywać tego przyspieszeniu pojedynczego solve.
-
-**Bramka:** zgodne oba porty oraz mniejszy koszt pełnego zadania; bez zmiany fizycznego port termination lub utraty artefaktów.
-
-### M4 — preconditioner i kontrola pamięci cuDSS
-
-- [ ] Ustalić poprawny minimalny limit cuDSS hybrid; porównać dwa sensowne budżety (np. 2/4 GiB tylko jeśli przekraczają minimum) z obecnym UVM. Logować minimum/limit/rzeczywiste użycie.
-- [ ] Jedna kontrolowana próba AMS na odpowiednim poziomie/operatorze, ten sam mesh i jawnie ta sama kontrola rozwiązania. Zweryfikować rzeczywistą pracę GPU, nie tylko Device=GPU.
-- [ ] Powrót do FP32 faktorów tylko z nowym projektem mixed precision: scaling i zewnętrzna korekcja FP64, kryterium stagnacji, fallback i ewentualnie FGMRES wraz z jego kosztem pamięci.
-- [ ] Utrzymać działającą opcję cuDSS FP64 również wtedy, gdy AMS okaże się szybszy w wybranym przypadku.
-
-**Bramka:** ocenić setup+wszystkie iteracje, peak memory i niezależną poprawność; szybszy pojedynczy coarse solve nie wystarcza.
-
-### M5 — Tensor Cores na zmierzonym gorącym fragmencie
-
-- [ ] Wybrać jeden kernel interpolacji/pochodnych preconditionera, rozmiary wziąć z realnego P2, a nie z wygodnego dużego GEMM.
-- [ ] Prototyp batchowania przez cuBLASLt; CUTLASS tylko po wykazaniu braku odpowiedniego rozwiązania bibliotecznego.
-- [ ] Zmierzyć pakowanie, transfery, mnożenia, konwersje, scatter i workspace; kontrolować błąd operatora lokalnego.
-- [ ] Porównać FP32 i TF32. Jeśli dokładność niewystarczająca, zbadać korekcję/emulację w osobnym eksperymencie lub odrzucić TF32.
-- [ ] Potwierdzić instrukcje/liczniki Tensor Core i uruchomić jeden pełny case. Użyteczny zysk musi przetrwać zmianę liczby iteracji.
-
-**Bramka:** dowód TC + zgodność + szybszy cały solve. Brak korzyści oznacza udokumentowany wynik, nie wymuszanie Tensor Cores wszędzie.
-
-### M6 — jedna symulacja na wielu GPU
-
-- [ ] Przypiąć zgodny zestaw Palace/MFEM/cuDSS/MPI i komunikację. Najpierw wykorzystać istniejący wrapper MGMN.
-- [ ] Mały test na 1 i 2 GPU: zgodne S i reszty, lokalne bufory, poprawna redukcja i brak ukrytej replikacji całego problemu.
-- [ ] Pełny case: 1→2 GPU; pamięć per rank/device, suma i max, czas komunikacji i globalnych redukcji, udział UVM.
-- [ ] Sprawdzić 2 GPU z kontrolowanym overflow RAM. Osobno GPU-resident i UVM/hybrid; nie zmieniać równocześnie kilku trybów.
-- [ ] NVLink sprawdzić na sprzęcie, który go faktycznie posiada; PCIe pozostaje wymaganym fallbackiem. 4 GPU dopiero po udanym 2 GPU.
-- [ ] Oddzielnie ocenić farming częstotliwości/portów vs dzielenie pojedynczego solve: throughput i koszt to inne metryki niż latency.
-
-**Bramka:** prawdziwe uruchomienie 2-GPU wymagane do deklaracji wsparcia. Sam build/MPI smoke na CPU nie wystarcza. Przy braku sprzętu etap pozostaje otwarty; najem wymaga aktualnego budżetu i autoryzacji, nie jest częścią tego dokumentu.
-
-### M7 — kwalifikacja i spakowanie
-
-- [ ] Finalista przechodzi kontrolny coax, trudne częstotliwości i oba porty; następnie końcowy sweep.
-- [ ] Trzy powtórzenia czasu bez profilera, porównanie pamięci i jakości; raport kompromisów.
-- [ ] Cache buildu, przypięte wersje, obraz z manifestem i mały CLI reużywający `infra/palace`; jednoznaczne opcje precision/memory/GPU.
-- [ ] Zachować wariant referencyjny, automatyczne odrzucenie niewspieranych kombinacji, cleanup i limity runu.
-- [ ] Zaktualizować ten dokument, README i STATE rzeczywistymi wynikami. Nie zapisywać planów jako wykonanych.
-
-**Ukończenie celu:** działający i odtwarzalny kompromis czasu/pamięci z podanym zakresem dokładności, CUDA/UVM/cuDSS oraz przetestowanym 2-GPU. Zysk TC raportować tylko jeśli wykazany; jeśli obiecana duża poprawa nie wystąpi, nie oznaczać celu jako osiągniętego wyłącznie z powodu wykonania eksperymentów.
-
-### R — warunkowy nowy solver FEM–BEM
-
-- [ ] Uruchomić tylko jeśli M1–M7 wskazują niewystarczający kompromis, a audyt DOF/pamięci powietrza uzasadnia zmianę metody.
-- [ ] Izolowany prototyp FP64: kula PEC z odniesieniem analitycznym, następnie dipol i dielektryk.
-- [ ] Dopiero potem CUDA, kompresja i TF32; uwzględnić też koszt setup i near interactions.
-- [ ] Integracja z Palace przez operator blokowy dopiero po przewadze małego prototypu. Nie zaczynać od całej anteny ani od pisania własnej biblioteki H².
+Cel ukończony po użytecznej, zmierzonej poprawie na jednej 5070 Ti, kwalifikacji jakości i pakietu oraz zakończonej ocenie FEM–BEM/MoM. Ambicje szybkości/pamięci nie są gwarancją; raport musi wskazać zysk i lukę. Nie kończyć celu tylko dlatego, że wykonano wszystkie próby.
 
 ## 9. Zasady prowadzenia zmian
 
@@ -297,4 +222,4 @@ Etapy prowadzić kolejno. Etap może zakończyć się odrzuceniem hipotezy z dow
 
 ### Krótki prompt do kontynuacji
 
-> Przeczytaj speedup.md, STATE.md i LOCAL_OPTIMIZATION_RESULTS.md. Wybierz pierwszy niezamknięty etap. Celem jest mniejsza pamięć i krótszy czas wiarygodnych obliczeń medium na RTX 5070 Ti 16 GB + 96 GB RAM, z CUDA, UVM, cuDSS i rzeczywistym multi-GPU. Rozwijaj istniejący Palace/MFEM/libCEED; TF32 wdrażaj tam, gdzie benchmark i kontrola błędu potwierdzą korzyść. Najpierw rozstrzygnij referencję i normy residuum, potem pamięć GMRES. Nie powtarzaj odrzuconego FP32 cuDSS bez nowej hipotezy. Jedna zmiana naraz, mały test, pojedynczy pełny case, dopiero potem kwalifikacja. Przygotuj dokładne uruchomienie dla tej samej Luny high; projektowanie i analiza należą do agenta głównego. Zapisuj dowody, wynik i następny krok. Brak hardware lub poprawnego wyniku oznaczaj jawnie; nie udawaj ukończenia etapu.
+> Przeczytaj AGENTS, PLAN, MILESTONES, PROGRESS i aktywny checkpoint. Cel: mniej VRAM/RAM i krótszy czas wiarygodnego medium na jednej 5070 Ti 16 GB + 96 GB RAM. Realizuj bramki po kolei: referencja/residuum/profil, prototyp Maxwell FEM–BEM/MoM, pamięć GMRES, reuse, preconditioner/mixed precision, TC i kwalifikacja. Nie zmieniaj fizyki dla lepszego czasu. Każdy eksperyment ma jedną hipotezę, referencję, limit i kontrolę jakości. Ta sama Luna high tylko uruchamia gotowe polecenia i odbiera wyniki; projekt i interpretacja należą do agenta głównego. Zapisuj także odrzucenia; bez płatnego compute i bez obowiązku multi-GPU.

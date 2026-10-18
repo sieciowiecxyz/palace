@@ -709,6 +709,29 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       CheckDot(checked_beta, "Verified GMRES residual is not valid: ");
       Mpi::Print(comm, "PALACE_KSP_CHECK: absolute={:.12e} relative_initial={:.12e} threshold={:.12e}\n",
                  checked_beta, checked_beta / initial_res, eps);
+      if (std::getenv("PALACE_VERIFY_RESIDUAL"))
+      {
+        // LEFT GMRES stops on ||B(b-Ax)||, which need not control ||b-Ax||.
+        // Reuse scratch vectors; this diagnostic does not change the stopping rule.
+        // The action-relative measure below is NOT a normwise backward error:
+        // ||Ax|| is not ||A||*||x||. Report the constituent norms explicitly.
+        A->Mult(x, V[0]);
+        const auto ax_norm = linalg::Norml2(comm, V[0]);
+        r = b;
+        r -= V[0];
+        const auto raw_norm = linalg::Norml2(comm, r);
+        const auto rhs_norm = linalg::Norml2(comm, b);
+        const auto relative_rhs = rhs_norm > 0.0 ? raw_norm / rhs_norm :
+                                  (raw_norm == 0.0 ? 0.0 : std::numeric_limits<double>::infinity());
+        const auto denominator = ax_norm + rhs_norm;
+        const auto relative_action = denominator > 0.0 ? raw_norm / denominator :
+                                     (raw_norm == 0.0 ? 0.0 : std::numeric_limits<double>::infinity());
+        Mpi::Print(comm,
+                   "PALACE_RAW_RESIDUAL: pc_side={} raw={:.12e} rhs={:.12e} "
+                   "ax={:.12e} relative_rhs={:.12e} relative_action={:.12e}\n",
+                   B && pc_side == PreconditionerSide::LEFT ? "left" : "raw",
+                   raw_norm, rhs_norm, ax_norm, relative_rhs, relative_action);
+      }
       if (compressed_basis)
       {
         beta = checked_beta;

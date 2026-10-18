@@ -10,6 +10,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: punkt wejścia](milestones/M1.md)
   - Czytaj gdy: rozpoczynasz kwalifikację referencji i profilowanie
   - Opis: Nieaktywny checkpoint M1 i pierwszy krok przed eksperymentami.
+- [M1: diagnostyka i audyt anteny](optimization-baseline.md)
+  - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
+  - Opis: Dwa krótkie smoke, audyt domen i rachunek pamięci powierzchniowej.
 - [Build i cache — lokalny SM120](build.md)
   - Czytaj gdy: budujesz, pakujesz lub przenosisz środowisko
   - Opis: Cache, lokalne obrazy, CLI i limity runnera.
@@ -22,7 +25,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [Pochodzenie i stan migracji](migration.md)
   - Czytaj gdy: sprawdzasz pochodzenie lub stan migracji
   - Opis: Rewizje, granice przeniesienia i wyniki kontroli.
-- [Palace: mniej pamięci, krótsze obliczenia, CUDA i wiele GPU](speedup.md)
+- [Palace: pamięć, szybkość i metody dla jednej GPU](speedup.md)
   - Czytaj gdy: planujesz optymalizację pamięci lub obliczeń
   - Opis: Cele użytkownika, research i bramki eksperymentów.
 - [Configuration File](src/config/config.md)
