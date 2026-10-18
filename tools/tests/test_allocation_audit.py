@@ -20,14 +20,18 @@ class AllocationAuditTests(unittest.TestCase):
             'PALACE_ALLOC_STACK 0x1 0 /opt/libceed.so(CeedBasisApply+0x1)',
             event('alloc', '0x2', 200, 310),
             'PALACE_ALLOC_STACK 0x2 0 /opt/libcudss.so(+0x1)',
+            'PALACE_ALLOC_STACK 0x2 1 /opt/libpalace.so(CompareFieldSnapshots+0x1)',
             event('free', '0x1', 100, 210), event('free', '0x2', 200, 10),
             event('alloc', '0x2', 50, 60),
             'PALACE_ALLOC_STACK 0x2 0 /unknown.so(+0x1)',
-            'CUDA_UVM: peak_managed_bytes=315 live_managed_bytes=60',
+            'Elapsed report: CUDA_UVM: peak_managed_bytes=315 live_managed_bytes=60',
         ])
         self.assertEqual(result['recovered_interleaved_events'], 1)
         self.assertEqual(result['largest_observed_event_live_bytes'], 310)
         self.assertEqual(result['reported_all_allocation_peak_bytes'], 315)
+        self.assertEqual(result['peak_trigger_event']['pointer'], '0x2')
+        self.assertEqual(result['peak_context_hint'], 'field_snapshot_comparison')
+        self.assertIn('/opt/libcudss.so', result['peak_trigger_event']['stack'][0])
         self.assertEqual(result['unattributed_small_bytes_at_event_peak'], 10)
         self.assertEqual(result['at_event_peak_by_category']['cuDSS factors/workspace']['bytes'], 200)
         self.assertEqual(result['at_event_peak_by_category']['libCEED basis evaluation']['bytes'], 100)

@@ -386,6 +386,30 @@ def cgroup_memory(directory):
         return {}  # A container can start/exit between samples; absence is not completion.
 
 
+def process_gpu_memory(pid):
+    """Reported compute-context VRAM for the direct single-rank entrypoint PID."""
+    if not pid:
+        return None
+    try:
+        query = subprocess.run(['nvidia-smi', '--query-compute-apps=pid,used_gpu_memory',
+                                '--format=csv,noheader,nounits'],
+                               capture_output=True, text=True, timeout=5)
+        if query.returncode:
+            return None
+        total, found = 0, False
+        for row in csv.reader(query.stdout.splitlines()):
+            if len(row) != 2 or row[0].strip() != str(pid):
+                continue
+            try:
+                total += int(row[1].strip()) * 1024**2  # nvidia-smi memory values are MiB.
+                found = True
+            except ValueError:
+                return None  # Unsupported/MIG/unavailable is not zero usage.
+        return total if found else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 def require_host_memory():
     free = available_memory()
     if free < 6 * 1024**3:
@@ -408,9 +432,12 @@ def verified_qpool(native):
 
 
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
-        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False):
+        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
+    if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
+                                       or not 16 <= hypre_pool_mib <= 4096):
+        raise ValueError('HYPRE pool must be an integer from 16 to 4096 MiB')
     require_host_memory()
     manifest = verified_build()
     qpool = verified_qpool(manifest) if ceed_qpool else None
@@ -440,6 +467,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     flags = {'MFEM_MEMORY': 'cuda', 'LD_PRELOAD': '/opt/precision/libcudss_fp32.so',
              'PALACE_CUDA_MANAGED': '1', 'PALACE_CUDSS_TRACK': '1',
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
+    if hypre_pool_mib is not None:
+        flags['PALACE_HYPRE_DEVICE_POOL_MIB'] = str(hypre_pool_mib)
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
     if allocation_trace:
@@ -456,6 +485,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
+            '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -475,7 +505,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     write(output / 'command.json', {'argv': args, 'environment': flags,
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
-                                                  'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool},
+                                                  'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
+                                                  'hypre_pool_mib': hypre_pool_mib},
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
@@ -484,6 +515,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             proc = subprocess.Popen(['podman', 'start', '--attach', container], stdout=log, stderr=subprocess.STDOUT)
             low_memory = 0
             memory_path = None
+            pid = 0
             while proc.poll() is None:
                 if memory_path is None:
                     inspected = read_output(['podman', 'inspect', container])[0]
@@ -493,6 +525,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                             memory_path = container_memory_path(pid)
                         except OSError:
                             pass
+                process_memory = process_gpu_memory(pid)
+                if process_memory is not None:
+                    status['gpu_process_memory_peak_bytes'] = max(status.get('gpu_process_memory_peak_bytes', 0), process_memory)
                 memory = cgroup_memory(memory_path)
                 if memory:
                     status['cgroup_memory_peak_bytes'] = max(status.get('cgroup_memory_peak_bytes', 0), memory['peak_bytes'])
@@ -502,7 +537,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                      capture_output=True, text=True, timeout=5)
                 telemetry.write(json.dumps({'seconds': time.monotonic() - started,
                                             'host_available_bytes': free, 'gpu': gpu.stdout.strip(),
-                                            'container_memory': memory}) + '\n')
+                                            'container_memory': memory, 'gpu_process_pid': pid or None,
+                                            'gpu_process_memory_bytes': process_memory}) + '\n')
                 telemetry.flush()
                 if low_memory >= 2 or time.monotonic() - started > seconds + 10:
                     status['host_guard_or_deadline'] = True
@@ -514,6 +550,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if hypre_pool_mib is not None:
+            logged = re.findall(r'PALACE_HYPRE_POOL: initial_device_bytes=(\d+)',
+                                (output/'palace.log').read_text())
+            status['hypre_pool_applied'] = logged == [str(hypre_pool_mib * 1024**2)]
+            status['complete'] = status['complete'] and status['hypre_pool_applied']
         if qpool:
             checks = re.findall(r'PALACE_CEED_QPOOL: calls=(\d+) borrowed_vectors=(\d+)',
                                 (output/'palace.log').read_text())
@@ -567,6 +608,7 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
+    r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
     r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
     r.add_argument('--allocation-trace', action='store_true', help='Trace large UVM allocations and caller stacks; diagnostic only')
     r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
@@ -611,7 +653,7 @@ def main():
             print(json.dumps({'job': str(metadata), **job}, indent=2))
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
-            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool)
+            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

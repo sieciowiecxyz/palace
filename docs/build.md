@@ -74,3 +74,7 @@ Nowe coax runy zapisują geometry.json i actual_config_sha256 po jawnych zmianac
 ## Osobny eksperyment libCEED
 
 [Q-pool](ceed-qpool.md) buduje jeden backend C z istniejącymi obiektami, nie cały toolchain. Opt-in --ceed-qpool ma osobny manifest i nie jest zawarty w normalnym package; brak kwalifikacji Maxwella. Domyślny runtime pozostaje bazowy. Preflight host RAM odrzuca start GPU poniżej6GiB, aktywny guard nadal działa podczas obliczeń.
+
+## Opcjonalny seed HYPRE i scope GPU
+
+`--hypre-pool-mib 256` ogranicza początkową rezerwację urządzenia, nie całą pamięć macierzy; [wyniki i walidacja](hypre-pool.md). Brak flagi zachowuje bazę. Telemetria ma dodatkowo sampled `gpu_process_memory_bytes` dla PID bezpośredniego single-rank entrypointu. N/A i brak procesu pozostają null; nie utożsamiać z globalnym GPU ani totalmanaged.

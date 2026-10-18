@@ -36,8 +36,9 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Dodać ślady dużych alokacji i pomiar cgroup RAM; interpretacja właścicieli pozostaje otwarta.
 - [x] Rozliczyć duże alokacje w tej samej chwili i zaplanować hipotezę workspace w RAM/VRAM: docs/memory-audit.md; bez nowej pełnej symulacji.
 - [x] Zbadać lifetime i przygotować izolowany Q-pool: oryginalne assembly/passive zachowane, sync przed/po, mały probe PASS; docs/ceed-qpool.md.
-- [ ] Zakwalifikować Q-pool w coax/TEM po dostępnej pamięci: baseline przerwany przed solve; pełna antena NOT RUN.
-- [ ] Osobno zbadać mniejszy seed puli HYPRE/Umpire (domyślnie4GiB), bez zmiany numeryki; nie mieszać z porównaniem Q-pool.
+- [x] Q-pool przeszedł coax/TEM, lecz zwiększył logical UVM peak w coax-tiny o 5,8% i nie zmniejszył sampled VRAM; brak promocji.
+- [x] Osobny seed HYPRE 256 MiB: coax/TEM PASS, sampled VRAM procesu niższy o 3,75 GiB na małym fixture, porty/energie zgodne; pełna antena niezakwalifikowana.
+- [ ] Rozdzielić peak pamięci faz solve i postprocessingu przez jawne znaczniki. Historyczny peak 45 GiB wyzwoliło `CompareFieldSnapshots`; nie jest to dowód peak samego GMRES. Oszacować RAM/VRAM przed referencją FP64 rezydującą wyłącznie w pamięci.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.

@@ -35,6 +35,7 @@ def audit(lines):
     peak, snapshot, events, stack_frames = 0, [], 0, 0
     interleaved_events = 0
     reported_peak = None
+    peak_event = None
     for line in lines:
         if 'PALACE_ALLOC {' in line:
             position = line.index('PALACE_ALLOC {')
@@ -62,17 +63,18 @@ def audit(lines):
                 peak = event['logical_live_bytes']
                 # Keep the allocation objects: following stack lines belong to this event.
                 snapshot = list(active.values())
+                peak_event = current if current is not None else event
         elif line.startswith('PALACE_ALLOC_STACK '):
             _, pointer, _, frame = line.rstrip().split(' ', 3)
             if current is None or pointer != current['pointer']:
                 raise ValueError('Stack does not belong to current allocation')
             current['stack'].append(frame)
             stack_frames += 1
-        elif line.startswith('CUDA_UVM:'):
+        elif 'CUDA_UVM:' in line:
             match = re.search(r'peak_managed_bytes=(\d+)', line)
             if match:
                 reported_peak = int(match[1])
-    if not events:
+    if not events or peak_event is None:
         raise ValueError('No attributable allocation events')
     groups = defaultdict(lambda: {'bytes': 0, 'allocations': 0})
     sizes = defaultdict(lambda: {'bytes': 0, 'allocations': 0, 'categories': set()})
@@ -91,6 +93,9 @@ def audit(lines):
         'events': events, 'stack_frames': stack_frames, 'recovered_interleaved_events': interleaved_events,
         'largest_observed_event_live_bytes': peak,
         'reported_all_allocation_peak_bytes': reported_peak,
+        'peak_trigger_event': peak_event,
+        'peak_context_hint': ('field_snapshot_comparison' if any('CompareFieldSnapshots' in frame
+                              for frame in peak_event.get('stack', [])) else 'not identified by this stack'),
         'attributed_large_bytes_at_event_peak': traced,
         'unattributed_small_bytes_at_event_peak': peak - traced,
         'at_event_peak_by_category': dict(sorted(groups.items(), key=lambda item: -item[1]['bytes'])),

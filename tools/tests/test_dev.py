@@ -12,12 +12,30 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_process_gpu_memory_uses_only_own_pid_and_real_units(self):
+        query = type('Query', (), dict(returncode=0, stdout='9, 4000\n42, 256\n'))()
+        with patch.object(dev.subprocess, 'run', return_value=query):
+            self.assertEqual(dev.process_gpu_memory(42), 256*1024**2)
+            self.assertIsNone(dev.process_gpu_memory(7))
+            self.assertIsNone(dev.process_gpu_memory(0))
+        query.stdout = '42, [N/A]\n'
+        with patch.object(dev.subprocess, 'run', return_value=query):
+            self.assertIsNone(dev.process_gpu_memory(42))
+        with patch.object(dev.subprocess, 'run', side_effect=dev.subprocess.TimeoutExpired('nvidia-smi', 5)):
+            self.assertIsNone(dev.process_gpu_memory(42))
+
     def test_qpool_generator_rejects_unpinned_source(self):
         spec = importlib.util.spec_from_file_location('qpool', Path(__file__).parents[1]/'experiments/ceed_qpool.py')
         qpool = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(qpool)
         with self.assertRaisesRegex(ValueError, 'Pinned libCEED source changed'):
             qpool.generate('unverified upstream source')
+
+    def test_invalid_hypre_pool_is_rejected_before_gpu(self):
+        with patch.object(dev, 'require_host_memory', side_effect=AssertionError('must not start')):
+            for size in [0, 15, 4097, -1, '256', True]:
+                with self.assertRaisesRegex(ValueError, '16 to 4096'):
+                    dev.run('coax-tiny', '/unused', 60, hypre_pool_mib=size)
 
     def test_low_host_memory_refuses_gpu_before_build(self):
         with patch.object(dev, 'available_memory', return_value=5*1024**3), \

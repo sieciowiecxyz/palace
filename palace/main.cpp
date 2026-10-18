@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+#include <charconv>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -151,6 +152,27 @@ static void PrintPalaceInfo(MPI_Comm comm, int np, int nt, int ngpu, mfem::Devic
   Mpi::Barrier(comm);
 }
 
+// Optional initial reservation, not a cap on matrix storage or total HYPRE memory.
+static void ConfigureHypreMemoryPool(MPI_Comm comm)
+{
+  const char *setting = std::getenv("PALACE_HYPRE_DEVICE_POOL_MIB");
+  if (!setting) return;
+  std::string_view text(setting);
+  unsigned int mib = 0;
+  const auto parsed = std::from_chars(text.data(), text.data() + text.size(), mib);
+  MFEM_VERIFY(parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size() &&
+                  mib >= 16 && mib <= 4096,
+              "PALACE_HYPRE_DEVICE_POOL_MIB must be an integer from 16 to 4096!");
+#if defined(HYPRE_USING_UMPIRE)
+  const auto bytes = static_cast<std::size_t>(mib) * 1024 * 1024;
+  MFEM_VERIFY(HYPRE_SetUmpireDevicePoolSize(bytes) == 0,
+              "Cannot configure HYPRE Umpire device pool!");
+  Mpi::Print(comm, "PALACE_HYPRE_POOL: initial_device_bytes={} (growth allowed; no disk storage)\n", bytes);
+#else
+  MFEM_ABORT("HYPRE was built without Umpire; requested device pool control is unavailable!");
+#endif
+}
+
 int main(int argc, char *argv[])
 {
   // Reject legacy launch scripts before MPI, CUDA or any solver allocation.
@@ -262,6 +284,7 @@ int main(int argc, char *argv[])
 
     // Initialize Hypre and, optionally, SLEPc/PETSc.
     hypre::Initialize();
+    ConfigureHypreMemoryPool(world_comm);
 #if defined(PALACE_WITH_SLEPC)
     slepc::Initialize(argc, argv, nullptr, nullptr);
     if (PETSC_COMM_WORLD != world_comm)

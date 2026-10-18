@@ -18,7 +18,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Reprodukowalny audyt zapisanych alloc/free, bufory libCEED i hipoteza współdzielenia workspace.
 - [M1: prototyp Q-workspace](ceed-qpool.md)
   - Czytaj gdy: budujesz lub kwalifikujesz eksperymentalny pool aktywnych Q-wektorów
-  - Opis: Osobny cached build libCEED, pozytywny probe i nieukończona walidacja Maxwella.
+  - Opis: Osobny cached build libCEED, probe i coax/TEM PASS; filtr nie poprawił pamięci i nie jest promowany.
+- [M1: pula HYPRE/Umpire](hypre-pool.md)
+  - Czytaj gdy: ograniczasz początkową rezerwację GPU lub oceniasz pomiar VRAM procesu
+  - Opis: Opt-in256MiB, dodatni filtr TEM i zmierzona oszczędność3,75GiB w małym przypadku.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

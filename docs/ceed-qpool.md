@@ -1,6 +1,6 @@
 # Eksperyment M1: aktywne Q-wektory libCEED
 
-Status 2026-10-18: **prototyp, niezakwalifikowany dla Palace/anteny**. Mały test operatorów przechodzi; porównanie solvera nie doszło do solve przez brak wolnej pamięci w systemie. M1 pozostaje otwarty, obowiązkowy M2 FEM–BEM/MoM nadal przed nami. Wymaganie RAM/VRAM bez dyskowego working storage obowiązuje także ten eksperyment.
+Status 2026-10-18: **filtr poprawności Palace/TEM PASS, brak promocji pamięci ani szybkości**. Po pierwszym przerwaniu bazy wykonano porównanie z jednakowym seedem HYPRE 256 MiB. W tym małym teście wariant nie oszczędza VRAM, ma większy logical UVM peak i nieco dłuższy zwykły run. Pełna antena NOT RUN. M1 pozostaje otwarty, a obowiązkowy M2 FEM–BEM/MoM nadal jest przed nami. Dane robocze pozostają w RAM/VRAM.
 
 ## Co dokładnie zmieniono
 
@@ -42,10 +42,12 @@ Probe `tools/experiments/ceed_qpool_probe.c/.h`: dwa operatory masowe o znanych 
 | Probe baza | PASS, exit0, 1,90 s | Dwa operatory, dane kontrolne |
 | Probe Q-pool | PASS, exit0, 0,63 s | 16 ApplyAdd / 32 pożyczone wektory |
 | Coax-tiny baza, 3freq/2porty | FAIL przed solve, 2,89 s | CUDA OOM + host guard; bez Q-pool |
-| Coax-tiny Q-pool i TEM L2 | NOT RUN | Przerwano drabinę po FAIL bazy |
+| Pierwszy coax-tiny Q-pool i TEM L2 | NOT RUN | Przerwano drabinę po FAIL bazy |
+| Późniejsza para: seed 256 MiB, Q-pool off/on | PASS, 6/6 | Baza 10,388 s; Q-pool 11,437 s; sampled VRAM procesu obu 631 242 752 B |
+| TEM Q-pool, seed 256 MiB | PASS, 17,561 s | E ~0,4953%, B ~0,5211–0,5363%, q4/q6, oba porty |
 | Pełna antena | NOT RUN | Nie uruchamiać przed filtrami |
 
-Artefakty: `artifacts/m1-qpool-probe-20261018/`, `artifacts/m1-qpool-tiny-baseline-20261018/`. Różnica 1,90/0,63 s nie jest benchmarkiem: kolejność zimny/ciepły JIT i bardzo mały problem. Nie mamy zmierzonego zysku pamięci ani błędu Maxwella z tego prototypu.
+Artefakty: `artifacts/m1-qpool-probe-20261018/` i `artifacts/m1-qpool-tiny-baseline-20261018/`. Różnica czasu probe 1,90/0,63 s nie jest benchmarkiem: kolejność zimnego/ciepłego JIT i mały problem ograniczają wniosek. Późniejszy filtr solvera potwierdził zgodność portów (max ΔS 3,765e−15 / ΔVSWR 6,662e−15), energii (max względne Δ 2,07e−13) oraz known-TEM L2 poniżej 1%. Jednak logical UVM peak wzrósł z 322 588 630 do 341 345 926 B (+5,8%); sampled VRAM procesu pozostał bez zmiany. Wariant ze synchronizacją nie jest promowany. Nie uruchamiać pełnej anteny wyłącznie po to, aby sprawdzać tę wersję ponownie. Dane: `artifacts/m1-qpool-256-{tiny,tem}-20261018/` i `artifacts/m1-pool-analysis-20261018.json`.
 
 Po nieudanym baseline telemetry pokazała MemAvailable 5,34→4,84 GB (4,97→4,51 GiB), a GPU telemetry wskazała około 15/16 GiB zajęte przez inne obciążenie. Nie zamykano aplikacji użytkownika ani nie obniżano guard. Runner dostał preflight odrzucający start GPU, gdy host RAM jest poniżej 6 GiB; guard nadal działa podczas runu. Brak pamięci zatrzymał próbę bazową i nie jest oceną Q-pool.
 
@@ -53,6 +55,6 @@ Po nieudanym baseline telemetry pokazała MemAvailable 5,34→4,84 GB (4,97→4,
 
 Źródło przypiętego hypre3.1.0 `src/utilities/memory.c`, funkcja `hypre_UmpireInit`, ustawia cztery pule (device/UM/host/pinned) po **4 GiB**. `hypre_umpire_device_pooled_allocate` tworzy pulę leniwie przy pierwszej alokacji; to nie cztery alokacje wykonane od razu. Failed baseline zgłosił `cudaMalloc(bytes=4294967312)` w tej ścieżce przy tworzeniu hierarchii FEM, przed libCEED Apply.
 
-Publiczne `HYPRE_SetUmpireDevicePoolSize(size_t)` może zmienić rozmiar przed utworzeniem puli. Następna osobna hipoteza: opcjonalny mniejszy seed (np.256 MiB), z logiem i dokładnym testem FP64; nie mylić z limitem całego HYPRE i nie ogłaszać stałej oszczędności dla dużej anteny. Najpierw trzeba wdrożyć flagę i sprawdzić inicjalizację/obsługę błędów; **jeszcze tego nie zmieniono ani nie zmierzono**. Nie łączyć w jednym porównaniu zmiany Umpire i Q-pool.
+Publiczne `HYPRE_SetUmpireDevicePoolSize(size_t)` może zmienić rozmiar przed utworzeniem puli. Następna osobna hipoteza: opcjonalny mniejszy seed (np.256 MiB), z logiem i dokładnym testem FP64; nie mylić z limitem całego HYPRE i nie ogłaszać stałej oszczędności dla dużej anteny. Ten oddzielny eksperyment został następnie wykonany: [pula HYPRE](hypre-pool.md) opisuje flagę, pozytywne testy i scope3,75GiB oszczędności na tiny. Nie przenosi to kwalifikacji na pełną antenę. Nie łączyć w jednym porównaniu zmiany Umpire i Q-pool.
 
 [Źródło hypre3.1.0](https://github.com/hypre-space/hypre/blob/v3.1.0/src/utilities/memory.c). W builderze odczytano faktycznie użyty stage `hypre-3.1.0-b4in3qr6dr5kzmer3qgvad2uuhrnvfvh`; brak katalogu Git w tym tarballu, więc nie przypisujemy mu nieustalonego SHA commita.

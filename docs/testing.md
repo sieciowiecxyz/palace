@@ -50,7 +50,7 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Obecny zestaw narzędzi ma 19 unittestów PASS, w tym regresje audytu alokacji poniżej; pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Obecny zestaw narzędzi ma 21 unittestów PASS, w tym regresje audytu alokacji poniżej; pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
@@ -64,4 +64,4 @@ Historyczne referencje/porównania dużej anteny z disk basis są ukończone, al
 
 ## Eksperymentalne Q-workspace
 
-Probe dwóch operatorów (zmiany pasywnych danych, diagonal i ApplyAdd) przeszedł w bazie i w osobnej bibliotece; pełny coax/TEM nie został zakwalifikowany, bo baseline zakończył się OOM/hostguard przed solve. Regresje Pythona sprawdzają preflight RAM, sourceSHA i stale/tampered manifest prototypu. Odtworzenie oraz scope: [Q-pool](ceed-qpool.md). Nie wnioskować o Maxwella/wydajności na podstawie6DOF.
+Probe dwóch operatorów i późniejszy pełny coax-tiny/TEML2 przeszły; Q-pool nie jest promowany z powodu braku oszczędności na tiny. Pierwszy baseline zakończony OOM/hostguard pozostaje FAIL. Regresje Pythona sprawdzają preflight RAM, sourceSHA, stale/tampered manifest, granice HYPREseed i jednostki/filtrowaniePID w pomiarze GPU. Odtworzenie oraz scope: [Q-pool](ceed-qpool.md), [pula HYPRE](hypre-pool.md). Antena nadal NOT RUN dla nowych wariantów.

@@ -61,3 +61,11 @@ To kierunek wynikający z M1; nie zamyka M1 i nie pomija obowiązkowego M2 FEM�
 W `InitialResidual` lewostronny GMRES mierzy `||B(b−Ax)|| / ||Bb||`. RAW sprawdza `||b−Ax|| / ||b||`. Przeliczany po rekonstrukcji warunek LEFT usuwa błąd samej rekurencji Arnoldiego, ale nie zmienia metryki na RAW.
 
 Historyczne antenowe dane: FP64 ma LEFT `9,9564e−7`, RAW `0,12527`; FP32 storage ma LEFT `9,9608e−7`, RAW `0,80769`. Ta duża różnica istnieje pomimo małej różnicy pól ważonych energią. Nie wolno uznać FP32 za równoważne rozwiązanie tylko na podstawie portów albo LEFT. Nierównomierne ważenie residuum przez preconditioner jest potwierdzone kodem i kontrolnym TEM (RIGHT schodzi z RAW poniżej 1e−6), lecz rozkład błędu pełnej anteny pozostaje otwarty. To nie dowód wadliwej fizyki ani rozwiązany problem jakości pełnej anteny.
+
+## Doprecyzowanie fazy maksimum
+
+Rozszerzony parser zachowuje `peak_trigger_event` i jego stos. Dla historycznego peaku 48 513 788 614 B zdarzenie wyzwalające było alokacją 120 352 248 B w ścieżce `DomainPostOperator::GetMagneticFieldEnergy` / **CompareFieldSnapshots**. Szczyt wiąże się więc z diagnostyką porównania pól; nie dowodzi maksimum samego GMRES. Nie dodawać do niego całej bazy ani nie wnioskować, że 48 buforów jest w całości working set Krylov.
+
+Kolejność zmieszanego stdout solvera i stderr alokacji nie jest wiarygodnym zegarem faz: buforowanie pozostawiło ostatnią wydrukowaną iterację 140 przed alokacją diagnostyki wykonywanej po solve. Następny pomiar wymaga jawnych znaczników faz na tym samym strumieniu, monotonicznego czasu i live/peak między markerami. Nie wyznaczać fazy wyłącznie na podstawie położenia tekstu GMRES w pliku.
+
+Późniejszy Q-pool przeszedł kontrolny Maxwell/TEM, ale na coax-tiny zwiększył logical UVM peak o 5,8% i nie zmniejszył sampled VRAM; [wyniki](ceed-qpool.md). Nie promować tej wersji. Osobne zmniejszenie seedu HYPRE dało 3,75 GiB mniej sampled VRAM procesu na coax-tiny, bez istotnej zmiany portów/energii, a known-TEM L2 pozostał poniżej 1%; [dowody](hypre-pool.md).
