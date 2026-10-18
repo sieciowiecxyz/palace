@@ -12,6 +12,48 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_separate_capture_preserves_partial_stdout_diagnostic(self):
+        # A delayed stdout suffix must not be split by an intervening stderr line.
+        script = ('import os; '
+                  'os.write(1, b"PALACE_KSP_CHECK: absolute="); '
+                  'os.write(2, b"PALACE_MEMORY_PHASE {}\\n"); '
+                  'os.write(1, b"1e-7 relative_initial=1e-7 threshold=1e-6\\n")')
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            with (work/'palace.stdout.log').open('wb') as stdout, \
+                 (work/'palace.stderr.log').open('wb') as stderr:
+                dev.command([dev.sys.executable, '-c', script], stdout=stdout, stderr=stderr)
+            dev.combine_run_logs(work)
+            text = (work/'palace.log').read_text()
+            self.assertIn('PALACE_KSP_CHECK: absolute=1e-7 relative_initial=1e-7 threshold=1e-6\n', text)
+            self.assertIn('PALACE_MEMORY_PHASE {}\n', text)
+            self.assertIn('not global event order', text)
+            self.assertNotIn('PALACE_MEMORY_PHASE', (work/'palace.stdout.log').read_text())
+
+    def test_memory_phases_require_coverage_order_and_sensible_peaks(self):
+        labels = ['setup.begin', 'setup.end', 'operators.begin', 'preconditioner.begin',
+                  'preconditioner.end', 'gmres.begin', 'gmres.basis_release.begin',
+                  'gmres.basis_release.end', 'gmres.end', 'postprocess.begin',
+                  'field_diagnostics.begin', 'field_diagnostics.end', 'postprocess.end', 'driven.end']
+        events = []
+        previous = 'unmarked'
+        for i, label in enumerate(labels):
+            events.append(dict(to=label, **{'from': previous}, t_s=i, elapsed_s=1,
+                               managed_live_bytes=10, managed_interval_peak_bytes=20,
+                               managed_process_peak_bytes=30, cudss_live_bytes=5))
+            previous = label
+        def log(items):
+            return '\n'.join('interleaved stdout PALACE_MEMORY_PHASE ' + json.dumps(e) for e in items)
+        self.assertTrue(dev.memory_phase_report(log(events), 1, fields=True, release=True)['complete'])
+        self.assertFalse(dev.memory_phase_report(log(events[:-1]), 1, fields=True, release=True)['complete'])
+        self.assertFalse(dev.memory_phase_report(log(events), 2, fields=True, release=True)['complete'])
+        broken = json.loads(json.dumps(events))
+        broken[5]['managed_live_bytes'] = 100
+        self.assertFalse(dev.memory_phase_report(log(broken), 1, fields=True, release=True)['complete'])
+        broken = json.loads(json.dumps(events))
+        broken[5]['from'] = 'wrong phase'
+        self.assertFalse(dev.memory_phase_report(log(broken), 1, fields=True, release=True)['complete'])
+
     def test_process_gpu_memory_uses_only_own_pid_and_real_units(self):
         query = type('Query', (), dict(returncode=0, stdout='9, 4000\n42, 256\n'))()
         with patch.object(dev.subprocess, 'run', return_value=query):

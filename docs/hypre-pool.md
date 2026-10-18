@@ -1,6 +1,6 @@
 # Początkowa pula HYPRE/Umpire — EXP11
 
-Status 2026-10-18: **pozytywny filtr coax-tiny**, pełna antena NOT RUN. Ustawienie jest opcjonalne; nie zmieniono globalnego defaultu ani medium. M1 pozostaje otwarty.
+Status 2026-10-18: **pozytywny filtr coax-tiny; jedna pełna antena FP64 z seedem 256 MiB ukończyła execution**. Ten run to pojedynczy punkt 3,50 GHz/P2, a jakość rozwiązania pozostaje otwarta; nie kwalifikuje seedu dla innych ustawień ani nie zmienia globalnego defaultu. M1 pozostaje otwarty.
 
 ## Mechanizm
 
@@ -43,4 +43,4 @@ Runner odpytuje `nvidia-smi --query-compute-apps=pid,used_gpu_memory` dla hostow
 
 ## Decyzja
 
-256 MiB jest użyteczną opcją do kolejnych małych filtrów. Pełna antena, zmiana liczby iteracji/czasu pod presją UVM i rzeczywisty wzrost puli nadal wymagają pomiaru. Nie zmieniać globalnego defaultu na podstawie tiny. Przed ewentualnym pełnym runem należy oszacować pamięć, zachować guard i deadline oraz rozdzielić koszt solve od diagnostyki pól.
+256 MiB jest użyteczną opcją do kolejnych małych filtrów. Pełny run z tym seedem ukończył się bez OOM/guard/deadline, ale nie rozstrzyga niezależnej jakości anteny ani wpływu seeda względem sparowanego pełnego defaultu. Zmiana liczby iteracji/czasu pod presją UVM i rzeczywisty wzrost puli nadal wymagają osobnego pomiaru. Nie zmieniać globalnego defaultu na podstawie tiny ani pojedynczego pełnego runu. Pełne wykonanie i fazy pamięci opisuje [raport](memory-phases.md).

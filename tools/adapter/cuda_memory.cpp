@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <string_view>
+#include <string>
 #include <unordered_map>
 #include <atomic>
 #include <mutex>
@@ -18,7 +19,9 @@ struct ManagedState {
   std::mutex mutex;
   std::once_flag reserve_once;
   std::unordered_map<void *,size_t> sizes;
-  uint64_t live=0, peak=0, allocations=0;
+  uint64_t live=0, peak=0, allocations=0, interval_peak=0;
+  double marked_at=0;
+  std::string phase="unmarked";
   void *reserve=nullptr;
   size_t reserved=0;
 };
@@ -69,7 +72,8 @@ void trace_managed(const char *event, void *p, size_t n, uint64_t live) {
 }
 void record_managed(void *p,size_t n) {
   auto &s=managed_state();std::lock_guard<std::mutex> guard(s.mutex);
-  s.sizes[p]=n;s.live+=n;if(s.live>s.peak)s.peak=s.live;++s.allocations;
+  s.sizes[p]=n;s.live+=n;if(s.live>s.peak)s.peak=s.live;
+  if(s.live>s.interval_peak)s.interval_peak=s.live;++s.allocations;
   trace_managed("alloc",p,n,s.live);
 }
 int dss_alloc(void *,void **p,size_t n,cudaStream_t) {
@@ -101,6 +105,18 @@ __attribute__((destructor)) void report_memory() {
     if(s.reserve)next<Free>("cudaFree")(s.reserve);
   }
 }
+}
+
+extern "C" void PalaceMemoryMark(const char *label) {
+  if(!flag("PALACE_MEMORY_MARKS") || !managed())return;
+  auto &s=managed_state();std::lock_guard<std::mutex> guard(s.mutex);
+  const auto now=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  // This records allocation lifetimes, not completion of asynchronous GPU work.
+  std::fprintf(stderr,"PALACE_MEMORY_PHASE {\"from\":\"%s\",\"to\":\"%s\",\"t_s\":%.9f,\"elapsed_s\":%.9f,\"managed_live_bytes\":%llu,\"managed_interval_peak_bytes\":%llu,\"managed_process_peak_bytes\":%llu,\"cudss_live_bytes\":%llu}\n",
+    s.phase.c_str(),label,now,s.marked_at?now-s.marked_at:0.0,
+    (unsigned long long)s.live,(unsigned long long)s.interval_peak,
+    (unsigned long long)s.peak,(unsigned long long)dss_live.load());
+  s.phase=label;s.marked_at=now;s.interval_peak=s.live;
 }
 
 extern "C" cudssStatus_t cudssConfigCreate(cudssConfig_t *config) {

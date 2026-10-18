@@ -2,13 +2,13 @@
 
 **Korekta 2026-10-18:** wszystkie opisane niżej próby z bazą na SSD są historyczne i odrzucone przez użytkownika. Kod disk basis został usunięty; nie stanowią dopuszczalnego baseline wydajności. Dalsze dane robocze wyłącznie RAM/VRAM, bez swap/offloadu na SSD/NVMe. Zachowane pola mogą pozostać archiwalnym wynikiem diagnostycznym.
 
-Data: 2026-10-18. Status: M1 ACTIVE. Historyczna referencja i porównanie pól pełnej anteny istnieją wyłącznie dla odrzuconego disk basis; kwalifikacja pełnej anteny przy wymaganiu RAM/VRAM pozostaje otwarta. To pomiary diagnostyczne, nie nowa kwalifikacja projektu ani przyspieszenia.
+Data: 2026-10-18. Status: M1 ACTIVE. Historyczna referencja i porównanie pól z disk basis są odrzucone. Jest już jeden resident FP64 run pełnej anteny (3,50 GHz/P2), lecz niezależna jakość rozwiązania nadal pozostaje otwarta: raw relative residual to 0,1253 i nie ma zakwalifikowanej referencji pełnych pól. To pomiar wykonania, nie nowa kwalifikacja projektu ani przyspieszenia. Szczegóły: [fazy pamięci i run resident](memory-phases.md).
 
 ## Co wykonano
 
 1. Sprawdzono kod InitialResidual i warunek zatrzymania GMRES w palace/linalg/iterative.cpp: LEFT używa ||B(b−Ax)||, nie surowego ||b−Ax||. Nowy PALACE_RAW_RESIDUAL pod PALACE_VERIFY_RESIDUAL przelicza Ax−b w FP64 operatora, korzystając z istniejących scratch vectors. Zapisuje normy b, Ax, b−Ax, relative_rhs oraz relative_action. Ostatnia miara ||b−Ax||/(||Ax||+||b||) nie jest normwise backward error i nie zastępuje kryterium M1.3.
 2. Przyrostowy build z zachowanymi dependencies/ccache: 7.354 s fazy build/export, nie pomiar cold build. Manifest: build/sm120/manifest.json; log: build/sm120/build.log. Zmiana runnera/Markdown nie wymagała ponownej kompilacji solvera.
-3. Dwa gotowe lokalne coax smoke uruchomiła ta sama Luna high: FP32 storage i FP64 storage. Medium, operator/faktory FP64, terminacje, UVM i MAGMA bez zmian. Każdy run miał limit 180 s; nie uruchamiano pełnej anteny.
+3. Dwa lokalne coax smoke opisane w tej sekcji uruchomiono sekwencyjnie: FP32 storage i FP64 storage. Medium, operator/faktory FP64, terminacje, UVM i MAGMA bez zmian. Każdy run miał limit 180 s; w chwili tych smoke'ów nie uruchamiano pełnej anteny.
 
 | Metryka | FP32 basis | FP64 basis |
 | --- | --- | --- |
@@ -89,7 +89,7 @@ Domyślny tiny (3 częstotliwości ×2 porty, bez L2/probes) trwał **11,25 s**,
 
 Dowody: artifacts/m1-tem-fields-{left-fp64,left-fp32,right-fp64}-20261018/, artifacts/m1-tiny-l2-{left-fp32,final-right-fp64}-20261018/, artifacts/m1-tiny-fast-smoke-20261018/; manifesty, komendy, logi, S, energie, próbki i tem-fields.json. Zbiorczy wynik: artifacts/m1-tem-validation-20261018.json. Ostatni przyrostowy build wyniósł 7,013 s i zawierał hit ccache; nie był cold buildem.
 
-**M1 pozostaje otwarty.** Wyjaśniono związek norm i zweryfikowano forward error kontrolnego coaxa. Pozostaje niezależne porównanie całych pól obecnej anteny, spójna referencja tego samego buildu oraz jej pełny rachunek czasu/pamięci. Nie przenosimy kwalifikacji coaxa na antenę ani prototyp FEM–BEM.
+**M1 pozostaje otwarty.** Wyjaśniono związek norm i zweryfikowano forward error kontrolnego coaxa. Pełna antena ma ukończony resident FP64 single-point run i snapshoty pól, lecz brakuje niezależnej, jakościowo zakwalifikowanej referencji do porównania pól i oceny raw residual. Pomiar pamięci fazami jest opisany w [raporcie resident](memory-phases.md). Nie przenosimy kwalifikacji coaxa na antenę ani prototyp FEM–BEM.
 
 Generator odtworzył tiny mesh z identycznym SHA w osobnym artifacts/coax-tiny-reproduced-20261018, bez nadpisywania fixture; generowanie z cache uv zajęło ułamek sekundy.
 
@@ -145,7 +145,7 @@ CUDA_UVM raportuje peak logicznych aktywnych alokacji managed44,95GiB; cuDSS pea
 
 Kandydat miał narastający spadek MemAvailable: około20,6GiB przy183s,15,6GiB przy549s,10,8GiB przy915s i4,7GiB przed guardem. Przy11,2mln DOF każdy zespolony wektor bazyFP32 to~85,6MiB;141wektorów to~11,8GiB dodatkowego logicznego storage, które referencja trzymała na SSD. To uzasadnia audyt alokacji i limitu working set, lecz nie dowodzi jeszcze dokładnego podziału całej pamięci ani opłacalności konkretnej kompresji.
 
-Dowody: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. M1 pozostaje otwarty: przed ponownym pełnym kandydatem potrzebny jest budżet UVM/RAM i ścieżka, która kończy solve bez osłabienia progu jakości.
+Dowody historyczne: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. Późniejszy resident FP64 execution run jest opisany w [raporcie faz](memory-phases.md). M1 pozostaje otwarty: dalsza kwalifikacja wymaga niezależnej oceny jakości pełnej anteny oraz kontroli budżetu UVM/RAM, bez osłabiania progu jakości.
 
 ## EXP07 — zakończony i wycofany disk basis
 

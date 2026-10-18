@@ -49,6 +49,15 @@ def capture(args):
     return subprocess.check_output([str(x) for x in args], text=True).strip()
 
 
+def combine_run_logs(output):
+    """Preserve raw streams; concatenation has no cross-stream chronological order."""
+    with (output / 'palace.log').open('wb') as combined:
+        for stream in ['stdout', 'stderr']:
+            combined.write(f'\n=== {stream} (separate capture; not global event order) ===\n'.encode())
+            with (output / f'palace.{stream}.log').open('rb') as source:
+                shutil.copyfileobj(source, combined)
+
+
 def source_hash():
     """Hash compiler inputs, including uncommitted/new files, excluding data and docs."""
     paths = [ROOT / 'CMakeLists.txt']
@@ -410,6 +419,43 @@ def process_gpu_memory(pid):
         return None
 
 
+def memory_phase_report(log, solves, fields=False, release=False):
+    events, errors = [], []
+    decoder = json.JSONDecoder()
+    for line in log.splitlines():
+        marker = 'PALACE_MEMORY_PHASE '
+        if marker not in line:
+            continue
+        try:
+            event, _ = decoder.raw_decode(line[line.index(marker)+len(marker):])
+            for key in ['managed_live_bytes', 'managed_interval_peak_bytes',
+                        'managed_process_peak_bytes', 'cudss_live_bytes']:
+                if not isinstance(event[key], int) or event[key] < 0:
+                    raise ValueError('Invalid memory counter')
+            if (event['managed_live_bytes'] > event['managed_interval_peak_bytes'] or
+                    event['managed_interval_peak_bytes'] > event['managed_process_peak_bytes']):
+                raise ValueError('Memory high-water ordering invalid')
+            if (not all(math.isfinite(event[k]) and event[k] >= 0 for k in ['t_s', 'elapsed_s'])
+                    or not isinstance(event['from'], str) or not isinstance(event['to'], str)):
+                raise ValueError('Invalid phase label/time')
+            if events and (event['t_s'] < events[-1]['t_s'] or event['from'] != events[-1]['to']):
+                raise ValueError('Broken phase order')
+            events.append(event)
+        except (ValueError, KeyError, TypeError) as error:
+            errors.append(str(error))
+    required = {key: solves for key in ['preconditioner.begin', 'preconditioner.end',
+                'gmres.begin', 'gmres.end', 'postprocess.begin', 'postprocess.end']}
+    required.update({'setup.begin': 1, 'setup.end': 1, 'operators.begin': 1, 'driven.end': 1})
+    if fields:
+        required.update({'field_diagnostics.begin': solves, 'field_diagnostics.end': solves})
+    if release:
+        required.update({'gmres.basis_release.begin': solves, 'gmres.basis_release.end': solves})
+    coverage = {label: sum(e['to'] == label for e in events) for label in required}
+    complete = not errors and coverage == required
+    return dict(complete=complete, events=events, required=required, coverage=coverage, errors=errors,
+                scope='Allocation lifetimes and host monotonic intervals; no GPU synchronization; peaks are not additive')
+
+
 def require_host_memory():
     free = available_memory()
     if free < 6 * 1024**3:
@@ -432,7 +478,7 @@ def verified_qpool(native):
 
 
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
-        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None):
+        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
     if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
@@ -443,6 +489,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
+    if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
+        raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
     if save_fields or field_reference:
         regions = config['Domains'].setdefault('Postprocessing', {}).setdefault('Energy', [])
@@ -469,6 +517,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
     if hypre_pool_mib is not None:
         flags['PALACE_HYPRE_DEVICE_POOL_MIB'] = str(hypre_pool_mib)
+    if memory_marks:
+        flags['PALACE_MEMORY_MARKS'] = '1'
+    if release_gmres_basis:
+        flags['PALACE_RELEASE_GMRES_BASIS'] = '1'
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
     if allocation_trace:
@@ -486,6 +538,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
+            '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -506,13 +559,16 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
                                                   'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
-                                                  'hypre_pool_mib': hypre_pool_mib},
+                                                  'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
+                                                  'release_gmres_basis': release_gmres_basis},
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
     try:
-        with (output / 'palace.log').open('w') as log, (output / 'telemetry.jsonl').open('w') as telemetry:
-            proc = subprocess.Popen(['podman', 'start', '--attach', container], stdout=log, stderr=subprocess.STDOUT)
+        with (output / 'palace.stdout.log').open('w') as log, \
+             (output / 'palace.stderr.log').open('w') as errors, \
+             (output / 'telemetry.jsonl').open('w') as telemetry:
+            proc = subprocess.Popen(['podman', 'start', '--attach', container], stdout=log, stderr=errors)
             low_memory = 0
             memory_path = None
             pid = 0
@@ -547,9 +603,21 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                     break
                 time.sleep(1)
             returncode = proc.wait(timeout=15)
+        combine_run_logs(output)
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if memory_marks:
+            phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
+                                         bool(save_fields or reference), release_gmres_basis)
+            write(output/'memory-phases.json', phases)
+            status['memory_marks_passed'] = phases['complete']
+            status['complete'] = status['complete'] and phases['complete']
+        if release_gmres_basis:
+            releases = re.findall(r'PALACE_GMRES_BASIS_RELEASED: vectors=(\d+) logical_fp64_bytes=(\d+)',
+                                  (output/'palace.log').read_text())
+            status['gmres_basis_released'] = len(releases) == status['expected_solves'] and all(int(n) > 0 for n, b in releases)
+            status['complete'] = status['complete'] and status['gmres_basis_released']
         if hypre_pool_mib is not None:
             logged = re.findall(r'PALACE_HYPRE_POOL: initial_device_bytes=(\d+)',
                                 (output/'palace.log').read_text())
@@ -575,6 +643,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         subprocess.run(['podman', 'rm', '--force', container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if 'proc' in locals() and proc.poll() is None:
             proc.wait(timeout=15)
+        if not (output/'palace.log').exists() and (output/'palace.stderr.log').exists():
+            combine_run_logs(output)
         status['elapsed_seconds'] = time.monotonic() - started
         if INTERRUPTED_SIGNAL is not None:
             status['interrupted_signal'] = INTERRUPTED_SIGNAL
@@ -608,6 +678,8 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
+    r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
+    r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
     r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
     r.add_argument('--allocation-trace', action='store_true', help='Trace large UVM allocations and caller stacks; diagnostic only')
@@ -653,7 +725,7 @@ def main():
             print(json.dumps({'job': str(metadata), **job}, indent=2))
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
-            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib)
+            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

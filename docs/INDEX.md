@@ -22,6 +22,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: pula HYPRE/Umpire](hypre-pool.md)
   - Czytaj gdy: ograniczasz początkową rezerwację GPU lub oceniasz pomiar VRAM procesu
   - Opis: Opt-in256MiB, dodatni filtr TEM i zmierzona oszczędność3,75GiB w małym przypadku.
+- [M1: fazy pamięci i baza GMRES](memory-phases.md)
+  - Czytaj gdy: analizujesz pełną referencję FP64 w RAM/VRAM albo śledzisz live/peak między fazami
+  - Opis: Opcjonalne zwalnianie bazy, osobne logi, pełny resident run i otwarta kontrola raw residual.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

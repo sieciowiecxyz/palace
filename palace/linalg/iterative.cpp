@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstddef>
 #include <limits>
@@ -12,6 +13,7 @@
 #include "linalg/orthog.hpp"
 #include "utils/communication.hpp"
 #include "utils/timer.hpp"
+#include "utils/memorymark.hpp"
 
 namespace palace
 {
@@ -778,6 +780,25 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   }
   final_res = beta;
   final_it = it;
+  if (std::getenv("PALACE_RELEASE_GMRES_BASIS"))
+  {
+    MemoryMark("gmres.basis_release.begin");
+    std::size_t bytes = 0, count = 0;
+    for (const auto &v : V)
+    {
+      bytes += static_cast<std::size_t>(v.Size()) * sizeof(ScalarType);
+      count += v.Size() > 0;
+    }
+    V.clear();  // Discard capacity in each owning vector, not the solution or restart data.
+    if (Mpi::Root(comm))
+    {
+      // Keep the complete diagnostic on the same stream as the memory phase markers.
+      std::fprintf(stderr,
+                   "PALACE_GMRES_BASIS_RELEASED: vectors=%zu logical_fp64_bytes=%zu\n",
+                   count, bytes);
+    }
+    MemoryMark("gmres.basis_release.end");
+  }
 }
 
 template <typename OperType>

@@ -16,7 +16,7 @@ Pierwsze uruchomienie `python3 tools/dev.py run coax-medium artifacts/coax-migra
 
 Parser poprawiono, dodając też test regresyjny dla rzeczywistego prefiksu. Dokładne powtórzenie w `artifacts/coax-migration-fixed-20261018/` zakończyło się exit 0 po 33,68 s, `complete=true`, sześcioma solve’ami i sześcioma kontrolami względnej normy 8,21e-7–9,78e-7; bez OOM i przerwania. Historia pierwszego błędnego statusu została zachowana w `artifacts/coax-migration-20261018/`.
 
-Osobna kontrola w `artifacts/migration-validation.json` raportuje maksymalny błąd analitycznego TEM 1,871285e-4 i maksymalną deltę zespolonego S równą 3,36394e-9 wobec historycznego, zakwalifikowanego coax smoke; te progi przeszły. Ograniczony coax smoke na zmigrowanym buildzie jest PASS. Pełna antena na nowym buildzie i multi-GPU pozostają NOT RUN. Dane smoke/porównania nie kwalifikują pełnej anteny ani produkcyjnej fizyki.
+Osobna kontrola w `artifacts/migration-validation.json` raportuje maksymalny błąd analitycznego TEM 1,871285e-4 i maksymalną deltę zespolonego S równą 3,36394e-9 wobec historycznego, zakwalifikowanego coax smoke; te progi przeszły. Ograniczony coax smoke na zmigrowanym buildzie jest PASS. Później ukończono też jeden resident FP64 run pełnej anteny w tym repo: execution PASS, lecz niezależna jakość anteny pozostaje otwarta; szczegóły są w [raporcie faz](memory-phases.md). Multi-GPU i symulacja z nowego spakowanego obrazu pozostają NOT RUN. Dane coax smoke nie kwalifikują pełnej anteny ani produkcyjnej fizyki.
 
 ## Build, cache i pakowanie
 

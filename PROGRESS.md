@@ -11,7 +11,7 @@ Aktualizacja: 2026-10-18. Mode: goal, Active: M1. [PLAN](PLAN.md), [MILESTONES](
 - M0 zamknięty, M1 otwarty; brak promowanej optymalizacji pełnej anteny. Lokalny sprzęt: jedna RTX 5070 Ti 16 GB + 96 GB RAM, tryb medium, bez płatnego compute.
 - Pełna antena FP64-disk reference oraz FP32-disk candidate z porównaniem pól są zachowane historycznie i oznaczone **REJECT**. Nie są dopuszczalnym baseline ani wynikiem dla wymaganego storage RAM/VRAM; nie odtwarzać starych poleceń.
 - Wcześniejszy resident FP32 run anteny przerwał RAM guard około 141 iteracji/1087,70 s; brak S/pól. Globalna pamięć obejmowała aplikacje użytkownika, więc ten wynik nie dowodzi, że antena nie mieści się na sprzęcie.
-- Po usunięciu disk basis wykonano resident-only coax-tiny: 6/6 solve'ów w 14,06 s, iteracje 24/13/14/25/13/13, zweryfikowane stopping relative ≤1e−6, cgroup peak 0,68 GiB. Log potwierdza `FP32 RAM/VRAM`; bez zapisu pól ani referencji. To smoke ścieżki solvera, nie kwalifikacja anteny.
+- Nowa referencja wykonania anteny **FP64 resident-only** ukończona: 1089,964 s, 151 iteracji, VSWR P2@3,50 GHz=1,672123; snapshot E/B kompletny. Cgroup peak57,72 GiB, logical managed54,74 GiB, sampled GPU procesu4,89 GiB. Artefakt `artifacts/m1-antenna-resident-fp64-20261018/`; niezależna jakość anteny nadal otwarta, więc nie jest to kwalifikowana referencja dokładności.
 - Trace alokacji dużej anteny pozostaje materiałem audytowym. Ostatni disk run miał cgroup peak 49,24 GiB, logical managed high-water ~45,17 GiB i cuDSS peak 7,52 GiB; telemetry obejmowała także globalny desktop. Nie traktować tych danych jako budżetu resident wariantu ani czystego benchmarku.
 - Otwarta kwestia jakości: raw residual ~0,125 różni się od stopping norm LEFT. Kontrole TEM i całych pól na małym coaxie przechodzą, ale nie dowodzą poprawności fizycznej ani błędu pełnej anteny.
 
@@ -32,10 +32,11 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-1. Agent główny analizuje zachowany trace alokacji, rozdzielając operator/q-data/preconditioner/basis/workspace od cgroup, UVM i globalnej pamięci hosta.
-2. Zaprojektować ewentualne oszczędności wyłącznie w RAM/VRAM i najpierw kontrolować je na małych fixture'ach. Nie obniżać medium, jakości ani RAM guard.
-3. Wrócić do pełnej anteny dopiero po konkretnej hipotezie, znanej dostępnej pamięci i kontroli jakości; poprzednie disk wyniki nie są baseline.
-4. Zamknąć bramki M1 przed wymaganym prototypem FEM–BEM/MoM w M2. Nie odhaczać etapu na podstawie pojedynczego smoke.
+1. Zamrozić nową referencję wykonania FP64 resident, nie kwalifikować jej automatycznie: raw0,125267 vs LEFT stopping9,956e−7.
+2. Przygotować kontrolę niezależną od preconditionera: RIGHT i/lub korekta rezydualna z porównaniem całych pól; najpierw mały filtr, jawny rachunek pamięci, bez powtórzenia pełnej anteny bez hipotezy. Domyślnie nie ładować kolejnej 240-wektorowej bazy do większego RIGHT solve.
+3. Po zamknięciu jakości wykorzystać profil: setup54,85 s, GMRES950,96 s, z tego timery preconditionera603,23 s i coarse79,57 s; baza155 wektorów zajmuje logicznie27,82 GB. Nie mylić całego solve z samym coarse/cuDSS.
+4. Zamknąć M1 przed obowiązkowym prototypem Maxwell FEM–BEM/MoM; M2 i dalsze etapy nie są pomijane.
+
 
 ## Reguły pracy
 
@@ -71,8 +72,29 @@ Q-pool sprawdzono osobno względem seedu 256 MiB. Coax-tiny: 11,437 s, sampled V
 
 Audyt historycznego peak 45,18 GiB przypisuje zdarzenie wyzwalające `CompareFieldSnapshots` / `GetMagneticFieldEnergy`, zgodnie ze stosem `peak_trigger_event`. To koszt diagnostyki pól, a nie dowód, że sam GMRES osiąga taki peak. Nie sumować wszystkich buforów ze snapshotu z całą bazą GMRES ani nie wyciągać właściciela z kolejności tekstów stdout/stderr. Następny krok M1 to jawne znaczniki faz i pomiar peaków w solve oraz postprocessingu, po czym ocena budżetu dla referencji FP64 rezydującej wyłącznie w RAM/VRAM.
 
-Pełna antena dla wariantu z seedem 256 MiB i Q-pool pozostaje NOT RUN. Domyślny seed 4 GiB nie zmienił się. M1 pozostaje otwarty, a obowiązkowy prototyp M2 FEM–BEM/MoM nie jest pominięty.
+Pełna antena z Q-pool pozostaje NOT RUN; seed256 MiB bez Q-pool został później użyty w ukończonym EXP12 poniżej. Domyślny seed 4 GiB nie zmienił się. M1 pozostaje otwarty, a obowiązkowy prototyp M2 FEM–BEM/MoM nie jest pominięty.
 
 ## Stan walidacji repozytorium
 
-Aktualny build przyrostowy native ukończył się w 7,815 s; 21 testów jednostkowych PASS. Te kontrole walidują narzędzia i małe fixture, nie kwalifikują pełnej anteny. Nowe testy pełnej anteny, multi-GPU i zbieżności produkcyjnej pozostają NOT RUN. Wymóg RAM/VRAM bez SSD/swap pozostaje obowiązujący.
+Aktualny build przyrostowy native ukończył się w 7,388 s; 23 testy jednostkowe PASS. Te kontrole walidują narzędzia i małe fixture, nie kwalifikują pełnej anteny. Pełna antena EXP12 ma execution PASS, lecz niezależna jakość pozostaje otwarta; multi-GPU i zbieżność produkcyjna pozostają NOT RUN. Wymóg RAM/VRAM bez SSD/swap pozostaje obowiązujący.
+
+## EXP12 — fazy pamięci i lifetime bazy (filtry i pełny run ukończone)
+
+Kod GMRES potwierdza, że zwykła baza FP64 V jest polem solvera i zostaje po Mult. Opcja release czyści V dopiero po rekonstrukcji i wszystkich checkach; nie zmienia E, statystyk, restartu ani tolerancji. Kolejne Initialize odtwarza V. Markery adaptera emitują monotoniczne czasy i live/peak pomiędzy fazami, bez deviceSync. Domyślne zachowanie pozostaje bez zmian. Walidacja: tiny 6 solve'ów, known-TEM, następnie jedna pełna referencja wykonania FP64; wyniki poniżej. Samo ukończenie nie zamyka M1.
+
+
+Pierwszy filtr `artifacts/m1-gmres-release-tiny-20261018/`: exit 0 i 6/6 solve w 11,515 s, lecz **FAIL kompletności diagnostyki** (`complete=false`). Ostatni komunikat zwolnienia bazy został rozdzielony przez zmieszanie stdout/stderr; rozpoznano tylko 5/6 pełnych prefiksów. Nie uruchomiono kolejnego TEM. Zmieniono emisję release na pojedynczy wpis stderr, jak markery faz; wymaganie sześciu pełnych komunikatów pozostaje bez zmian. Cached rebuild 7,388 s, 22 unittesty PASS. Powtórzenie z nowym hashem źródeł otrzymuje osobny sufiks `r2`; pierwotnego FAIL nie nadpisujemy.
+
+Retry r2: release i fazy 6/6 PASS, ale kolejny **FAIL kompletności** (5/6 `PALACE_KSP_CHECK`). Interleaving przeciął tym razem stdout z residuum, więc samo przeniesienie release na stderr nie wystarcza. Runner zapisuje teraz stdout/stderr osobno, a dopiero po zakończeniu składa `palace.log` z jawną informacją o braku globalnej chronologii strumieni. Zachowuje surowe logi; test z celowo przerwanym stdout potwierdza integralność komunikatu. 23 unittesty PASS. Kolejny filtr r3 używa tego samego native builda (zmiana wyłącznie Python/logging).
+
+
+EXP12 r3 filtry **PASS**: tiny save-fields 10,517 s, 6/6 solve (24/13/14/25/13/13), wszystkie stopping checks ≤1e−6, markery i release 6/6. Względem EXP11 seed256 max |ΔS|=3,88e−15, ΔVSWR=6,66e−15, względna zmiana wspólnych energii=2,07e−13 (`artifacts/m1-gmres-release-analysis-20261018.json`). Sampled GPU procesu 631242752 B; cgroup peak506884096 B; logical UVM peak308538406 B. To kontrola numeryczna małego fixture, nie dowód speedup ani kwalifikacja anteny.
+
+TEM r3: 17,586 s, 2/2 solve, pełne coverage; E L2 q4/q6 około0,495%, B0,521–0,536%, oba porty <1%. Logical UVM peak290950486 B, sampled process GPU631242752 B. Baza znika po sprawdzeniu rozwiązania, przed postprocessingiem; liczniki liczą lifetimes, nie rezydencję GPU.
+
+Wykonane polecenie pełnego runu: `python3 tools/dev.py run tshaped-medium artifacts/m1-antenna-resident-fp64-20261018 --seconds 1800 --basis fp64 --hypre-pool-mib 256 --release-gmres-basis --memory-marks --save-fields --background`. Jedna3,50GHz/P2, identyczny mesh medium, bez Q-pool i porównania starej referencji, bez dyskowej pamięci roboczej. Cgroup60GiB, hostguard6GiB, przed uruchomieniem około68,7GiB MemAvailable; GPU miał obciążenie aplikacji użytkownika (około4,8GiB), nie zamykamy ich. Guard/OOM/deadline nadal oznaczają FAIL; ten konkretny run ukończył się naturalnie. M1.2/M1.3 niezależnej jakości nadal otwarte.
+
+
+Pełny run EXP12 **execution PASS**, 1089,964 s, 151 iteracji, 3,50GHz/P2; bez OOM/guard/deadline. Wszystkie markery faz i release1/1. Zwalnianie V po solve zmniejszyło logical managed58,706→31,422 GB (25,41GiB), koszt0,181 s. Maksymalny logical managed58,779 GB (54,74GiB) nastąpił w GMRES; postprocessing48,090 GB (44,79GiB). Cgroup peak57,72GiB, sampled GPU4,89GiB, min hostavailable11,98GiB. Peaki nie są addytywne ani dowodem konkretnej rezydencji alokacji. Snapshot E/B ma179499600/240704512 B i SHA w fields.json; pełna analiza root w `root-analysis.json`.
+
+VSWR P2=1,672123; raw ||b−Ax||/||b||=0,1252666005 przy independently recomputed LEFT stopping9,956397e−7. Raw/stopping ratio≈125815; nie wynika to z FP32, bo aktualny solve jest FP64. **Jakość anteny M1.2/M1.3 pozostaje nierozstrzygnięta**; nie promować dalszej precyzji na podstawie samego S lub ukończenia. Ten run zastępuje odrzucone dyskowe wykonanie jako dopuszczalny punkt diagnostyczny, ale nie stanowi jeszcze kwalifikowanej referencji fizycznej. Nie wyliczać speedup względem historycznego disk runu z innym tracingiem/polityką pamięci. [Interpretacja i odtwarzanie](docs/memory-phases.md).

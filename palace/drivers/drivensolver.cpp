@@ -29,6 +29,7 @@
 #include "utils/coaxdiagnostic.hpp"
 #include "utils/fieldcomparison.hpp"
 #include "utils/iodata.hpp"
+#include "utils/memorymark.hpp"
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
 
@@ -42,7 +43,9 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
 {
   // Set up the spatial discretization and frequency sweep.
   BlockTimer bt0(Timer::CONSTRUCT);
+  MemoryMark("setup.begin");
   SpaceOperator space_op(iodata, mesh);
+  MemoryMark("setup.end");
   const auto &port_excitations = space_op.GetPortExcitations();
   SaveMetadata(port_excitations);
 
@@ -74,12 +77,14 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
   }
 
   // Main frequency sweep loop.
-  return {adaptive ? SweepAdaptive(space_op) : SweepUniform(space_op),
-          space_op.GlobalTrueVSize()};
+  auto indicator = adaptive ? SweepAdaptive(space_op) : SweepUniform(space_op);
+  MemoryMark("driven.end");
+  return {std::move(indicator), space_op.GlobalTrueVSize()};
 }
 
 ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 {
+  MemoryMark("operators.begin");
   const auto &port_excitations = space_op.GetPortExcitations();
   const auto &omega_sample = iodata.solver.driven.sample_f;
 
@@ -181,12 +186,14 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       auto omega = omega_sample[omega_i];
       // Assemble frequency dependent matrices and initialize operators in linear
       // solver.
+      MemoryMark("preconditioner.begin");
       auto A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
       auto A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
                                         K.get(), C.get(), M.get(), A2.get());
       auto P = space_op.GetPreconditionerMatrix<ComplexOperator>(
           1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, omega);
       ksp.SetOperators(*A, *P);
+      MemoryMark("preconditioner.end");
 
       Mpi::Print(
           "\nIt {:d}/{:d}: ω/2π = {:.3e} GHz (total elapsed time = {:.2e} s{})\n",
@@ -203,8 +210,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       space_op.GetExcitationVector(excitation_idx, omega, RHS);
 
       Mpi::Print("\n");
+      MemoryMark("gmres.begin");
       ksp.Mult(RHS, E);
+      MemoryMark("gmres.end");
 
+      MemoryMark("postprocess.begin");
       // Start Post-processing.
       BlockTimer bt0(Timer::POSTPRO);
       Mpi::Print(" Sol. ||E|| = {:.6e} (||RHS|| = {:.6e})\n",
@@ -242,16 +252,19 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       const char *reference_fields = std::getenv("PALACE_REFERENCE_FIELDS");
       if (save_fields || reference_fields)
       {
+        MemoryMark("field_diagnostics.begin");
         std::vector<int> regions;
         for (const auto &[idx, data] : iodata.domains.postpro.energy) regions.push_back(idx);
         CompareFieldSnapshots(post_op.GetEGridFunction(), post_op.GetBGridFunction(),
                               post_op.GetDomainPostOperator(), regions, excitation_idx,
                               omega_i, save_fields, reference_fields);
+        MemoryMark("field_diagnostics.end");
       }
 
       // Calculate and record the error indicators.
       Mpi::Print(" Updating solution error estimates\n");
       AddEstimate(E, B, total_domain_energy, indicator);
+      MemoryMark("postprocess.end");
     }
 
     // Final postprocessing & printing.
