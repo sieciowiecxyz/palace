@@ -90,3 +90,57 @@ Dowody: artifacts/m1-tem-fields-{left-fp64,left-fp32,right-fp64}-20261018/, arti
 **M1 pozostaje otwarty.** Wyjaśniono związek norm i zweryfikowano forward error kontrolnego coaxa. Pozostaje niezależne porównanie całych pól obecnej anteny, spójna referencja tego samego buildu oraz jej pełny rachunek czasu/pamięci. Nie przenosimy kwalifikacji coaxa na antenę ani prototyp FEM–BEM.
 
 Generator odtworzył tiny mesh z identycznym SHA w osobnym artifacts/coax-tiny-reproduced-20261018, bez nadpisywania fixture; generowanie z cache uv zajęło ułamek sekundy.
+
+## Porównanie całych pól: mechanizm i pełna antena
+
+Dodano FP64 snapshots lokalnych zespolonych grid functions E/B i porównanie sqrt(energy(reference−candidate)/energy(reference)), z użyciem tych samych częściowo złożonych operatorów masowych. To fizyczna norma ważona epsilon/mu, nie różnica samych energii i nie procent poszczególnych DOF. Zachowuje fazę. Mierzy całą domenę i wybrane regiony; dla anteny dodano osobno PTFE zasilania3, przy zachowanych2/4/5/6/7. Różne siatki/kolejności DOF nie są obsługiwane. Instrukcja: [porównanie pól](field-validation.md).
+
+Testy tiny na całych polach:
+
+- FP64 zapis + FP32 porównanie: oba runy ~11,25s, 12plików pól; max relative_E1,13e−7 i relative_B6,08e−5, poniżej1%.
+- Jawny fault injection: kopia referencji z B×1,02, bez zmiany oryginału. Mechanizm wykrył relative_B=0,02/1,02=0,0196078431 globalnie i wregionie1, a CLI zwróciło FAIL jakości mimo ukończonego solve. To test rzeczywistej normy błędu, nie tylko sum energii.
+- FP64-disk kontra FP64 resident: ~11,28s, max relative_E~7,9e−14 i relative_B~8,75e−13; potwierdzono format, zgodność i sprzątanie scratch.
+- 12regresji narzędzi: m.in. zła fizyka, uszkodzone/nieukończone referencje, brakujące/duplikowane regiony i NaN. Pełna kampania upstream nadal NOT RUN.
+
+### Para antenowa i ograniczenie RAM
+
+Pierwszy run referencyjny zakończył się przerwaniem po107,5s przedGMRES; terminalny runnerexit130/interruptedtrue, kontener usunięty, powód sygnału nieustalony. Nie był to timeout1800s ani guardRAM. Wprowadzono --background: proces w nowej sesji, stdin odłączone, log i jobPID+birth; nadal zachowane deadline, guard i cleanup. Prawdziwy tiny test potwierdził działający proces po wyjściu launchera, następnie terminalny PID i complete result. Teraz SIGINT/SIGTERM jest jawnie zapisywany w logu/wyniku.
+
+Odłączona referencja anteny r2 ukończyła się na bieżącym buildzie: 3,50GHz/P2, 1 601 320tetrahedrów, 11 218 724ND DOF i15 044 031RT DOF. Operator/faktoryFP64, bazaFP64 na dysku, UVM/MAGMA/Order2/Tol1e−6/K240/MaxIts1600/PA1; medium i fizyka zachowane. Zapisano E179 499 600B iB240 704 512B z SHA; snapshot trwał0,215s. Baza na dysku została posprzątana.
+
+| Wynik | Referencja FP64-disk | Kandydat FP32 |
+| --- | --- | --- |
+| Runner | 1384,22s, complete | 1087,70s, nieukończony |
+| Iteracje | 151, stopping check PASS | przerwanie około141, brak zakończonego solve |
+| Min globalny MemAvailable | 11,30GiB | 4,70GiB, guard zadziałał |
+| Peak GPU użyty globalnie | 15 863MiB | 15 894MiB |
+| OOMKilled | false | false; stop przez guard, exit137 |
+| Pola/reference manifest | E/B, fields.json kompletne | brak; porównanie pól niemożliwe |
+
+Nie porównywać1087,7s do1384,2s jako przyspieszenia. To FAIL zasobów, nie wynik RF. Kontener i scratch sprzątnięte, referencja zachowana; nie ponawiać jej od zera bez zmiany źródeł/siatki/fizyki wymagającej nowego odniesienia.
+
+Referencja vs mały historyczny plik S: maxcomplexΔS=4,1371e−6, ΔVSWR P2~1,3e−5. VSWR benchmarku~1,672 nie reprezentuje najlepszego projektu produkcyjnego. Raw relative residual referencji=0,1252666, niezależne stopping criterion spełnione; nie raportować raw1e−6. Pełna jakość FP32 dla aktualnej anteny pozostaje niezweryfikowana.
+
+### Co kosztuje obecny referencyjny run
+
+Timery BlockTimer przerywają pomiar rodzica przy wejściu do dziecka (sprawdzone w timer.hpp). Poniższe koszyki są rozłączne; ich suma różni się od Total o~0,07s.
+
+| Koszyk | Czas | Udział Total |
+| --- | ---: | ---: |
+| Preconditioner, bez coarse | 647,33s | 46,81% |
+| LinearSolve/Krylov, bez podtimerów | 522,69s | 37,80% |
+| CoarseSolve | 78,14s | 5,65% |
+| Setup | 53,90s | 3,90% |
+| Mesh preprocessing | 29,36s | 2,12% |
+| DiskIO | 20,69s | 1,50% |
+| Operator construction | 14,57s | 1,05% |
+| Postprocessing | 9,48s | 0,69% |
+| Initialization | 6,53s | 0,47% |
+
+Basis DiskIO nie ma własnego timera i zawiera się w Krylov; koszyka DiskIO z tabeli nie wolno utożsamiać z odczytem bazy. Dla tej referencji samo dwukrotne przyspieszenie coarse dałoby teoretycznie tylko~2,9% całego czasu, jeśli wszystko inne nie zmieni się. Wąskie optymalizacje biblioteki cuDSS nie zastępują pracy nad całym preconditionerem i transferami.
+
+CUDA_UVM raportuje peak logicznych aktywnych alokacji managed44,95GiB; cuDSS peak7,52GiB (szczyty nie muszą wystąpić w tej samej chwili, nie odejmować ich jako dokładnego budżetu). Native RSS HWM~6,39GiB **nie rozlicza całej presji RAM/UVM**. Globalny MemAvailable i GPU telemetry zawierają tło desktopu; nie przypisujemy ich w całości solverowi. Szczegółowy podział operator/q-data/workspace i cgroup peak pozostają do zmierzenia.
+
+Kandydat miał narastający spadek MemAvailable: około20,6GiB przy183s,15,6GiB przy549s,10,8GiB przy915s i4,7GiB przed guardem. Przy11,2mln DOF każdy zespolony wektor bazyFP32 to~85,6MiB;141wektorów to~11,8GiB dodatkowego logicznego storage, które referencja trzymała na SSD. To uzasadnia audyt alokacji i limitu working set, lecz nie dowodzi jeszcze dokładnego podziału całej pamięci ani opłacalności konkretnej kompresji.
+
+Dowody: artifacts/m1-antenna-fields-{reference,fp32}-r2-20261018/ oraz artifacts/m1-antenna-field-attempt-20261018.json; pierwszy przerwany run zachowany bez r2. M1 pozostaje otwarty: przed ponownym pełnym kandydatem potrzebny jest budżet UVM/RAM i ścieżka, która kończy solve bez osłabienia progu jakości.

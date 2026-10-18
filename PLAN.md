@@ -30,6 +30,10 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 
 ### M1 — najpierw podstawa porównań
 
+- [x] Dodać i sprawdzić na tiny normę różnicy całych pól, detekcję kontrolowanego błędu i zgodność disk/resident.
+- [x] Zachować bieżącą referencję anteny FP64-disk i jej E/B; kandydatFP32 nie ukończył solve przez RAMguard.
+- [ ] Rozliczyć właścicieli UVM i host/cgroup peak przed nowym pełnym kandydatem; nie ponawiać bez zmiany.
+
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
 

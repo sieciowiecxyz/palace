@@ -62,3 +62,7 @@ Nie porównywać ślepo historycznych czasów z nowym buildem. Szczegóły zgodn
 coax-tiny to osobny2 mm filtr; większy coax-medium zachowuje20 mm odniesienie. --basis fp32/fp64 wybiera storage, --pc-side left/right jawnie zmienia stronę preconditionera. --coax-fields wybiera3,55 GHz i18 probes, --coax-l2 dodatkowo uruchamia kosztowniejszą całkę po wszystkich tetraedrach. Oba wymagają zweryfikowanej geometrii coaxa. Domyślne runy nie włączają tych diagnostyk.
 
 Nowe coax runy zapisują geometry.json i actual_config_sha256 po jawnych zmianach; nie nadpisują config fixture. Przykłady i generator: examples/coax-tiny/README.md. Zmiana tych opcji/runnera nie wymaga rekompilacji solvera.
+
+## Zachowanie referencji i dłuższy run
+
+--save-fields/--field-reference i --basis fp64-disk są opisane w [kontroli pól](field-validation.md). FP64-disk wymaga własnego katalogu scratch, runner tworzy i czyści go automatycznie. --background uruchamia ten sam bounded runner w nowej sesji procesu, zapisuje PID+birth i launcherlog; nie zmienia dokładności ani limitów. To opcja dla długiej anteny, nie dodatkowy serwis/kolejka. Domyślny szybki run działa dalej na pierwszym planie.

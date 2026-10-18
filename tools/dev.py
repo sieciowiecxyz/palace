@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD = ROOT / 'build/sm120'
 SETTINGS = ROOT / 'tools/runtime.json'
 CASES = ['coax-tiny', 'coax-medium', 'tshaped-medium']
+INTERRUPTED_SIGNAL = None
 
 
 def sha(path):
@@ -277,10 +279,102 @@ def diagnostic_config(name, config, coax_fields=False, pc_side=None):
     return config
 
 
-def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False):
+def field_identity(config, info, build):
+    """Field ordering/physics identity; permit explicit solver/backend comparisons."""
+    physics = json.loads(json.dumps(config))
+    physics['Problem'].pop('Output', None)
+    physics['Problem'].pop('Verbose', None)
+    physics['Model']['Mesh'] = info['mesh_sha256']
+    physics['Domains'].pop('Postprocessing', None)
+    physics['Boundaries'].pop('Postprocessing', None)
+    for key in ['Linear', 'Device', 'Backend']:
+        physics['Solver'].pop(key, None)
+    physics['Solver']['Driven'].pop('Save', None)
+    identity = {'physics': physics, 'runtime_base_id': build['runtime_base_id'],
+                'builder_image_id': build['builder_image_id'], 'format': 'PALF64V1-le-single-rank'}
+    return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+
+
+def expected_field_files(config):
+    excitations = set()
+    for port in config['Boundaries']['LumpedPort']:
+        value = port.get('Excitation')
+        if value:
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError('Field snapshots require explicit integer excitations')
+            excitations.add(value)
+    count = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
+    return {f's{excitation}-f{frequency}-{field}.bin'
+            for excitation in excitations for frequency in range(count) for field in ['E', 'B']}
+
+
+def field_inventory(directory, expected):
+    if {p.name for p in directory.iterdir()} != expected:
+        raise ValueError('Missing or unexpected field snapshot files')
+    result = {}
+    for filename in sorted(expected):
+        path = directory / filename
+        if not path.is_file() or path.is_symlink():
+            raise ValueError('Field snapshot must be a regular file')
+        with path.open('rb') as stream:
+            header = stream.read(16)
+        if len(header) != 16:
+            raise ValueError('Truncated field snapshot')
+        magic, size = struct.unpack('<8sQ', header)
+        if magic != b'PALF64V1' or size == 0 or path.stat().st_size != 16 + 16*size:
+            raise ValueError('Invalid field snapshot format/size')
+        result[filename] = {'sha256': sha(path), 'dofs': size, 'bytes': path.stat().st_size}
+    return result
+
+
+def verified_field_reference(directory, config, info, build):
+    directory = Path(directory).resolve()
+    metadata = read(directory / 'fields.json')
+    source_identity = field_identity(read(directory/'config.json'), read(directory/'fixture.json'),
+                                     read(directory/'build-manifest.json'))
+    if (metadata.get('identity') != field_identity(config, info, build) or
+            metadata.get('identity') != source_identity or
+            sha(directory/'config.json') != read(directory/'command.json')['actual_config_sha256'] or
+            not metadata.get('complete') or not read(directory / 'result.json').get('complete') or
+            read(directory/'result.json').get('field_accuracy_passed') is False):
+        raise ValueError('Field reference is incomplete or uses different physics/mesh/dependencies')
+    if field_inventory(directory/'fields', expected_field_files(config)) != metadata['files']:
+        raise ValueError('Field reference bytes changed')
+    return directory
+
+
+def field_comparisons(work, config):
+    entries = [dict(excitation=int(e), frequency_index=int(f), region=int(r),
+                    relative_E=float(a), relative_B=float(b))
+               for e, f, r, a, b in re.findall(
+                   r'PALACE_FIELD_COMPARE: excitation=(\d+) frequency_index=(\d+) region=(-?\d+) '
+                   r'relative_E=(\S+) relative_B=(\S+)', (work/'palace.log').read_text())]
+    expected_files = expected_field_files(config)
+    solves = {(int(re.match(r's(\d+)-f(\d+)-', name)[1]),
+               int(re.match(r's(\d+)-f(\d+)-', name)[2])) for name in expected_files}
+    regions = [-1] + [d['Index'] for d in config['Domains'].get('Postprocessing', {}).get('Energy', [])]
+    expected = {(e, f, r) for e, f in solves for r in regions}
+    coverage = {(v['excitation'], v['frequency_index'], v['region']) for v in entries}
+    complete = coverage == expected and len(entries) == len(expected)
+    passed = complete and all(math.isfinite(v[k]) and 0.0 <= v[k] <= 0.01
+                              for v in entries for k in ['relative_E', 'relative_B'])
+    return {'complete': complete, 'passed': passed, 'tolerance': 0.01, 'entries': entries,
+            'norm': 'sqrt(error energy/reference energy), epsilon/mu weighted, same mesh; no phase fitting'}
+
+
+def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
+        save_fields=False, field_reference=None):
     manifest = verified_build()
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
+    # Include the cable dielectric as a separate region for antenna field qualification.
+    if save_fields or field_reference:
+        regions = config['Domains'].setdefault('Postprocessing', {}).setdefault('Energy', [])
+        region = 3 if name == 'tshaped-medium' else 1
+        if not any(r['Index'] == region for r in regions):
+            regions.append({'Index': region, 'Attributes': [region]})
+    reference = (verified_field_reference(field_reference, config, info, manifest)
+                 if field_reference else None)
     mesh = prepare(name)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -299,18 +393,28 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
+    elif basis == 'fp64-disk':
+        (output/'basis').mkdir()
+        flags['PALACE_GMRES_FP64_DISK_BASIS'] = '/work/basis'
     if coax_l2:
         flags['PALACE_COAX_TEM_DIAGNOSTIC'] = '1'
         flags['PALACE_COAX_TEM_LENGTH_M'] = str(coax_geometry(name)['length_mm']*1e-3)
+    if save_fields:
+        flags['PALACE_SAVE_FIELDS'] = '/work/fields'
+    if reference:
+        flags['PALACE_REFERENCE_FIELDS'] = '/reference-fields'
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
+            '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
+    if reference:
+        args.extend(['-v', f'{reference / "fields"}:/reference-fields:ro'])
     for key, value in flags.items():
         args.extend(['-e', f'{key}={value}'])
     args.extend(['--entrypoint', '/opt/palace-cudss/bin/palace-x86_64.bin', settings['runtime_image'], 'config.json'])
@@ -345,15 +449,30 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         if status.get('host_guard_or_deadline'):
             status['complete'] = False
         status['interrupted'] = False
+        if status['complete'] and save_fields:
+            write(output/'fields.json', {'schema': 1, 'identity': field_identity(config, info, manifest),
+                                         'complete': True, 'files': field_inventory(output/'fields', expected_field_files(config))})
+        if reference:
+            comparison = field_comparisons(output, config)
+            write(output/'field-comparison.json', comparison)
+            status['field_accuracy_passed'] = comparison['passed']
+            status['complete'] = status['complete'] and comparison['complete']
     finally:
         subprocess.run(['podman', 'rm', '--force', container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if 'proc' in locals() and proc.poll() is None:
             proc.wait(timeout=15)
         status['elapsed_seconds'] = time.monotonic() - started
+        if INTERRUPTED_SIGNAL is not None:
+            status['interrupted_signal'] = INTERRUPTED_SIGNAL
+        if basis == 'fp64-disk':
+            shutil.rmtree(output/'basis')
+            status['disk_basis_scratch_cleaned'] = True
         write(output / 'result.json', status)
     print(json.dumps(status, indent=2))
     if not status['complete']:
         raise ValueError('Run incomplete; see ' + str(output / 'palace.log'))
+    if status.get('field_accuracy_passed') is False:
+        raise ValueError('Field accuracy failed; see ' + str(output/'field-comparison.json'))
 
 
 def package(tag):
@@ -378,11 +497,14 @@ def main():
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
-    r.add_argument('--basis', choices=['fp32', 'fp64'], default='fp32',
+    r.add_argument('--basis', choices=['fp32', 'fp64', 'fp64-disk'], default='fp32',
                    help='GMRES basis storage only; FP64 operators/factors unchanged')
     r.add_argument('--coax-fields', action='store_true', help='Diagnostic coax: 3.55 GHz, 18 field probes')
     r.add_argument('--coax-l2', action='store_true', help='Expensive opt-in volume L2 check for the TEM coax')
     r.add_argument('--pc-side', choices=['left', 'right'], help='Explicit diagnostic preconditioning side')
+    r.add_argument('--save-fields', action='store_true', help='Save FP64 same-mesh field snapshots')
+    r.add_argument('--field-reference', type=Path, help='Completed run with verified field snapshots')
+    r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
     args = parser.parse_args()
@@ -392,7 +514,32 @@ def main():
     elif args.action == 'prepare': print(prepare(args.case))
     elif args.action == 'run':
         if not 1 <= args.seconds <= 1800: parser.error('--seconds must be 1..1800')
-        run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side, args.coax_l2)
+        if args.background:
+            output = args.output.resolve()
+            metadata = output.parent/(output.name+'.job.json')
+            if output.exists() or metadata.exists():
+                raise ValueError('Background output/job already exists')
+            metadata.parent.mkdir(parents=True, exist_ok=True)
+            logfile = output.parent/(output.name+'.launcher.log')
+            argv = [sys.executable, str(Path(__file__).resolve()),
+                    *(arg for arg in sys.argv[1:] if arg != '--background')]
+            with logfile.open('x') as log:
+                process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.DEVNULL,
+                                           stdout=log, stderr=subprocess.STDOUT,
+                                           start_new_session=True)
+            proc = Path(f'/proc/{process.pid}/stat')
+            # Read after the final ')' because the comm field may contain spaces.
+            try:
+                birth = proc.read_text().rsplit(')', 1)[1].split()[19]
+            except FileNotFoundError:
+                birth = None  # Early failure is diagnosed from launcher log, never called live.
+            job = {'pid': process.pid, 'start_ticks': birth, 'argv': argv, 'cwd': str(ROOT),
+                   'output': str(output), 'log': str(logfile), 'result': str(output/'result.json')}
+            write(metadata, job)
+            print(json.dumps({'job': str(metadata), **job}, indent=2))
+            return
+        run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
+            args.coax_l2, args.save_fields, args.field_reference)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),
@@ -401,8 +548,12 @@ def main():
 
 if __name__ == '__main__':
     def interrupted(_signum, _frame):
+        global INTERRUPTED_SIGNAL
+        INTERRUPTED_SIGNAL = signal.Signals(_signum).name
+        print('PALACE_RUNNER_SIGNAL: ' + INTERRUPTED_SIGNAL, file=sys.stderr, flush=True)
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
     try:
         main()
     except KeyboardInterrupt:

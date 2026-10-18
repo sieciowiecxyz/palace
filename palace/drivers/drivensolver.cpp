@@ -27,6 +27,7 @@
 #include "models/waveportoperator.hpp"
 #include "utils/communication.hpp"
 #include "utils/coaxdiagnostic.hpp"
+#include "utils/fieldcomparison.hpp"
 #include "utils/iodata.hpp"
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
@@ -236,6 +237,16 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         MFEM_VERIFY(length, "Coax diagnostic requires its validated fixture length!");
         CheckCoaxTEM(post_op.GetEGridFunction(), post_op.GetBGridFunction(), iodata.units,
                      omega, excitation_idx, std::stod(length));
+      }
+      const char *save_fields = std::getenv("PALACE_SAVE_FIELDS");
+      const char *reference_fields = std::getenv("PALACE_REFERENCE_FIELDS");
+      if (save_fields || reference_fields)
+      {
+        std::vector<int> regions;
+        for (const auto &[idx, data] : iodata.domains.postpro.energy) regions.push_back(idx);
+        CompareFieldSnapshots(post_op.GetEGridFunction(), post_op.GetBGridFunction(),
+                              post_op.GetDomainPostOperator(), regions, excitation_idx,
+                              omega_i, save_fields, reference_fields);
       }
 
       // Calculate and record the error indicators.

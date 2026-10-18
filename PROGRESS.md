@@ -1,87 +1,34 @@
 # Stan i dowody optymalizacji
 
-Aktualizacja: 2026-10-18. Checkpoint do wznowienia; checklisty są wyłącznie w [PLAN](PLAN.md), kryteria w [MILESTONES](MILESTONES.md).
+Aktualizacja: 2026-10-18. Mode: goal, Active: M1. Checklisty: [PLAN](PLAN.md); bramki: [MILESTONES](MILESTONES.md). Raport danych: [M1](docs/optimization-baseline.md). Instrukcja narzędzi: [pola](docs/field-validation.md).
 
 ## Bieżący checkpoint
 
-- Tryb: goal aktywny na polecenie użytkownika; Active: M1.
-- Ostatni zamknięty etap: M0, research i migracja lokalnego forka.
-- Następny krok: przygotować porównanie całych E/B w fizycznej normie masowej na tym samym mesh anteny, z zachowaniem plików referencji i preflight pamięci; potem jedna para bounded runów benchmarku, bez sweepa. Kontrolny test znanego pola TEM i L2 już wykonano. Audyt i oba krótkie runy opisane w docs/optimization-baseline.md.
-- Najlepszy zakwalifikowany wariant całej anteny na nowym forku: **jeszcze nie ustalony**. Istnieje ograniczony coax smoke; historyczne wyniki nie kwalifikują automatycznie aktualnego buildu.
-- Otwarte ryzyko: raw residual ~0,125/0,808 przy bliskich S; pełna zgodność pól i niezależne kryterium rozwiązania wymagają wyjaśnienia.
-- Sprzęt: plan pod RTX 5070 Ti 16 GB + 96 GB RAM. Jedna karta jest docelowym sprzętem. Multi-GPU poza celem; bez płatnego compute.
-- Dodano raw residual, pola/probes, całki L2, audyt siatki i szybszy filtr tiny. Diagnostyka TEM przeszła na obu portach; M1 nadal otwarty, żadnej optymalizacji antenowego solvera jeszcze nie promowano.
-
-## Dowody istniejące przed tym planem
-
-| Dowód | Wynik / zakres | Źródło |
-| --- | --- | --- |
-| Migracja źródeł, przykłady, cache | Zakończona; pełna antena na nowym buildzie nie była kwalifikowana | [Raport migracji](docs/migration.md) |
-| Coax nowego forka | Smoke ukończony, parser poprawiony; zakres TEM/complex S opisany w raporcie | [Walidacja](docs/testing.md), artifacts/coax-migration-fixed-20261018/ |
-| Poprzedni eksperyment antenowy | Historycznie 955,176 s FP32 basis vs 1194,812 s FP64 basis na SSD; nie porównanie z resident FP64 | [Wyniki historyczne](docs/local-optimization-results.md) |
-| Dotychczasowy research | Hipotezy i źródła, nie dowód nowych przyspieszeń | [Speedup](docs/speedup.md) |
-
-Przed użyciem dowodu sprawdź rewizję, manifest i zakres. Surowe wyniki w ignorowanym artifacts/ mogą być dostępne tylko lokalnie; raport w Git ma zachować liczby i ograniczenia potrzebne do decyzji.
+- Ostatni zamknięty etap: M0. M1 pozostaje otwarty; żaden wariant optymalizacji anteny nie jest promowany.
+- **Zachowana ukończona referencja:** artifacts/m1-antenna-fields-reference-r2-20261018/ —3,50GHz/P2, ta sama siatka medium, FP64 operator/faktory/baza na SSD, UVM/MAGMA,151iteracji,1384,22s. E/B i fields.json z SHA są kompletne. Nie przeliczać od zera bez koniecznej zmiany referencji.
+- **Nieukończony kandydat:** artifacts/m1-antenna-fields-fp32-r2-20261018/ — guard6GiB przerwał około141iteracji po1087,70s; minMemAvailable4,70GiB, bezOOM. Brak pól/S/porównania antenowego, brak dowodu przyspieszenia. Procesy i kontenery terminalne, scratch posprzątany; nie ponawiać bez nowego uzasadnienia.
+- **Następny krok:** audyt właścicieli alokacji managed/operator/q-data/workspace oraz cgroup peak przy ograniczonym setup/fragmencie GMRES, przed nowym pełnym kandydatem. Wykorzystać już zapisane E/B do przyszłego porównania. Zachować progi1% i medium; nie obniżać progu guard ani tolerancji dla sukcesu.
+- Wąskie gardła referencji: preconditioner647s +coarse78s; Krylov522,7s (zawiera basisIO). Logical managed peak44,95GiB, cuDSS peak7,52GiB; nativeRSSHWM6,39GiB nie rozlicza całego UVM/RAM. Globalna telemetria obejmuje desktop. Szczegółowy podział nadal otwarty.
+- Jakość: rawresidualFP64~0,1253 to inna miara niż stoppingnormLEFT. Known TEM i niezależne normy pól sprawdzone na coaxie; aktualny błąd pól FP32 **anteny** nie jest jeszcze znany. Nie przenosić kwalifikacji coaxa na antenę.
+- Sprzęt: jedna5070Ti16GB +96GBRAM. Bez płatnego compute i bez obowiązkowego multi-GPU. FEM–BEM/MoM pozostaje wymaganym M2, po bramce M1.
 
 ## Rejestr eksperymentów
 
-Wykonano diagnostykę M1 poniżej; nie są to próby nowego solvera ani przyspieszenia. Dodawaj krótkie wpisy w poniższym formacie; osobny raport twórz tylko dla dużego badania i linkuj go tutaj. Udane i nieudane próby są równie istotne.
+| ID20261018 | Status i decyzja | Dowody |
+| --- | --- | --- |
+| EXP01 | Coax FP32/FP64: porty zgodne, rawresidual nie znika z FP64; sam storage nie wyjaśnia norm | m1-coax-{raw-residual,fp64-raw-residual}-20261018 |
+| EXP02 | Audyt anteny: AIR61,71%elementów, PTFE30,03%; jeden dense BEMblock~11,90GiB, nie dowód oszczędności | m1-mesh-audit-20261018.json |
+| EXP03 | Probes TEM E/B/energia PASS; LEFTvsRIGHT pokazuje różnicę raw/stopping, RIGHT więcej iteracji | m1-tem-fields-{left-fp64,left-fp32,right-fp64}-20261018 |
+| EXP04 | Tiny natywne L2PASS<1% obu portów, szybki smoke11,25s; wcześniejszy20mmL2FAIL/deadline180s zachowany | m1-tem-validation-20261018.json |
+| EXP05 | Całe pola tiny: FP32vsFP64PASS(E≤1,14e−7,B≤6,09e−5); fault B×1,02 prawidłowoFAIL1%; diskvsresidentPASS≤9e−13 | m1-fields-tiny-{reference,fp32,perturbed,detection,disk}-20261018 |
+| EXP06 | Pierwszy run anteny przerwany sygnałem, przyczyna nieustalona; background tiny potwierdził livePID po launcherze. Ref-r2PASS, candidate-r2FAIL/hostguard | m1-antenna-field-attempt-20261018.json, m1-background-smoke-20261018 |
 
-### EXP-20261018-01 — residuum i FP32/FP64 storage
+Wszystkie ścieżki w tabeli pod artifacts/. Zawierają argv/config/build manifesty, wynik, telemetry i logi. Kontenery mają deadline, a agent śledzi konkretny PID+birth; brak liveuchwytu nie jest sam w sobie sukcesem. Dane są lokalne, ważne liczby/ograniczenia zapisane w raporcie w Git.
 
-- Kryteria M1.1/M1.2; PASS wykonania i kontroli portów coaxa, NOT QUALIFIED pola/antena.
-- Hipoteza: skompresowana baza sama wywołuje duże raw relative residual. Ten sam mały coax, różni się wyłącznie storage bazy.
-- Zapis przed runem: gotowe polecenia do Luny, 180 s deadline, lokalnie, bez pełnej anteny; build i argv zachowane w artefaktach.
-- Wynik: oba runy ~33,6 s, 6/6 solve i identyczne liczby iteracji. Raw relative residual jest rzędu 0,02–0,06 również dla FP64; zgodność portów i TEM opisana w [raporcie](docs/optimization-baseline.md).
-- Decyzja: odrzucamy kompresję jako jedyną przyczynę na tym coaxie; potrzebny test niezależnego błędu pola. Bez deklaracji rozstrzygnięcia anteny i bez promocji numeryki.
+## Reguły kolejnych prób
 
-### EXP-20261018-02 — udział powietrza i koszt potencjalnego BEM
+Jedna próba = hipoteza zapisana przed runem, referencja/input/build hash, dokładne argv, limit, wynik i decyzja PROMOTE/REJECT/REPEAT WITH CHANGE/BLOCKED. Statusy: PLANNED/RUNNING/PASS/FAIL/NOT RUN; FAIL kompletności nie jest poprawnym wynikiem RF. Zapisuj brakujące pomiary, nie domysły.
 
-- Kryteria M1.4/M1.5, audyt geometrii wykonany; globalne DOF/czas/pamięć wymagają dalszego pomiaru.
-- Wynik: AIR 61,71% tetraedrów, PTFE 30,03%; obecny zewnętrzny blok dense complex128 miałby ~11,90 GiB. Dane/hash/ograniczenia w [raporcie](docs/optimization-baseline.md).
-- Decyzja: w M2 badać kompresję/FMM i położenie interfejsu, a w FEM koszt drobnej siatki feedu. Nie ekstrapolować oszczędności pamięci z samej objętości powietrza.
+Domyślnie tiny~11s, nativeL2~18s; większy case tylko po filtrze. Cache dependencies/CMake/ccache zachowany. Nie powtarzać3razy/sweepa przed finalistą. Ta sama Luna high uruchamia gotowe polecenia i babysitting; agent główny projektuje oraz analizuje.
 
-### EXP-20261018-03 — pole TEM, niezależnie od normy solvera
-
-- Kryteria M1.2/M1.3; wszystkie trzy warianty medium przeszły filtr próbek/energii, patrz raport. FP64 LEFT: RMS E ~0,42%, B ~0,65–0,67%, max punkt B ~1,48%, energie <1,38e−4. Brak jeszcze kwalifikacji L2 całej domeny/anteny.
-- Bez rekompilacji: diagnostyczny wycinek 3,55 GHz, oba porty, 18 punktów wewnętrznych (różne z/r/kąt), ten sam mesh/Order/Tol. Najpierw FP64 storage, LEFT, limit 180 s.
-- Przed runem: filtr diagnostyczny E/B sample relative RMS ≤1%, maksymalny błąd punktowy ≤2%, energia względnie ≤1e−3. Nie jest to L2 po całej domenie; próg L2 kontraktu pozostaje osobnym wymaganiem.
-- Analityczny model TEM z amplitudą incident voltage i znaną geometrią; nie dopasowywać amplitudy/fazy do wyniku. Odbicie/efekty dyskretyzacji raportować jako błąd, nie usuwać fitowaniem.
-- Polecenie: python3 tools/dev.py run coax-medium artifacts/m1-tem-fields-left-fp64-20261018 --seconds 180 --basis fp64 --coax-fields --pc-side left .
-- Gotowy analizator: tools/coax_fields.py, uruchamiany przez agenta głównego po odbiorze danych. Po odczycie pierwszego wyniku zaplanowano FP32 LEFT oraz FP64 RIGHT: każdy 180 s, te same punkty/mesh/medium. Hipotezy: storage FP32 zachowuje próbki pól; RIGHT wiąże stopping z raw residual i daje porównywalne pola/energię. To diagnostyka M1, nie promocja zmiany domyślnego solvera.
-
-### EXP-20261018-04 — objętościowy L2 pola TEM
-
-- M1.3, tiny PASS; medium20mm FAIL kompletności po deadline. Ponieważ 18 próbek nie kwalifikuje całej domeny, dodano opt-in PALACE_COAX_TEM_DIAGNOSTIC: MFEM ComputeL2Error na wszystkich tetraedrach, real+imag, analityczny TEM bez fitowania, dwie kwadratury stopnia 6/10.
-- Przed runem: względne L2 E/B ≤1%, zmiana L2 pomiędzy kwadraturami ≤5e−4 bezwzględnie. Energie i próbki według wcześniejszego filtra. Runtime flag włącza wyłącznie zweryfikowany fixture coax-medium; to nie diagnostyka dowolnej anteny.
-- Build przyrostowy po dodaniu nowej diagnostyki: 8,564 s. Bez przebudowy zależności. Najpierw FP64/RIGHT z limitem 180 s, potem FP32/LEFT jeżeli pierwszy ukończy się i diagnostyka będzie poprawna.
-
-### Szablon EXP-YYYYMMDD-NN — krótka hipoteza
-
-- Milestone / kryteria: Mx.y; status PLANNED / RUNNING / PASS / FAIL / NOT RUN / BLOCKED.
-- Hipoteza i uzasadnienie: co zmieniamy, jaki profil/źródło ją wspiera; oczekiwany efekt i warunek odrzucenia zapisane przed runem.
-- Referencja i kandydat: commit/diff, build/image hash, case/mesh/config hash, porty/frequency, hardware, memory/precision/restart; dokładne argv i limity w artefakcie.
-- Dowody: artifacts/<id>/ — manifest, log, telemetry, wynik, porównanie S/pól/residuum; link do małego raportu w Git.
-- Wynik: czas faz i całości, RAM/VRAM, iteracje/transfery, max ΔS/ΔVSWR, niezależny błąd rozwiązania/pól; brakujące metryki oznacz NOT MEASURED.
-- Interpretacja: obserwacje vs hipotezy, zakres wiarygodności i ograniczenia pomiaru.
-- Decyzja: PROMOTE / REJECT / REPEAT WITH CHANGE / BLOCKED; wybrany wariant i konkretny następny krok. PASS techniczny nie oznacza automatycznie PROMOTE.
-
-## Trwałe decyzje
-
-- 2026-10-18: sekwencja M1–M7 z bramkami; medium i fizyka pozostają częścią kontraktu. Najpierw referencja/residuum, potem pamięć GMRES. Research techniczny i projektowanie prowadzi agent główny; uruchamianie/oczekiwanie/odbiór gotowych symulacji delegowane tej samej GPT-6 Luna high.
-- 2026-10-18: C++/CUDA w obecnym Palace/MFEM/libCEED; Python stdlib do narzędzi. Rust tylko po odrębnym uzasadnieniu. FEM–BEM/MoM stały się obowiązkowym kierunkiem M2 po korekcie celu przez użytkownika. Nowy FP32 cuDSS wymaga nowej hipotezy; nie powtarzać znanej porażki.
-
-- 2026-10-18, korekta celu: zastąpiono obowiązkowe multi-GPU przez research/prototyp Maxwell FEM–BEM/MoM. Główny cel: pamięć i czas na jednej 5070 Ti przy kontrolowanej jakości; zakończona ocena nowej metody wymagana, integracja tylko po wykazaniu przewagi.
-
-### Uzupełnienie EXP-20261018-04: skrócenie filtra
-
-Pierwsza pełna całka q6/q10 przerwała limit180s po porcie1 (L2 E~0,4939%, B~0,4561%); cały run FAIL/niekompletny. Nie zwiększono deadline. Wydzielono --coax-l2 z szybkiego --coax-fields i przygotowano osobny analityczny fixture coax-tiny długości2mm, z tą samą poprzeczną geometrią, PTFE, siatką geometry-order2 oraz Order2/Tol1e−6/MaxSize240. Ma filtrować kod, nie zastępować anteny/20mm odniesienia. Plan: L2 q4/q6 na tiny (180s), po wcześniejszej zgodności q6/q10 na ukończonym porcie20mm. Reguły jakości bez zmian.
-
-Tiny FP64 RIGHT ukończył oba porty w18,32s. Całkowite L2 q6: E~0,4953%, B~0,4558%, zmiana q4→q6 ~2e−6; raw residual <1e−6. Nie interpretować tego jako przyspieszenia tej samej anteny: to mniejszy oddzielny filtr. Następna kontrola: tiny FP32 LEFT z takim samym opt-in L2, limit180s. Progi z EXP-04 bez zmian.
-
-### Podsumowanie EXP-20261018-04
-
-- Pełny mały test zakończony: tiny RIGHT/FP64 18,36s i LEFT/FP32 17,33s, L2 E/B <1%, q4→q6 <2,2e−6. Finalny build po korekcie etykiety logu sprawdzony rzeczywistym L2 runem obu portów.
-- Szybki tiny smoke: 11,25s, 6/6 rozwiązań; analityczne TEM i zakresy w docs/optimization-baseline.md i artifacts/m1-tem-validation-20261018.json.
-- Decyzja: promujemy tiny jako pierwszy filtr developmentu, nie jako zamiennik kwalifikacji anteny. Native L2 zostaje opcjonalne. M1.1/M1.3/M1.4 dla anteny nadal otwarte.
-- Najbliższy eksperyment: snapshot/porównanie mass-weighted E/B pomiędzy referencją i kandydatem przy identycznych wejściach, najpierw tiny, potem tylko 3,50GHz/P2 anteny. Bez zmiany precyzji lub fizyki, dopóki nie zadziała kontrola jakości.
+Nowa numeracja: M1referencja/profil →M2prototypMaxwellFEM–BEM/MoM →M3pamięćGMRES →M4reuse →M5preconditioner/mixedprecision →M6TensorCores →M7kwalifikacja jednejGPU. Nie odhaczać etapu bez spełnienia kryteriów. Rust wymaga osobnego uzasadnienia; nowy FP32cuDSS wymaga nowej hipotezy, nie powtórki odrzuconej próby.

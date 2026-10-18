@@ -51,3 +51,9 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
 Pierwszy20 mm run q6/10 nie zmieścił się w180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Narzędzia mają teraz10 regresji; cała kampania C++ upstream nadal NOT RUN.
+
+## Snapshoty i porównanie masowe
+
+12regresji narzędzi pokrywa SHA/format/nieukończone referencje, inną fizykę i pokrycie regionów oraz NaN/duplikaty. Rzeczywiste tiny testy: snapshotFP64→FP32, bazaFP64disk→resident, domyślny background worker i kontrolowanyB×1,02 (oczekiwany FAILjakości). Native pliki E/B single-rank little-endian są chronione sprawdzaniem źródłowego config i zależności. Szczegóły: [kontrola pól](field-validation.md).
+
+Referencja dużej anteny ukończona; FP32 zatrzymany guardem i **niezakwalifikowany**. Nie zgłaszać zielonej kampanii antenowej na podstawie samych tiny/ukończenia referencji. Brakujący cgroup/native allocation budget jest następnym krokiem M1.

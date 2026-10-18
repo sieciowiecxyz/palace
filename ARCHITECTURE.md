@@ -11,6 +11,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `tools/adapter/`: dotychczasowy adapter CUDA UVM/cuDSS; FP32 faktory są opcjonalne, runner używa faktorów FP64.
 - `tools/runtime.json`: przypięte lokalne obrazy zależności i wersje; `tools/import.json`: pochodzenie zaimportowanych źródeł i zasad vibecoding.
 - `tools/containers/`: cienka warstwa ccache na gotowym builderze i runtime z binariami forka.
+- `palace/utils/fieldcomparison.hpp`: opcjonalne lokalne snapshoty FP64 i różnica E/B ważona istniejącymi operatorami energii; bez modyfikacji rozwiązania. Runner wiąże referencje hashami fizyki/mesh/dependencies.
 - `tools/coax_fields.py`: analityczne porównanie E/B/energii; opt-in native L2 w `palace/utils/coaxdiagnostic.hpp`, tylko znane jednorodne fixtures.
 - `tools/generate_coax_tiny.py`: jednorazowe generowanie mniejszego filtra przez opcjonalny gmsh, nie część runtime.
 - `tools/mesh_cost.py`: audyt domen Gmsh 2.2 i orientacyjnego kosztu powierzchniowego, bez bibliotek FEM/GPU.

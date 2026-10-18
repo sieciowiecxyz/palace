@@ -498,6 +498,9 @@ public:
   auto MeasureDomainFieldEnergyOnly(const ComplexVector &e, const ComplexVector &b)
       -> std::enable_if_t<U == ProblemType::DRIVEN, double>;
 
+  // Reuse the existing positive physical mass operators for optional field diagnostics.
+  const DomainPostOperator &GetDomainPostOperator() const { return dom_post_op; }
+
   // Access grid functions for field solutions. Note that these are NOT const functions. The
   // electrostatics / magnetostatics solver do measurements of the capacitance/ inductance
   // matrix globally at the end of all solves. This is done in the solver class, but uses

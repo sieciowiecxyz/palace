@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import struct
 from pathlib import Path
 import tempfile
 import unittest
@@ -11,6 +12,54 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_field_reference_rejects_wrong_physics_corruption_and_unfinished_run(self):
+        _, info, config = dev.fixture('coax-tiny')
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'fields').mkdir()
+            for name in dev.expected_field_files(config):
+                (root/'fields'/name).write_bytes(struct.pack('<8sQdd', b'PALF64V1', 1, 1.0, 0.0))
+            for name, value in [('config.json', config), ('fixture.json', info),
+                                ('build-manifest.json', build), ('result.json', {'complete': True})]:
+                dev.write(root/name, value)
+            dev.write(root/'command.json', {'actual_config_sha256': dev.sha(root/'config.json')})
+            dev.write(root/'fields.json', {'identity': dev.field_identity(config, info, build),
+                                          'complete': True,
+                                          'files': dev.field_inventory(root/'fields', dev.expected_field_files(config))})
+            dev.verified_field_reference(root, config, info, build)
+            changed = json.loads(json.dumps(config))
+            changed['Domains']['Materials'][0]['Permittivity'] = 4.4
+            with self.assertRaisesRegex(ValueError, 'different physics'):
+                dev.verified_field_reference(root, changed, info, build)
+            dev.write(root/'result.json', {'complete': False})
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                dev.verified_field_reference(root, config, info, build)
+            dev.write(root/'result.json', {'complete': True, 'field_accuracy_passed': False})
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                dev.verified_field_reference(root, config, info, build)
+            dev.write(root/'result.json', {'complete': True})
+            path = root/'fields'/sorted(dev.expected_field_files(config))[0]
+            path.write_bytes(struct.pack('<8sQdd', b'PALF64V1', 1, 2.0, 0.0))
+            with self.assertRaisesRegex(ValueError, 'bytes changed'):
+                dev.verified_field_reference(root, config, info, build)
+
+    def test_field_comparison_requires_all_solves_regions_and_finite_errors(self):
+        _, _, config = dev.fixture('coax-tiny')
+        config = dev.diagnostic_config('coax-tiny', config, True)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            def log(values):
+                (root/'palace.log').write_text(''.join(
+                    f'PALACE_FIELD_COMPARE: excitation={p} frequency_index=0 region=-1 '
+                    f'relative_E={v} relative_B={v}\n' for p,v in values))
+            log([(1, '1e-5'), (2, '1e-5')])
+            self.assertTrue(dev.field_comparisons(root, config)['passed'])
+            for values in [[(1, '1e-5')], [(1, 'nan'), (2, '0')], [(1, '0.02'), (2, '0')],
+                           [(1, '-0.01'), (2, '0')], [(1, '0'), (1, '0'), (2, '0')]]:
+                log(values)
+                self.assertFalse(dev.field_comparisons(root, config)['passed'])
+
     def test_tiny_diagnostic_keeps_medium_and_scales_probe_positions(self):
         _, _, config = dev.fixture('coax-tiny')
         linear = config['Solver']['Linear'].copy()
