@@ -541,7 +541,16 @@ def native_complex_coarse_applied(log, solves):
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
-        phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False):
+        phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
+        nsys_window=None):
+    profiler = profile = None
+    if nsys_window is not None:
+        if basis != 'fp64' or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
+            raise ValueError('Profiling requires FP64 CUDA and no output/reference field qualification')
+        import nsight_window as profiler
+        profiler.parse_window(nsys_window)
+        profiler.verified_tool()
+        phase_trace = True
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
     if native_complex_coarse and (basis != 'fp64' or cpu_reference or ceed_qpool):
@@ -617,6 +626,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_REFERENCE_FIELDS'] = '/reference-fields'
     if initial:
         flags['PALACE_INITIAL_FIELDS'] = '/initial-fields'
+    if profiler:
+        profile = profiler.prepare(nsys_window, output)
+        flags['PALACE_KRYLOV_PROFILE'] = nsys_window
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--ulimit', 'core=0:0',
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
@@ -630,6 +642,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_CUDSS_HYBRID_EXECUTE', '--unsetenv', 'PALACE_CUDSS_HYBRID_MIB',
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_PHASE_TRACE',
+            '--unsetenv', 'PALACE_KRYLOV_PROFILE',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -645,10 +658,25 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         args.extend(['-v', f'{reference / "fields"}:/reference-fields:ro'])
     if initial:
         args.extend(['-v', f'{initial / "fields"}:/initial-fields:ro'])
+    if profile:
+        args.extend(['-v', f'{profiler.TOOL}:/profile-tools:ro',
+                     '-v', f'{profile["ram_directory"]}:/profile',
+                     '--tmpfs', '/tmp:rw,size=256m', '-e', 'TMPDIR=/profile/tmp'])
     for key, value in flags.items():
+        if profile and key == 'LD_PRELOAD': continue  # Inject target only, not collector.
         args.extend(['-e', f'{key}={value}'])
-    args.extend(['--entrypoint', '/opt/palace-cudss/bin/palace-x86_64.bin', settings['runtime_image'], 'config.json'])
-    command(args, stdout=subprocess.DEVNULL)
+    target = '/opt/palace-cudss/bin/palace-x86_64.bin'
+    if profile:
+        args.extend(['--unsetenv', 'LD_PRELOAD', '--entrypoint', '/profile-tools/'+profiler.BINARY,
+                     settings['runtime_image'], *profiler.arguments(profile), 'env',
+                     'LD_PRELOAD='+flags['LD_PRELOAD'], target, 'config.json'])
+    else:
+        args.extend(['--entrypoint', target, settings['runtime_image'], 'config.json'])
+    try:
+        command(args, stdout=subprocess.DEVNULL)
+    except BaseException:
+        if profile: shutil.rmtree(profile['ram_directory'])
+        raise
     write(output / 'command.json', {'argv': args, 'environment': flags,
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
@@ -657,6 +685,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'release_gmres_basis': release_gmres_basis,
                                                   'release_final_solver': release_final_solver},
                                    'native_complex_coarse': native_complex_coarse,
+                                   'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
                                    'initial_fields': str(initial) if initial else None,
@@ -683,7 +712,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                             memory_path = container_memory_path(pid)
                         except OSError:
                             pass
-                process_memory = process_gpu_memory(pid)
+                process_pid = (profiler.target_pid(pid) if profile else pid)
+                process_memory = process_gpu_memory(process_pid or 0)
                 if process_memory is not None:
                     status['gpu_process_memory_peak_bytes'] = max(status.get('gpu_process_memory_peak_bytes', 0), process_memory)
                 memory = cgroup_memory(memory_path)
@@ -695,7 +725,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                      capture_output=True, text=True, timeout=5)
                 telemetry.write(json.dumps({'seconds': time.monotonic() - started,
                                             'host_available_bytes': free, 'gpu': gpu.stdout.strip(),
-                                            'container_memory': memory, 'gpu_process_pid': pid or None,
+                                            'container_memory': memory, 'gpu_process_pid': process_pid or None,
                                             'gpu_process_memory_bytes': process_memory}) + '\n')
                 telemetry.flush()
                 if low_memory >= 2 or time.monotonic() - started > seconds + 10:
@@ -709,6 +739,13 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if profile:
+            measured = profiler.collect(profile, output)
+            status['profile_complete'] = (measured['complete'] and returncode == 0 and
+                                          not inspected['State'].get('OOMKilled', False) and
+                                          not status.get('host_guard_or_deadline', False))
+            status['complete'] = False  # Deliberately partial; never an RF qualification.
+            status['scope'] = profile['scope']
         if native_complex_coarse:
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
                 (output/'palace.log').read_text(), status['expected_solves'])
@@ -763,6 +800,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         subprocess.run(['podman', 'rm', '--force', container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if 'proc' in locals() and proc.poll() is None:
             proc.wait(timeout=15)
+        if profile:
+            # collect() normally cleans up; also cover interrupted/failed launches.
+            shutil.rmtree(profile['ram_directory'], ignore_errors=True)
         if not (output/'palace.log').exists() and (output/'palace.stderr.log').exists():
             combine_run_logs(output)
         status['elapsed_seconds'] = time.monotonic() - started
@@ -770,7 +810,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['interrupted_signal'] = INTERRUPTED_SIGNAL
         write(output / 'result.json', status)
     print(json.dumps(status, indent=2))
-    if not status['complete']:
+    if not status['complete'] and not status.get('profile_complete'):
         raise ValueError('Run incomplete; see ' + str(output / 'palace.log'))
     if status.get('field_accuracy_passed') is False:
         raise ValueError('Field accuracy failed; see ' + str(output/'field-comparison.json'))
@@ -818,6 +858,7 @@ def main():
     r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
     r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex FP64 cuDSS coarse, without real 2N block; implies --complex-coarse')
+    r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Intentional partial CUDA/NVTX trace; native solver exits cleanly after selected GMRES iterations')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
@@ -855,7 +896,7 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver, args.native_complex_coarse)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

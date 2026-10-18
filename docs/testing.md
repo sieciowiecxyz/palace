@@ -50,7 +50,7 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 33 unittesty narzędzi PASS; pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 41 unittestów narzędzi PASS; pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 

@@ -21,7 +21,8 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `docs/reference-profiles.md`: filtrowane profile CPU/cuDSS, zespolonego coarse solve i zwalniania solvera; small-case PASS nie kwalifikuje pełnej anteny.
 - `docs/native-complex-coarse.md`: opcjonalny natywny complex FP64 coarse solver, zakwalifikowany dla jednego punktu anteny; brak promocji defaultu i otwarte profilowanie UVM/kerneli.
 - `tools/experiments/ceed_qpool.py`: izolowany, niezakwalifikowany backend workspace; osobne SO, cache jednego obiektu, manifest i opt-in runnera.
-- `tools/mesh_cost.py`: audyt domen Gmsh 2.2 i orientacyjnego kosztu powierzchniowego, bez bibliotek FEM/GPU.
+- `tools/mesh_cost.py`: audyt domen Gmsh 2.2, opcjonalne rzeczywiste DOF/material incidence wRAM i koszt powierzchniowy, bez bibliotek FEM/GPU.
+- `tools/nsight_window.py`: przypięty profiler CLI, RAM/tmpfs na trace/SQLite, selekcja NVTX i quality gate. `--nsys-window` kończy native diagnostycznie po kilku iteracjach; nigdy nie kwalifikuje RF. Obecny profil ma nierozwiązane NVTX warning.
 - `tools/tests/`: regresje narzędzi i mały natywny probe cuDSS.
 - `examples/tshaped-medium/`, `examples/coax-medium/`, `examples/coax-tiny/`: kompletne wejścia z archiwami siatek i sumami kontrolnymi.
 - `build/sm120/`, `.cache/`, `artifacts/`: ignorowane buildy, ccache i wyniki. Obiekty CMake są dodatkowo zachowane w dedykowanym kontenerze buildera.

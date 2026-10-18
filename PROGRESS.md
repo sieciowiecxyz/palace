@@ -12,7 +12,8 @@ Aktualizacja: 2026-10-18. Mode: goal, Active: M1. [PLAN](PLAN.md), [MILESTONES](
 - EXP18–19 native complex coarse FP64: probe/coax/TEM/fallbackPASS. Pełny W.3 (3,50GHz/P2) zakwalifikowany numerycznie względem ostrzejszej referencji FP64RIGHT1e−9:35iteracji/447,462s bez phase-trace, raw8,36e−7, maxE/B9,89e−8, K.3/K.4PASS. Snapshoty/SHA i rootanaliza w artifacts/m1-native-complex-coarse-antenna-qualified-20261018; referencja tight-r2,raw7,28e−10. docs/native-complex-coarse.md.
 - Dane robocze wyłącznieRAM/VRAM; cuDSSlive0porelease,peakcuDSS25,008GB/UVM55,148GB/cgroup58,899GB, sampledGPU-process2GiB. Nowe defaulty i mixed precision niepromowane. Czas używa warmstartuEXP12; nie zgłaszać447/1089jako kontrolowanegospeedupu.
 - Historyczne diskreference/candidate REJECT; ichwyniki nie są baseline. ResidentEXP12 ukończył151iter/1089,964s,ale LEFTstopping przyraw0,125 i lokalneB>1%vsnowaref niekwalifikujągojako referencji dokładności. EXP13/14deadline,EXP15CPUOOM,EXP17exactrealblockguard zachowaneFAIL.
-- PozostajeM1.4: aktualna atrybucja kerneli/UVMtransferów i pełny bilans DOF/pamięci/operator/workspace; hosttrace176sparowanycheventów i pełnyrun beztrace już są. HistorycznyNsight miałlostevents; nieprzenosićjegoliczbnaobecnąwersję.
+- EXP21: rzeczywista topologia/DOF zgodna z Palace, AIR-exclusive57,586% ND2; audyt17,349s/633MiB RAM. Bilans net-release rozlicza55,148GBmanaged, ale semantyczna atrybucja wszystkich buforów nadal otwarta. docs/topology-memory.md.
+- PozostajeM1.4: wiarygodna atrybucja kerneli/UVM i pełny operator/workspace. EXP20 tiny r5 ma czyste zakończenie i brak CUDA-loss warning, lecz nadal NVTX-loss warning: profil REJECT. Nie uruchomiono pełnej anteny z tym profilerem. docs/profiling-window.md.
 
 ## Rejestr eksperymentów
 
@@ -31,8 +32,8 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-1. Zachować nową referencję tight-r2 i zakwalifikowany W.3 bez zmiany progów; domknąć dokumentację/commit EXP18–19.
-2. Przygotować krótki bieżący profil kerneli/UVM (małe okno, kontrola lostevents i narzutu), rozliczyć DOF/workspace/transfery. Nie powtarzać pełnej anteny dla samego statusu ani ponawiać znanych FAIL bez diagnozy.
+1. Zachować referencję tight-r2 i zakwalifikowany W.3; tolerancje bez zmian. EXP18–19 zapisane lokalnie w0b689c3.
+2. Nie powtarzać wariantu wyzwalanego capture ani pełnego antena profilu z obecnym NVTX warning. Najpierw ustalić źródło ostrzeżenia/zgodność kolektora lub użyć niezależnej metody pomiaru. Pozostałe zadanie M1: semantyczne rozbicie operator/workspace na aktualnej referencji. Topologia i bilans net-release EXP21 gotowe.
 3. Domknąć pozostałe bramki M1 i dopiero aktywować M2 FEM–BEM/MoM. Kierunek M2 ma wynikać z kosztu powietrza/interfejsu, nie z samego udziału objętości. Mixed precision/TC pozostają w przyszłych etapach.
 
 ## Reguły pracy
@@ -240,3 +241,25 @@ Domknięcie docs/codeEXP18–19: docs-gardenLuna33testsPASS,rootpoprawiłstareop
 
 
 Checkpoint przed commitemEXP18–19: końcowy docs-gardenLunaPASS,rootdiffreviewPASS,33unittestyPASS,docscheckerPASS (istniejące miękkieAGENTS591~tok),gitdiffcheckPASS,source/native/depsmanifestPASS. Wszystkie przygotowane symulacje terminalne, brakpalace-run kontenerów. WorkingstoragewyłącznieRAM/VRAM,corelimit0zweryfikowany;bezpaidcompute. Lokalnycommit,niepushupstream. DalejM1.4krótkiprofildanych/kerneli/UVM i pamięci; nieaktywowaćM2ani nieukończyćgoal bezpozostałychdowodów.
+
+
+## EXP20 — krótkie okno kerneli/UVM (ACTIVE)
+
+M1.4: Nsight2026.5.1CLI z oficjalnegoNVIDIA225594886B, SHA61829db6392e5c293ada1319df86a97c3356bc810335a1975cb551fcfe3eca08. Wyodrębniony lokalnie bez zmianCUDA/OS; runtime--versionpotwierdza2026.5.1.161. Poprzedni2025profilmiałlostevents; nieliczyć naobecne wyniki. Nowyprofil ma nativeNVTXokno FIRST:COUNT zregisteredrange Krylov sample@palace, a natywny solver synchronizuje CUDA i kończy kontrolowanym wyjątkiem po kilku iteracjach; main przechwytuje go przed niepełnym RF postprocessingiem. Nsight używa --trace=cuda-sw,nvtx oraz --kill=none. Profile jest świadomieczęściowy,nieRFcompletion/PASSsolution.
+
+Najpierwcoax-tinyFP64nativeFIRST1:COUNT2,limit120s,cap60GiB/guard6GiB; potem pełnasiatkaFIRST2:COUNT2,limit600s poAPIprofilePASS,bezpowtarzania całego solve. Tracecuda,nvtx,CPU sampling/contextswitch/off,UMperpagefaultsoff; zliczyćmigracjebytes/kerneliinadzór nadutraconymizdarzeniami. Temp/logbuforyprofilera wtmpfsRAM; zachowaćmałyreportjakozwykływynik(max64MiB),podsumowanieSQLitewstdlib. DaneFEM/baza/macierz nadalRAM/VRAM,corelimit0. Progi przedprofilem:obaNVTXmarkery i2pełneiteracje,niezerowekernel/transferrecordygdyobecne,braklost/mismatch/nieobsługiwanejwersji; liczbęnieznanychprzypisańraportowaćnieukrywać. Nieinterpretowaćczęściowego okna jako całego benchmarku ani sumyGPUtimejako walltime.
+
+
+EXP20 pierwszy tiny: 9,36s, exit143, 1409 kerneli, ale SQL DIAGNOSTIC_EVENT zawiera ostrzeżenia o możliwie niepełnych CUDA/NVTX events i fallback HW→software. **REJECT dla wiążącej atrybucji**. Pierwotny profile_complete=true był błędem walidatora (sprawdzał stdout, nie SQL). Zachowano oryginalny wynik i osobny root-analysis.json z korektą. Poprawka: SQL warning gate, wymagany clean-stop marker, jawne software tracing, sync+kontrolowane unwind bez SIGTERM, PID celu z dzieci wszystkich wątków. 38 regresji PASS; następny jeden tiny r2, przed full krótkim oknem. Żadnego disk workspace ani zmiany tolerancji.
+
+
+EXP20 dalsze małe filtry: r2 8,438s clean-stopFAIL (stop-shutdown kończył sesję przed cleanupem celu); r3 8,55s clean-stopPASS po stop/waitall, CUDA+NVTXwarnings; r4 8,44s cudaProfilerAPI+flush nie usunęływarnings; r5 9,41s cały boundedproces bez triggeredcapture: CUDAwarning zniknął, NVTXwarning pozostał. **Wszystkie REJECT profilowania**, brak RF i brak full antena retry. Obecny kod zachowuje prostszy wariant r5: sync+nativeunwind, wholeprocesscapture, okno iteracji wybierane po NVTX offline. TargetPIDtelemetry poprawiona i zmierzona; wszystkie temptrace/SQLite w/dev/shm, final małe raporty zwykłe wyniki. Buildy przyrostowe8,6–8,9s, brak dependencyrebuild. NieaktywowaćM2 na podstawie tych profili.
+
+## EXP21 — rzeczywiste DOF i bilans resident pamięci (PASS zakresu audytu)
+
+`tools/mesh_cost.py --dofs` liczy unikatowe wierzchołki/krawędzie/ściany tetra i materialincidence wRAM, bez plików roboczych; 17,349s, maxRSS663875584B. SHAmesh identyczne W3. 383949vertices/2196005edges/3413357faces/1601320tet; ND2=11218724,H1p2=2579954,RTdegree1=15044031 — wszystkie zgodne z runtime. AIRexclusive6460374DOF=57,586%; pozostaje4758350nonair/shared, nie jest to dowód speedupu. Obecny exteriorsurface94200ND2traceDOF: jeden densecomplex128blok141978240000B (~132,23GiB), vs wcześniejszy RWG-edge estimate11,90GiB dla innej przestrzeni. FEM–BEM wymaga kompresji/FMM lub odpowiednio dobranej mniejszej powierzchni i jawnej kwalifikacji dyskretyzacji.
+
+Bilans na tym samymEXP19gmrespeak55147611962B: cuDSS25008217684 + netVrelease6461985024 + inne linear-solvernetrelease14390057060 + pozostaje9287352194 = dokładniepeak. Vnet odpowiada36complexNDwektorom, podczasgdycapacitylog45; nieutożsamiać host/device/mirrors. Netrelease nie rozstrzyga właściciela każdego bufora, a cuDSS już zawarty wmanaged. Źródła/SHA/checks w artifacts/m1-topology-memory-balance-20261018.json oraz m1-mesh-dofs-20261018.json; docs/topology-memory.md. 41regresjiPASS. M1 nadalotwarty, brakpromocjidefaultów.
+
+
+EXP20 normalpath regression (profiling OFF):6/6coaxsolvePASS,12,545s,rawmax9,10045e−7; maxΔcomplexS9,09e−16,E3,18e−15/B1,51e−13względemnativetiny-r2. Profilemarkerynieobecne; releasememorygatesPASS. Artefakty artifacts/m1-nsys-normal-regression-20261018 oraz root-analysis.json. 41testsPASS; docs-gardenLuna/rootreview: przywrócono właściwy opis --trace=cuda-sw,nvtx (r5jawnysoftwaretrace, niehistorycznyHWfallback). Dodano gateexit0/noOOM i cleanupRAMtakże przy wyjątkach runnera. M1/goal pozostająaktywne.

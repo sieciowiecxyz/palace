@@ -34,6 +34,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: native complex coarse i nowa referencja](native-complex-coarse.md)
   - Czytaj gdy: używasz eksperymentalnego coarse FP64 albo porównujesz jakość pełnego W.3
   - Opis: EXP18–19, naprawa ABI CUDA, probe/TEM/fallback, pełny solver i kontrola względem ostrzejszej referencji.
+- [M1: rzeczywiste DOF i bilans pamięci](topology-memory.md)
+  - Czytaj gdy: oceniasz potencjał usunięcia powietrza lub liczysz koszty wektorów i zwalniania
+  - Opis: EXP21, zgodność topologii z Palace, shared DOF i bilans netto tej samej fazy; ograniczenia BEM.
+- [M1: krótkie profilowanie CUDA](profiling-window.md)
+  - Czytaj gdy: używasz --nsys-window lub diagnozujesz niekompletne ślady Nsight
+  - Opis: EXP20, RAM/tmpfs, bounded stop, jakość raportów i nierozwiązane ostrzeżenie NVTX; brak promocji.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

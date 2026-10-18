@@ -47,7 +47,8 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Hash/fizyka/build zinwentaryzowane; silniejsza resident FP64 referencja tight-r2 i W.3qualified mają snapshoty/SHA i rootanalizę. Stary EXP12 pozostaje tylko referencją wykonania.
 - [ ] Prześledzić definicje norm i skalowanie w kodzie; wyjaśnić historyczne raw residual 0,125 / 0,808 mimo małej różnicy S.
 - [x] Raw RHS niezależne od PC + TEM/L2; W.3medium względem FP64RIGHT1e−9 przechodzi zamrożone K.3/K.4. M1 jako całość nadal otwarty, szersze pasma i geometria produkcyjna niezakwalifikowane.
-- [ ] Zmapować czas: assembly, preconditioner/faktoryzacja, matvec, ortogonalizacja, transfery, postprocessing. Dodać tylko brakujące logi/NVTX.
+- [x] Rzeczywiste DOF/material incidence zgodne z Palace i bilans net-release EXP21; docs/topology-memory.md. Semantyczni właściciele wszystkich workspace nadal otwarci.
+- [ ] Zmapować czas: assembly, preconditioner/faktoryzacja, matvec, ortogonalizacja, transfery, postprocessing. Dodać tylko brakujące logi/NVTX. EXP20 tiny profile REJECT przez NVTX warning, bez pełnej anteny; docs/profiling-window.md.
 - [ ] Rozliczyć udział powietrza i granicy zewnętrznej oraz operator/q-data, bazę V/Z, faktory, workspace i kopie; odróżnić alokację, rezydencję GPU oraz peak RAM.
 - [ ] Krótki profil reprezentatywnej fazy plus pełny run bez profilera; ustalić największy koszt i następny jeden eksperyment.
 

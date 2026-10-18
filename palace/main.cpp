@@ -23,6 +23,7 @@
 #include "utils/jsonschema.hpp"
 #include "utils/omp.hpp"
 #include "utils/outputdir.hpp"
+#include "utils/profilewindow.hpp"
 #include "utils/timer.hpp"
 
 #if defined(MFEM_USE_STRUMPACK)
@@ -310,7 +311,14 @@ int main(int argc, char *argv[])
   // reuse the exact same code path on an in-process IoData. See palace/driver.hpp
   // for the preconditions it expects.
   PrintPalaceInfo(world_comm, world_size, omp_threads, ngpu, *device);
-  palace::Run(iodata, world_comm, omp_threads, GetPalaceGitTag());
+  try
+  {
+    palace::Run(iodata, world_comm, omp_threads, GetPalaceGitTag());
+  }
+  catch (const palace::KrylovProfileComplete &)
+  {
+    Mpi::Print("PALACE_PROFILE_STOP: clean diagnostic stop; no RF qualification\n");
+  }
 
   // Finalize libCEED.
   ceed::Finalize();

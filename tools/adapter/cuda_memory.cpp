@@ -13,6 +13,11 @@
 #include <mutex>
 #include <chrono>
 
+extern "C" void PalaceProfileSynchronize() {
+  const auto error=cudaDeviceSynchronize();
+  if(error!=cudaSuccess){std::fprintf(stderr,"Profile window synchronization failed: %s\n",cudaGetErrorString(error));std::abort();}
+}
+
 namespace {
 std::atomic<uint64_t> dss_live{0}, dss_peak{0}, dss_allocations{0};
 struct ManagedState {

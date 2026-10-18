@@ -4,16 +4,19 @@
 #include "iterative.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstddef>
 #include <limits>
 #include <string>
+#include <string_view>
 #include "linalg/orthog.hpp"
 #include "utils/communication.hpp"
 #include "utils/timer.hpp"
 #include "utils/memorymark.hpp"
+#include "utils/profilewindow.hpp"
 
 namespace palace
 {
@@ -25,6 +28,75 @@ bool UseStoredBasis()
 {
   return std::getenv("PALACE_GMRES_FP32_BASIS");
 }
+
+// Diagnostic-only NVTX capture range. Unwind cleanly at its end, without RF output.
+class KrylovProfileWindow
+{
+  int first = -1, count = 0;
+  bool active = false, done = false;
+  nvtxDomainHandle_t domain = nullptr;
+  nvtxStringHandle_t message = nullptr;
+
+public:
+  explicit KrylovProfileWindow(MPI_Comm comm)
+  {
+    const char *raw = std::getenv("PALACE_KRYLOV_PROFILE");
+    if (!raw) return;
+    const std::string_view value(raw);
+    const auto colon = value.find(':');
+    MFEM_VERIFY(colon != std::string_view::npos, "Expected profile FIRST:COUNT!");
+    const auto begin = value.data(), end = begin + value.size();
+    auto a = std::from_chars(begin, begin + colon, first);
+    auto b = std::from_chars(begin + colon + 1, end, count);
+    MFEM_VERIFY(a.ec == std::errc() && a.ptr == begin + colon && b.ec == std::errc() &&
+                    b.ptr == end && first >= 0 && first <= 32 && count >= 1 && count <= 8 &&
+                    Mpi::Size(comm) == 1,
+                "Profile requires one rank, FIRST=0..32 and COUNT=1..8!");
+    domain = nvtxDomainCreateA("palace");
+    message = nvtxDomainRegisterStringA(domain, "Krylov sample");
+  }
+
+  void Begin(int iteration)
+  {
+    if (!done && iteration == first)
+    {
+      MFEM_VERIFY(PalaceProfileSynchronize, "Profile window requires the CUDA adapter sync hook!");
+      PalaceProfileSynchronize();
+      Mpi::Print("PALACE_PROFILE_WINDOW: begin first={} count={}\n", first, count);
+      nvtxEventAttributes_t event{};
+      event.version = NVTX_VERSION;
+      event.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
+      event.messageType = NVTX_MESSAGE_TYPE_REGISTERED;
+      event.message.registered = message;
+      nvtxDomainRangePushEx(domain, &event);
+      active = true;
+    }
+  }
+
+  void End(int iteration)
+  {
+    if (active && iteration + 1 == first + count)
+    {
+      MFEM_VERIFY(PalaceProfileSynchronize, "Profile window requires the CUDA adapter sync hook!");
+      PalaceProfileSynchronize();
+      Mpi::Print("PALACE_PROFILE_WINDOW: end first={} count={}\n", first, count);
+      nvtxDomainRangePop(domain);
+      active = false;
+      done = true;
+      throw KrylovProfileComplete{};
+    }
+  }
+
+  ~KrylovProfileWindow()
+  {
+    if (active)
+    {
+      Mpi::Print("PALACE_PROFILE_WINDOW: incomplete\n");
+      nvtxDomainRangePop(domain);
+    }
+    if (domain) nvtxDomainDestroy(domain);
+  }
+};
 
 template <typename T>
 inline void CheckDot(T dot, const char *msg)
@@ -531,6 +603,7 @@ void GmresSolver<OperType>::Update(int j) const
 template <typename OperType>
 void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 {
+  KrylovProfileWindow profile_window(comm);
   // Set up workspace.
   RealType beta = 0.0, true_beta, eps = 0.0;
   MFEM_VERIFY(A, "Operator must be set for GmresSolver::Mult!");
@@ -646,6 +719,7 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
     int j = 0;
     for (;; j++, it++)
     {
+      profile_window.Begin(it);
       if (print_opts.iterations)
       {
         Mpi::Print(comm, "{}{:{}d} (restart {:d}) KSP residual norm {:.6e}\n",
@@ -692,6 +766,7 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 
       beta = std::abs(s[j + 1]);
       CheckDot(beta, "GMRES residual norm is not valid: beta = ");
+      profile_window.End(it);
       converged = (beta < eps);
       if (converged || j + 1 == max_dim || it + 1 == max_it)
       {
