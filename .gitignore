@@ -11,6 +11,15 @@ spack_repo/local/packages/palace/__pycache__/
 Manifest.toml
 .vscode/
 
+# Local fork development outputs and unpacked, checksum-verified fixtures.
+.cache/
+artifacts/
+__pycache__/
+examples/tshaped-medium/mesh/pcb.msh
+examples/coax-medium/coax.msh
+*.unpacking
+!.github/upstream-workflows/build-*.yml
+
 # Coverage files
 *.profraw
 *.gcno

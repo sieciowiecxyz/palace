@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "profile": "sm120",
+  "architecture": "120",
+  "platform": "linux/amd64",
+  "builder_image": "sha256:296248155e55ca84f1e362d6a2926682f78c4f0290ab26158a265300244fb55d",
+  "builder_tag": "localhost/palace:sm120-dev-builder-20261018",
+  "runtime_image": "sha256:43cd147fb88b398e143152be73d17e7e42ace53f922fd9317119b7214677a40e",
+  "cuda": "12.9.1",
+  "cudss": "0.7.1.4",
+  "build_dir": "/opt/palace-cudss-build",
+  "install_prefix": "/opt/palace-cudss",
+  "qualified_image": "sha256:65d1cc1edab73425469a47a0265e390ec4f7952c95694cd4633d31ba7315a283"
+}

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "name": "tshaped-medium",
+  "mesh": "mesh/pcb.msh",
+  "mesh_sha256": "ec56c9a7de3e9cdc9618b87a2029975d474d6d5621f9fd08b35f24501b6f161e",
+  "archive_sha256": "44455eedb68a887818033ecbe4a86e9f9d09899069f17d13d163ec7b760bf251",
+  "mesh_bytes": 336128373,
+  "source_repo": "sieciowiecxyz/orange-n78-feeder",
+  "source_path": "artifacts/infra/antenna-precision-3500-p2-medium-20261017/case",
+  "scope": "performance fixture; not manufacturing baseline",
+  "medium": {
+    "Order": 2,
+    "Tol": 1e-06,
+    "MaxIts": 1600,
+    "MaxSize": 240,
+    "PartialAssemblyOrder": 1
+  },
+  "archive_parts": [
+    "mesh/pcb.msh.zst.part00",
+    "mesh/pcb.msh.zst.part01",
+    "mesh/pcb.msh.zst.part02",
+    "mesh/pcb.msh.zst.part03"
+  ],
+  "config_sha256": "275883215892bd1bd9815813933c6dbb29105c2799f6489c0594de4f526f94ea"
+}

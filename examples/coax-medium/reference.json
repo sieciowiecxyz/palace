@@ -1,0 +1,5 @@
+{
+  "scope": "historical qualified-image result; not a fresh run or production antenna baseline",
+  "image": "sha256:65d1cc1edab73425469a47a0265e390ec4f7952c95694cd4633d31ba7315a283",
+  "port_s_sha256": "4f3251a3dbe6a256cec0a3169ae8f098ccf2acab19325a99c020d7a6b3f777f7"
+}

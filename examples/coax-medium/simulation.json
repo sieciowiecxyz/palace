@@ -1,0 +1,10 @@
+{
+  "accuracy": "medium",
+  "scope": "Analytical 50-ohm PTFE coax compute fixture; not antenna validation",
+  "profile": {
+    "order": 2,
+    "tol": 1e-06,
+    "max_its": 1600,
+    "max_size": 240
+  }
+}

@@ -1,0 +1,7 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY native/libpalace.so /opt/palace-cudss/lib/libpalace.so
+COPY native/palace-x86_64.bin /opt/palace-cudss/bin/palace-x86_64.bin
+COPY native/libcudss_fp32.so /opt/precision/libcudss_fp32.so
+COPY build-manifest.json /opt/palace-local/build-manifest.json
+ENTRYPOINT ["palace"]

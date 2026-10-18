@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "name": "coax-medium",
+  "mesh": "coax.msh",
+  "mesh_sha256": "6331c7cc60fad6add95ae36a4218b8dad8461d718c463145ab038a261eb4cf25",
+  "archive_sha256": "7cf0acb7430c371cb964c4fba43700170431bf6b319916b4e3107e4d92af39e5",
+  "mesh_bytes": 21684472,
+  "source_repo": "sieciowiecxyz/orange-n78-feeder",
+  "source_path": "artifacts/infra/precision-medium-20261017/case",
+  "scope": "performance fixture; not manufacturing baseline",
+  "medium": {
+    "Order": 2,
+    "Tol": 1e-06,
+    "MaxIts": 1600,
+    "MaxSize": 240,
+    "PartialAssemblyOrder": 1
+  },
+  "archive_parts": [
+    "coax.msh.zst"
+  ],
+  "config_sha256": "cf6f4e6cb368d8f2e88028cac092411d7df50b762b32e2ddf5a91ccff77d0c5a"
+}

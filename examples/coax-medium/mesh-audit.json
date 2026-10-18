@@ -1,0 +1,30 @@
+{
+  "solver_ready": true,
+  "tetrahedra": 126498,
+  "minimum_jacobian": 0.00027153817120514716,
+  "min_signed_quality": 0.08994223934305494,
+  "geometry": {
+    "inner_radius_mm": 0.12,
+    "shield_inner_radius_mm": 0.40179519190143026,
+    "length_mm": 20,
+    "epsilon_r": 2.1,
+    "geometry_order": 2,
+    "one_sided_ports": true,
+    "mesh_size_mm": 0.04
+  },
+  "source_kind": "analytical coax geometry specification",
+  "source_model_sha256": "38f4aa16aefcc92827af35d170185021f680fc7a43f719cee09f19abd794b65f",
+  "mesh_sha256": "6331c7cc60fad6add95ae36a4218b8dad8461d718c463145ab038a261eb4cf25",
+  "builder_sha256": "5967a7ad3e6b3a1418ada7c0a84e25b1ac2aa03909a75023117bdff65fa62db2",
+  "ports": [
+    {
+      "index": 1,
+      "adjacent_volumes": 1
+    },
+    {
+      "index": 2,
+      "adjacent_volumes": 1
+    }
+  ],
+  "physics_validated": false
+}

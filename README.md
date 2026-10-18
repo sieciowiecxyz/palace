@@ -1,3 +1,20 @@
+# Lokalny fork Palace — CUDA / UVM / medium
+
+Samodzielne źródła dotychczasowego forka, przykłady anteny i coaxa oraz przyrostowy build z zachowanymi zależnościami i ccache.
+
+```sh
+python3 tools/dev.py build --jobs 8
+python3 tools/dev.py run coax-medium artifacts/coax-check --seconds 180
+```
+
+Wymagane lokalne obrazy zależności: [build i przenoszenie środowiska](docs/build.md). Binariów/obrazów nie pobieramy obecnie z rejestru. Wyniki trafiają do `build/sm120/` i nowego katalogu `artifacts/`.
+
+[Instrukcje agentów](AGENTS.md) · [Mapa dokumentacji](docs/INDEX.md) · [Plan optymalizacji](docs/speedup.md) · [Testy](docs/testing.md)
+
+Poniżej zachowano README upstream. Kwalifikacja dotychczasowych zmian i jej ograniczenia: [raport historyczny](docs/local-optimization-results.md).
+
+---
+
 <!---
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0

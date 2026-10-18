@@ -1,0 +1,121 @@
+# Indeks dokumentacji
+
+Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla zmienianej części.
+
+- [Build i cache — lokalny SM120](build.md)
+  - Czytaj gdy: budujesz, pakujesz lub przenosisz środowisko
+  - Opis: Cache, lokalne obrazy, CLI i limity runnera.
+- [Dokumentacja i kontekst](context.md)
+  - Czytaj gdy: zapisujesz lub odzyskujesz wiedzę
+  - Opis: Zasady krótkiej dokumentacji i jednego źródła prawdy.
+- [Palace na RTX 5070 Ti — wynik badania](local-optimization-results.md)
+  - Czytaj gdy: potrzebujesz wyników wcześniejszych benchmarków
+  - Opis: Historyczne czasy, poprawność i nierozstrzygnięte normy residuum.
+- [Pochodzenie i stan migracji](migration.md)
+  - Czytaj gdy: sprawdzasz pochodzenie lub stan migracji
+  - Opis: Rewizje, granice przeniesienia i wyniki kontroli.
+- [Palace: mniej pamięci, krótsze obliczenia, CUDA i wiele GPU](speedup.md)
+  - Czytaj gdy: planujesz optymalizację pamięci lub obliczeń
+  - Opis: Cele użytkownika, research i bramki eksperymentów.
+- [Configuration File](src/config/config.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/config/config.md
+  - Opis: Zachowana dokumentacja upstream Palace: Configuration File
+- [Developer Notes](src/developer/notes.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/developer/notes.md
+  - Opis: Zachowana dokumentacja upstream Palace: Developer Notes
+- [Working with Spack](src/developer/spack.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/developer/spack.md
+  - Opis: Zachowana dokumentacja upstream Palace: Working with Spack
+- [Testing](src/developer/testing.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/developer/testing.md
+  - Opis: Zachowana dokumentacja upstream Palace: Testing
+- [Tutorial: Adding a New Unit Test](src/developer/tutorial_add_new_unit_test.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/developer/tutorial_add_new_unit_test.md
+  - Opis: Zachowana dokumentacja upstream Palace: Tutorial: Adding a New Unit Test
+- [Tutorial: GPU Profiling with NVIDIA Nsight Systems and NVTX](src/developer/tutorial_gpu_profiling.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/developer/tutorial_gpu_profiling.md
+  - Opis: Zachowana dokumentacja upstream Palace: Tutorial: GPU Profiling with NVIDIA Nsight Systems and NVTX
+- [Dipole Antenna and Radiation Fields](src/examples/antenna.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/antenna.md
+  - Opis: Zachowana dokumentacja upstream Palace: Dipole Antenna and Radiation Fields
+- [Flux Trapping Analysis](src/examples/circular_hole.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/circular_hole.md
+  - Opis: Zachowana dokumentacja upstream Palace: Flux Trapping Analysis
+- [Signal Propagation in a Coaxial Cable](src/examples/coaxial.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/coaxial.md
+  - Opis: Zachowana dokumentacja upstream Palace: Signal Propagation in a Coaxial Cable
+- [Crosstalk Between Coplanar Waveguides](src/examples/cpw.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/cpw.md
+  - Opis: Zachowana dokumentacja upstream Palace: Crosstalk Between Coplanar Waveguides
+- [2D Coplanar Waveguide Mode Analysis](src/examples/cpw2d.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/cpw2d.md
+  - Opis: Zachowana dokumentacja upstream Palace: 2D Coplanar Waveguide Mode Analysis
+- [Eigenmodes of a Cylinder](src/examples/cylinder.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/cylinder.md
+  - Opis: Zachowana dokumentacja upstream Palace: Eigenmodes of a Cylinder
+- [Floquet Ports for a Dielectric Grating](src/examples/dielectric_grating.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/dielectric_grating.md
+  - Opis: Zachowana dokumentacja upstream Palace: Floquet Ports for a Dielectric Grating
+- [Overview](src/examples/examples.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/examples.md
+  - Opis: Zachowana dokumentacja upstream Palace: Overview
+- [Inductance Matrix for a Pair of Concentric Rings](src/examples/rings.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/rings.md
+  - Opis: Zachowana dokumentacja upstream Palace: Inductance Matrix for a Pair of Concentric Rings
+- [Capacitance Matrix for Two Spheres](src/examples/spheres.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/spheres.md
+  - Opis: Zachowana dokumentacja upstream Palace: Capacitance Matrix for Two Spheres
+- [Single transmon with read-out resonator](src/examples/transmon.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/examples/transmon.md
+  - Opis: Zachowana dokumentacja upstream Palace: Single transmon with read-out resonator from [`DeviceLayout.jl`](https://aws-cqc.github.io/DeviceLayout.jl/)
+- [Frequently Asked Questions](src/faq.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/faq.md
+  - Opis: Zachowana dokumentacja upstream Palace: Frequently Asked Questions
+- [Adaptive Frequency Sweeps for Driven Simulations](src/features/adaptive_driven_solver.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/features/adaptive_driven_solver.md
+  - Opis: Zachowana dokumentacja upstream Palace: Adaptive Frequency Sweeps for Driven Simulations
+- [Circuit Synthesis from AC Simulations](src/features/circuit_extraction.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/features/circuit_extraction.md
+  - Opis: Zachowana dokumentacja upstream Palace: Circuit Synthesis from AC Simulations
+- [Extracting Fields in the Radiation Zone](src/features/farfield.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/features/farfield.md
+  - Opis: Zachowana dokumentacja upstream Palace: Extracting Fields in the Radiation Zone
+- [Boundary Conditions](src/guide/boundaries.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/boundaries.md
+  - Opis: Zachowana dokumentacja upstream Palace: Boundary Conditions
+- [Overview](src/guide/guide.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/guide.md
+  - Opis: Zachowana dokumentacja upstream Palace: Overview
+- [Simulation Models](src/guide/model.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/model.md
+  - Opis: Zachowana dokumentacja upstream Palace: Simulation Models
+- [Parallelism and GPU Support](src/guide/parallelism.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/parallelism.md
+  - Opis: Zachowana dokumentacja upstream Palace: Parallelism and GPU Support
+- [Postprocessing and Visualization](src/guide/postprocessing.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/postprocessing.md
+  - Opis: Zachowana dokumentacja upstream Palace: Postprocessing and Visualization
+- [Problem Types](src/guide/problem.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/guide/problem.md
+  - Opis: Zachowana dokumentacja upstream Palace: Problem Types
+- [Palace: 3D Finite Element Solver for Computational Electromagnetics](src/index.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/index.md
+  - Opis: Zachowana dokumentacja upstream Palace: Palace: 3D Finite Element Solver for Computational Electromagnetics
+- [Installation](src/install.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/install.md
+  - Opis: Zachowana dokumentacja upstream Palace: Installation
+- [JSON.jl doesn't support // comments](src/quick.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/quick.md
+  - Opis: Zachowana dokumentacja upstream Palace: JSON.jl doesn't support // comments
+- [Reference](src/reference.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/reference.md
+  - Opis: Zachowana dokumentacja upstream Palace: Reference
+- [Running *Palace*](src/run.md)
+  - Czytaj gdy: pracujesz z funkcją upstream opisaną przez src/run.md
+  - Opis: Zachowana dokumentacja upstream Palace: Running *Palace*
+- [Walidacja lokalnego forka](testing.md)
+  - Czytaj gdy: zmieniasz kod lub kwalifikujesz build
+  - Opis: Polecenia regresji, smoke i zakres dowodów.
+- [Praca podczas długich sesji](workflow.md)
+  - Czytaj gdy: prowadzisz długie zadanie lub goal mode
+  - Opis: Wznawianie, sekwencyjne etapy i delegowanie.

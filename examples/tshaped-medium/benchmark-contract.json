@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "source": "/home/sieciowiec/dev/python/anteny/artifacts/modal/panel-flat-mast-return28-neck09-rear-route-v2-midn78-p2-k120-h200-20261011/inputs/job-001",
+  "source_config_sha256": "d5ef0995a69e52bf7f120bea3b69320ccdeb1adf2e7e6ae51be95790c6df80ef",
+  "config_sha256": "39791911b7c2733c9136a9bbb95cf99c59c4d2becaac9198c2e4c98480fd6e64",
+  "mesh_sha256": "ec56c9a7de3e9cdc9618b87a2029975d474d6d5621f9fd08b35f24501b6f161e",
+  "frequency_ghz": 3.5,
+  "excited_port": 2,
+  "accuracy": "medium",
+  "profile": {
+    "order": 2,
+    "tol": 1e-06,
+    "max_its": 1600,
+    "max_size": 240
+  },
+  "original_linear": {
+    "KSPType": "GMRES",
+    "MaxIts": 1600,
+    "MaxSize": 120,
+    "Tol": 1e-06,
+    "Type": "cuDSS"
+  },
+  "backend": "/gpu/cuda/gen",
+  "modes": [
+    "gpu-fp64",
+    "gpu-fp32"
+  ],
+  "unified_memory": false,
+  "precision": "FP64 FEM/GMRES; FP32 variant changes only cuDSS preconditioner",
+  "accuracy_reference": "FP64 same input; agreement is not mesh/physical validation"
+}
