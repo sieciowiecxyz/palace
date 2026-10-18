@@ -2,7 +2,7 @@
 
 **Korekta 2026-10-18:** wszystkie opisane niżej próby z bazą na SSD są historyczne i odrzucone przez użytkownika. Kod disk basis został usunięty; nie stanowią dopuszczalnego baseline wydajności. Dalsze dane robocze wyłącznie RAM/VRAM, bez swap/offloadu na SSD/NVMe. Zachowane pola mogą pozostać archiwalnym wynikiem diagnostycznym.
 
-Data: 2026-10-18. Status: M1 ACTIVE. Historyczna referencja i porównanie pól z disk basis są odrzucone. Jest już jeden resident FP64 run pełnej anteny (3,50 GHz/P2), lecz niezależna jakość rozwiązania nadal pozostaje otwarta: raw relative residual to 0,1253 i nie ma zakwalifikowanej referencji pełnych pól. To pomiar wykonania, nie nowa kwalifikacja projektu ani przyspieszenia. Szczegóły: [fazy pamięci i run resident](memory-phases.md).
+Data: 2026-10-18. Status: M1 ACTIVE. Historyczna referencja i porównanie pól z disk basis są odrzucone. Ukończono jeden resident FP64 run pełnej anteny (3,50 GHz/P2), lecz niezależna jakość rozwiązania pozostaje otwarta: raw relative residual to 0,1253 i nie ma zakwalifikowanej referencji pełnych pól. Późniejsze próby korekty EXP13/14 zakończyły się timeoutem bez pełnych wyników S/pól; ich końcowe iteracje są nieznane. To pomiar wykonania, nie nowa kwalifikacja projektu ani przyspieszenia. Szczegóły prób: [korekta referencji](reference-correction.md); fazy EXP12: [raport resident](memory-phases.md).
 
 ## Co wykonano
 

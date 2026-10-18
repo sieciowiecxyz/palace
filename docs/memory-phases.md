@@ -54,6 +54,9 @@ bez Q-pool, scratch, swap i alokacji roboczych na SSD. Obowiązują cgroup
 - `artifacts/m1-antenna-resident-fp64-20261018/`: natural exit0, bez OOM,
   complete=true, 151 iteracji, 1089,964 s. `root-analysis.json` przechowuje
   analizę z SHA logów, pól, faz i port-S; `fields.json` potwierdza snapshoty.
+  To historyczny pomiar wykonania, nie kwalifikacja dokładności. Późniejsze
+  próby korekty EXP13/14 nie ukończyły solve; ich końcowe iteracje są nieznane.
+  Szczegóły: [korekta referencji](reference-correction.md).
 
 | Faza pełnej anteny | Interwał hosta | Peak logicznych alokacji managed |
 | --- | ---: | ---: |

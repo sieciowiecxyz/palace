@@ -270,8 +270,24 @@ def coax_geometry(name):
     return geometry
 
 
-def diagnostic_config(name, config, coax_fields=False, pc_side=None):
+def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size=None,
+                      initial_fields=False, linear_tol=None):
     """Explicit runtime diagnostics; never change a frozen fixture on disk."""
+    if linear_tol is not None:
+        if (isinstance(linear_tol, bool) or not isinstance(linear_tol, (int, float))
+                or not math.isfinite(linear_tol)
+                or not 1e-14 <= linear_tol <= config['Solver']['Linear']['Tol']):
+            raise ValueError('Diagnostic tolerance must be finite, at least 1e-14, and no weaker than fixture')
+        config['Solver']['Linear']['Tol'] = linear_tol
+    if krylov_size is not None:
+        if (isinstance(krylov_size, bool) or not isinstance(krylov_size, int)
+                or not 1 <= krylov_size <= 240):
+            raise ValueError('Diagnostic Krylov size must be 1..240')
+        if config['Solver']['Linear']['KSPType'] != 'GMRES':
+            raise ValueError('Diagnostic Krylov size requires GMRES')
+        config['Solver']['Linear']['MaxSize'] = krylov_size
+    if initial_fields:
+        config['Solver']['Linear']['InitialGuess'] = True
     if coax_fields:
         geometry = coax_geometry(name)
         config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [3.55]}]
@@ -350,6 +366,15 @@ def verified_field_reference(directory, config, info, build):
     if field_inventory(directory/'fields', expected_field_files(config)) != metadata['files']:
         raise ValueError('Field reference bytes changed')
     return directory
+
+
+def field_restart_applied(log, config):
+    matches = re.findall(r'PALACE_FIELD_RESTART: excitation=(\d+) frequency_index=(\d+) norm_E=([\deE+.-]+)', log)
+    expected = {(int(stem.split('-')[0][1:]), int(stem.split('-')[1][1:]))
+                for stem in expected_field_files(config) if stem.endswith('-E.bin')}
+    return (len(matches) == len(expected) and
+            {(int(s), int(f)) for s, f, n in matches} == expected and
+            all(math.isfinite(float(n)) and float(n) >= 0 for s, f, n in matches))
 
 
 def field_comparisons(work, config):
@@ -478,7 +503,8 @@ def verified_qpool(native):
 
 
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
-        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False):
+        save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
+        initial_fields=None, krylov_size=None, linear_tol=None):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
     if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
@@ -488,7 +514,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     manifest = verified_build()
     qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name)
-    config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side)
+    config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
+                               bool(initial_fields), linear_tol)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -499,6 +526,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             regions.append({'Index': region, 'Attributes': [region]})
     reference = (verified_field_reference(field_reference, config, info, manifest)
                  if field_reference else None)
+    initial = None
+    if initial_fields:
+        initial = (reference if Path(initial_fields).resolve() == reference else
+                   verified_field_reference(initial_fields, config, info, manifest))
     mesh = prepare(name)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -514,6 +545,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     container = 'palace-run-' + hashlib.sha256(str(output).encode()).hexdigest()[:12]
     flags = {'MFEM_MEMORY': 'cuda', 'LD_PRELOAD': '/opt/precision/libcudss_fp32.so',
              'PALACE_CUDA_MANAGED': '1', 'PALACE_CUDSS_TRACK': '1',
+             'PALACE_LINE_BUFFERED_LOG': '1',
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
     if hypre_pool_mib is not None:
         flags['PALACE_HYPRE_DEVICE_POOL_MIB'] = str(hypre_pool_mib)
@@ -532,6 +564,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_SAVE_FIELDS'] = '/work/fields'
     if reference:
         flags['PALACE_REFERENCE_FIELDS'] = '/reference-fields'
+    if initial:
+        flags['PALACE_INITIAL_FIELDS'] = '/initial-fields'
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
@@ -539,9 +573,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
+            '--unsetenv', 'PALACE_LINE_BUFFERED_LOG',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
+            '--unsetenv', 'PALACE_INITIAL_FIELDS',
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
@@ -551,6 +587,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         write(output/'ceed-qpool-manifest.json', metadata)
     if reference:
         args.extend(['-v', f'{reference / "fields"}:/reference-fields:ro'])
+    if initial:
+        args.extend(['-v', f'{initial / "fields"}:/initial-fields:ro'])
     for key, value in flags.items():
         args.extend(['-e', f'{key}={value}'])
     args.extend(['--entrypoint', '/opt/palace-cudss/bin/palace-x86_64.bin', settings['runtime_image'], 'config.json'])
@@ -561,6 +599,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
                                                   'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
                                                   'release_gmres_basis': release_gmres_basis},
+                                   'initial_fields': str(initial) if initial else None,
+                                   'initial_fields_metadata_sha256': sha(initial/'fields.json') if initial else None,
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
@@ -607,6 +647,12 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        status['line_buffered_log_applied'] = ((output/'palace.stderr.log').read_text()
+                                              .count('PALACE_LOG_BUFFERING: stdout=line\n') == 1)
+        status['complete'] = status['complete'] and status['line_buffered_log_applied']
+        if initial:
+            status['field_restart_applied'] = field_restart_applied((output/'palace.log').read_text(), config)
+            status['complete'] = status['complete'] and status['field_restart_applied']
         if memory_marks:
             phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
                                          bool(save_fields or reference), release_gmres_basis)
@@ -690,6 +736,9 @@ def main():
     r.add_argument('--pc-side', choices=['left', 'right'], help='Explicit diagnostic preconditioning side')
     r.add_argument('--save-fields', action='store_true', help='Save FP64 same-mesh field snapshots')
     r.add_argument('--field-reference', type=Path, help='Completed run with verified field snapshots')
+    r.add_argument('--initial-fields', type=Path, help='Verified same-mesh snapshot input, read once per solve as initial E')
+    r.add_argument('--krylov-size', type=int, help='Explicit diagnostic GMRES restart size, 1..240; leaves medium mesh/tolerance unchanged')
+    r.add_argument('--linear-tol', type=float, help='Stricter reference tolerance, 1e-14 up to fixture Tol; leaves spatial medium unchanged')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
@@ -725,7 +774,8 @@ def main():
             print(json.dumps({'job': str(metadata), **job}, indent=2))
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
-            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis)
+            args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
+            args.initial_fields, args.krylov_size, args.linear_tol)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

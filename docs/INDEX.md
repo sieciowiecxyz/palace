@@ -25,6 +25,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: fazy pamięci i baza GMRES](memory-phases.md)
   - Czytaj gdy: analizujesz pełną referencję FP64 w RAM/VRAM albo śledzisz live/peak między fazami
   - Opis: Opcjonalne zwalnianie bazy, osobne logi, pełny resident run i otwarta kontrola raw residual.
+- [M1: korekta referencji i wznowienie](reference-correction.md)
+  - Czytaj gdy: oceniasz raw residual, warm start lub timeout pełnej korekty
+  - Opis: Filtry RIGHT/ostrzejszy LEFT, dwa pełne deadline FAIL i logowanie bez opóźnionych linii.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

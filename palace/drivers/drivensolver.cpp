@@ -209,6 +209,20 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       // Solve linear system.
       space_op.GetExcitationVector(excitation_idx, omega, RHS);
 
+      if (const char *initial_fields = std::getenv("PALACE_INITIAL_FIELDS"))
+      {
+        MFEM_VERIFY(Mpi::Size(space_op.GetComm()) == 1 && iodata.solver.linear.initial_guess,
+                    "Field restart requires one rank and InitialGuess=true!");
+        GridFunction initial_E(space_op.GetNDSpace(), true);
+        const std::string stem = "s" + std::to_string(excitation_idx) + "-f" +
+                                 std::to_string(omega_i) + "-E.bin";
+        FieldSnapshot(std::filesystem::path(initial_fields) / stem, initial_E, false);
+        initial_E.Real().GetTrueDofs(E.Real());
+        initial_E.Imag().GetTrueDofs(E.Imag());
+        Mpi::Print("PALACE_FIELD_RESTART: excitation={} frequency_index={} norm_E={:.12e}\n",
+                   excitation_idx, omega_i, linalg::Norml2(space_op.GetComm(), E));
+      }
+
       Mpi::Print("\n");
       MemoryMark("gmres.begin");
       ksp.Mult(RHS, E);

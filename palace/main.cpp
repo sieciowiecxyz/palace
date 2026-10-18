@@ -175,6 +175,16 @@ static void ConfigureHypreMemoryPool(MPI_Comm comm)
 
 int main(int argc, char *argv[])
 {
+  if (const char *line_buffered = std::getenv("PALACE_LINE_BUFFERED_LOG");
+      line_buffered && line_buffered[0] == '1')
+  {
+    if (std::setvbuf(stdout, nullptr, _IOLBF, 0) != 0)
+    {
+      std::fprintf(stderr, "Failed to enable line-buffered stdout.\n");
+      return EXIT_FAILURE;
+    }
+    std::fprintf(stderr, "PALACE_LOG_BUFFERING: stdout=line\n");
+  }
   // Reject legacy launch scripts before MPI, CUDA or any solver allocation.
   if (std::getenv("PALACE_GMRES_FP64_DISK_BASIS") ||
       std::getenv("PALACE_GMRES_FP32_DISK_BASIS"))

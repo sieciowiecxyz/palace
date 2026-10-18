@@ -12,6 +12,37 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_explicit_restart_controls_preserve_physics_and_require_field_coverage(self):
+        _, info, config = dev.fixture('coax-tiny')
+        original = json.loads(json.dumps(config))
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        for size in [0, 241, True, 3.5]:
+            with self.assertRaisesRegex(ValueError, '1..240'):
+                dev.diagnostic_config('coax-tiny', config, krylov_size=size)
+        updated = dev.diagnostic_config('coax-tiny', config, pc_side='right',
+                                        krylov_size=64, initial_fields=True)
+        self.assertEqual(updated['Solver']['Linear']['MaxSize'], 64)
+        self.assertTrue(updated['Solver']['Linear']['InitialGuess'])
+        self.assertEqual(updated['Solver']['Linear']['PCSide'], 'Right')
+        self.assertEqual(updated['Solver']['Linear']['Tol'], original['Solver']['Linear']['Tol'])
+        self.assertEqual(dev.field_identity(updated, info, build), dev.field_identity(original, info, build))
+        log = ''.join(f'PALACE_FIELD_RESTART: excitation={s} frequency_index={f} norm_E=1.0e-2\n'
+                      for s in [1, 2] for f in range(3))
+        self.assertTrue(dev.field_restart_applied(log, config))
+        self.assertFalse(dev.field_restart_applied(log + log, config))
+        self.assertFalse(dev.field_restart_applied(log.replace('excitation=2', 'excitation=3'), config))
+        self.assertFalse(dev.field_restart_applied(log.replace('norm_E=1.0e-2', 'norm_E=NaN', 1), config))
+
+    def test_reference_tolerance_cannot_weaken_fixture_or_use_nonfinite_values(self):
+        _, _, config = dev.fixture('coax-tiny')
+        for value in [True, 0, 1e-15, 1e-5, float('nan'), float('inf'), '1e-12']:
+            with self.assertRaisesRegex(ValueError, 'no weaker'):
+                dev.diagnostic_config('coax-tiny', config, linear_tol=value)
+        original = json.loads(json.dumps(config))
+        changed = dev.diagnostic_config('coax-tiny', config, linear_tol=1e-12)
+        original['Solver']['Linear']['Tol'] = 1e-12
+        self.assertEqual(changed, original)
+
     def test_separate_capture_preserves_partial_stdout_diagnostic(self):
         # A delayed stdout suffix must not be split by an intervening stderr line.
         script = ('import os; '
