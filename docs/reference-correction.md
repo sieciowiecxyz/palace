@@ -69,20 +69,25 @@ Oddzielne stdout/stderr nadal zapobiegają przecinaniu diagnostyki.
 Końcowy `palace.log` nadal jest konkatenacją, nie wspólną chronologią.
 
 Historyczny replay build8,298 s; wówczas 25 unittestów PASS. Bieżący
-checkpoint profilowania raportuje 29 unittestów narzędzi PASS. Replay
+checkpoint raportuje 33 unittesty narzędzi PASS. Replay
 `artifacts/m1-line-buffered-replay-tiny-20261018/`: complete=true,
 11,437 s, sześć zerowych iteracji i pełne checks/coverage/porównania pól.
 Potwierdza nowe logowanie i wznowienie; nie ustanawia nowego benchmarku anteny.
 
 ## Decyzja
 
-Nie ponawiać obecnych pełnych wariantów ani nie zmniejszać progu raw1e−6,
-aby zaliczyć próbę. Pozostaje dopuszczalna referencja **wykonania** FP64
-LEFT1e−6 z [EXP12](memory-phases.md), z raw≈0,125 i otwartą jakością.
+Nie zmniejszać progu raw1e−6, aby zaliczyć próbę. EXP12 pozostaje historyczną
+referencją wykonania, nie dokładności (raw≈0,125). Późniejszy W.3 native
+complex coarse wyznaczył resident FP64 RIGHT referencję Tol1e−9 i osobny
+medium run przeszedł bramki numeryczne przy tej samej geometrii i siatce;
+szczegóły są w [raporcie native complex coarse](native-complex-coarse.md).
+To nie zamyka M1: profilowanie kerneli/UVM, pamięć i szersza kwalifikacja
+anteny nadal są otwarte.
 
-Późniejsze profile CPU/cuDSS, zespolonego coarse solve i finalnego release są
-zapisane w [reference-profiles.md](reference-profiles.md). CPU full replay
-został zabity przez OOM po ok.247,6s; complex-coarse full zatrzymał host guard
-po ok.399,8s. To nie są ukończone wyniki anteny. Małe filtry nie zamykają
-jakości EXP12 ani M1; nie pomijać M2 FEM–BEM i nie promować TF32/FP32/BF16
-na podstawie małych przypadków.
+Historyczne profile CPU/cuDSS, dokładnego real-block coarse solve i zwalniania
+finalnego solvera są w [reference-profiles.md](reference-profiles.md).
+CPU full replay zakończył się OOM; real-block full zatrzymał host guard.
+Nowszy W.3 native complex coarse przeszedł dla jednego punktu anteny, ale
+nie kwalifikuje innych częstotliwości, obudowy ani prototypu i nie zmienia
+domyślnego solvera. Nie pomijać wymaganej ścieżki M2 FEM–BEM ani nie promować
+TF32/FP32/BF16 na podstawie małych przypadków.

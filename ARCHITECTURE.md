@@ -19,6 +19,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `tools/allocation_audit.py`: analiza zachowanego large-UVM alloc/free trace ze stosami, bez GPU i bez ponownego runu.
 - `docs/reference-correction.md`: diagnostyczne warm-start/restart i tolerance checks; opisuje timeouty pełnej anteny bez promowania ich jako wyniku RF.
 - `docs/reference-profiles.md`: filtrowane profile CPU/cuDSS, zespolonego coarse solve i zwalniania solvera; small-case PASS nie kwalifikuje pełnej anteny.
+- `docs/native-complex-coarse.md`: opcjonalny natywny complex FP64 coarse solver, zakwalifikowany dla jednego punktu anteny; brak promocji defaultu i otwarte profilowanie UVM/kerneli.
 - `tools/experiments/ceed_qpool.py`: izolowany, niezakwalifikowany backend workspace; osobne SO, cache jednego obiektu, manifest i opt-in runnera.
 - `tools/mesh_cost.py`: audyt domen Gmsh 2.2 i orientacyjnego kosztu powierzchniowego, bez bibliotek FEM/GPU.
 - `tools/tests/`: regresje narzędzi i mały natywny probe cuDSS.

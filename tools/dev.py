@@ -272,12 +272,15 @@ def coax_geometry(name):
 
 def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size=None,
                       initial_fields=False, linear_tol=None, cpu_reference=False,
-                      complex_coarse=False):
+                      complex_coarse=False, native_complex_coarse=False):
     """Explicit runtime diagnostics; never change a frozen fixture on disk."""
     if cpu_reference:
         config['Solver']['Device'] = 'CPU'
         config['Solver']['Backend'] = '/cpu/self'
-    if complex_coarse:
+    if native_complex_coarse:
+        if cpu_reference or config['Solver']['Linear']['Type'] != 'cuDSS':
+            raise ValueError('Native complex coarse requires GPU cuDSS')
+    if complex_coarse or native_complex_coarse:
         config['Solver']['Linear'].update({'ComplexCoarseSolve': True, 'PCMatShifted': False})
     if linear_tol is not None:
         if (isinstance(linear_tol, bool) or not isinstance(linear_tol, (int, float))
@@ -358,7 +361,7 @@ def field_inventory(directory, expected):
     return result
 
 
-def verified_field_reference(directory, config, info, build):
+def _verified_field_snapshot(directory, config, info, build, *, require_accuracy):
     directory = Path(directory).resolve()
     metadata = read(directory / 'fields.json')
     source_identity = field_identity(read(directory/'config.json'), read(directory/'fixture.json'),
@@ -367,11 +370,21 @@ def verified_field_reference(directory, config, info, build):
             metadata.get('identity') != source_identity or
             sha(directory/'config.json') != read(directory/'command.json')['actual_config_sha256'] or
             not metadata.get('complete') or not read(directory / 'result.json').get('complete') or
-            read(directory/'result.json').get('field_accuracy_passed') is False):
+            (require_accuracy and read(directory/'result.json').get('field_accuracy_passed') is False)):
         raise ValueError('Field reference is incomplete or uses different physics/mesh/dependencies')
     if field_inventory(directory/'fields', expected_field_files(config)) != metadata['files']:
         raise ValueError('Field reference bytes changed')
     return directory
+
+
+def verified_field_reference(directory, config, info, build):
+    return _verified_field_snapshot(directory, config, info, build, require_accuracy=True)
+
+
+def verified_initial_fields(directory, config, info, build):
+    # A completed, byte-verified approximation may seed a stricter solve. It is
+    # never accepted as an accuracy reference by this separate path.
+    return _verified_field_snapshot(directory, config, info, build, require_accuracy=False)
 
 
 def field_restart_applied(log, config):
@@ -520,12 +533,19 @@ def verified_qpool(native):
     return directory, metadata
 
 
+def native_complex_coarse_applied(log, solves):
+    markers = re.findall(r'PALACE_NATIVE_COMPLEX_COARSE: dimension=(\d+) nnz=(\d+) dtype=complex_fp64 matrix=general', log)
+    return len(markers) == solves and all(int(n) > 0 and int(nnz) > 0 for n, nnz in markers)
+
+
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
-        phase_trace=False, complex_coarse=False, release_final_solver=False):
+        phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
+    if native_complex_coarse and (basis != 'fp64' or cpu_reference or ceed_qpool):
+        raise ValueError('Native complex coarse requires FP64 basis without CPU or Q-pool')
     if cpu_reference and (ceed_qpool or basis != 'fp64' or complex_coarse):
         raise ValueError('CPU reference requires FP64 basis without GPU Q-pool or complex-coarse profile')
     if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
@@ -536,7 +556,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
-                               bool(initial_fields), linear_tol, cpu_reference, complex_coarse)
+                               bool(initial_fields), linear_tol, cpu_reference, complex_coarse,
+                               native_complex_coarse)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -550,7 +571,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     initial = None
     if initial_fields:
         initial = (reference if Path(initial_fields).resolve() == reference else
-                   verified_field_reference(initial_fields, config, info, manifest))
+                   verified_initial_fields(initial_fields, config, info, manifest))
     mesh = prepare(name)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -571,6 +592,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     if cpu_reference:
         flags.update({'MFEM_MEMORY': 'host', 'PALACE_CUDSS_HYBRID_EXECUTE': '1',
                       'OMP_NUM_THREADS': '8', 'OPENBLAS_NUM_THREADS': '1'})
+    if native_complex_coarse:
+        flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
     if phase_trace:
         flags['PALACE_PHASE_TRACE'] = '1'
     if hypre_pool_mib is not None:
@@ -595,6 +618,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     if initial:
         flags['PALACE_INITIAL_FIELDS'] = '/initial-fields'
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
+            '--ulimit', 'core=0:0',
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
@@ -604,6 +628,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_RELEASE_FINAL_SOLVER',
             '--unsetenv', 'PALACE_LINE_BUFFERED_LOG',
             '--unsetenv', 'PALACE_CUDSS_HYBRID_EXECUTE', '--unsetenv', 'PALACE_CUDSS_HYBRID_MIB',
+            '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
@@ -631,10 +656,13 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
                                                   'release_gmres_basis': release_gmres_basis,
                                                   'release_final_solver': release_final_solver},
+                                   'native_complex_coarse': native_complex_coarse,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
                                    'initial_fields': str(initial) if initial else None,
                                    'initial_fields_metadata_sha256': sha(initial/'fields.json') if initial else None,
+                                   'initial_fields_source_accuracy_passed': read(initial/'result.json').get('field_accuracy_passed') if initial else None,
+                                   'initial_fields_scope': 'Starting approximation only; not an accuracy reference' if initial else None,
                                    'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
     status = {'complete': False, 'interrupted': True}
@@ -681,6 +709,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if native_complex_coarse:
+            status['native_complex_coarse_applied'] = native_complex_coarse_applied(
+                (output/'palace.log').read_text(), status['expected_solves'])
+            status['complete'] = status['complete'] and status['native_complex_coarse_applied']
         if cpu_reference:
             status['cpu_reference_applied'] = cpu_reference_applied((output/'palace.log').read_text())
             status['complete'] = status['complete'] and status['cpu_reference_applied']
@@ -779,12 +811,13 @@ def main():
     r.add_argument('--pc-side', choices=['left', 'right'], help='Explicit diagnostic preconditioning side')
     r.add_argument('--save-fields', action='store_true', help='Save FP64 same-mesh field snapshots')
     r.add_argument('--field-reference', type=Path, help='Completed run with verified field snapshots')
-    r.add_argument('--initial-fields', type=Path, help='Verified same-mesh snapshot input, read once per solve as initial E')
+    r.add_argument('--initial-fields', type=Path, help='Byte-verified completed same-mesh snapshot as initial approximation only; accuracy not implied')
     r.add_argument('--krylov-size', type=int, help='Explicit diagnostic GMRES restart size, 1..240; leaves medium mesh/tolerance unchanged')
     r.add_argument('--linear-tol', type=float, help='Stricter reference tolerance, 1e-14 up to fixture Tol; leaves spatial medium unchanged')
     r.add_argument('--cpu-reference', action='store_true', help='Experimental FP64 host FEM/GMRES with cuDSS hybrid execute; not the CUDA baseline')
     r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
+    r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex FP64 cuDSS coarse, without real 2N block; implies --complex-coarse')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
@@ -822,7 +855,7 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

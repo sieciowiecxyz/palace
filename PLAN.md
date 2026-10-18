@@ -39,14 +39,14 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Q-pool przeszedł coax/TEM, lecz zwiększył logical UVM peak w coax-tiny o 5,8% i nie zmniejszył sampled VRAM; brak promocji.
 - [x] Osobny seed HYPRE 256 MiB: coax/TEM PASS, sampled VRAM procesu niższy o 3,75 GiB na małym fixture, porty/energie zgodne; pełna antena niezakwalifikowana.
 - [x] Rozdzielić fazy solve/postprocessingu: EXP12 resident FP64 i jawne znaczniki; zwalnianie bazy GMRES oraz opt-in finalnego solvera. Zysk lifetime zweryfikowany na tiny, pełne complex-coarse EXP17 zatrzymane guardem (bez promocji).
-- [ ] Zmniejszyć koszt dokładnego coarse solve: zbadać native FP64 complex N×N zamiast realnego bloku 2N×2N; najpierw mały probe cuDSS i normy, potem coax/TEM. Nie powtarzać EXP17 ani podnosić cap/guard.
+- [x] Native FP64 complex N×N: probe/coax/TEM/fallback i W.3 PASS; cuDSS setup live25,008GB vs30,641GB exactbloku. Nowa referencja RIGHT1e−9 i medium kontrola pól; docs/native-complex-coarse.md. Bez promocji defaultów i bez podnoszenia cap/guard.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
 
-- [ ] Zinwentaryzować hash wejść, fizyczny wariant, build, ustawienia i dostępne wyniki referencyjne; odtworzyć brakujące minimum na obecnym forku.
+- [x] Hash/fizyka/build zinwentaryzowane; silniejsza resident FP64 referencja tight-r2 i W.3qualified mają snapshoty/SHA i rootanalizę. Stary EXP12 pozostaje tylko referencją wykonania.
 - [ ] Prześledzić definicje norm i skalowanie w kodzie; wyjaśnić historyczne raw residual 0,125 / 0,808 mimo małej różnicy S.
-- [ ] Ustalić niezależną kontrolę rozwiązania, pól i energii; zamrozić progi przed oceną nowych kandydatów.
+- [x] Raw RHS niezależne od PC + TEM/L2; W.3medium względem FP64RIGHT1e−9 przechodzi zamrożone K.3/K.4. M1 jako całość nadal otwarty, szersze pasma i geometria produkcyjna niezakwalifikowane.
 - [ ] Zmapować czas: assembly, preconditioner/faktoryzacja, matvec, ortogonalizacja, transfery, postprocessing. Dodać tylko brakujące logi/NVTX.
 - [ ] Rozliczyć udział powietrza i granicy zewnętrznej oraz operator/q-data, bazę V/Z, faktory, workspace i kopie; odróżnić alokację, rezydencję GPU oraz peak RAM.
 - [ ] Krótki profil reprezentatywnej fazy plus pełny run bez profilera; ustalić największy koszt i następny jeden eksperyment.

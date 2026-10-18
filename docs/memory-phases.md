@@ -1,7 +1,9 @@
 # M1: fazy pamięci i zwalnianie bazy GMRES
 
-2026-10-18. Jeden GPU, jeden rank. Stan: ukończona referencja **wykonania**
-FP64 w RAM/VRAM; niezależna jakość anteny nadal otwarta. Bez promocji mixed precision.
+2026-10-18. Jeden GPU, jeden rank. Ten raport opisuje historyczny EXP12,
+referencję **wykonania** FP64 w RAM/VRAM. Późniejsza silniejsza referencja
+i numeryczna kwalifikacja W.3 są w [native complex coarse](native-complex-coarse.md).
+M1 pozostaje otwarty; bez promocji mixed precision.
 
 ## Mechanizm i odtwarzanie
 

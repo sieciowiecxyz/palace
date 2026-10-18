@@ -24,13 +24,16 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Opt-in256MiB, dodatni filtr TEM i zmierzona oszczędność3,75GiB w małym przypadku.
 - [M1: fazy pamięci i baza GMRES](memory-phases.md)
   - Czytaj gdy: analizujesz pełną referencję FP64 w RAM/VRAM albo śledzisz live/peak między fazami
-  - Opis: Opcjonalne zwalnianie bazy, osobne logi, pełny resident run i otwarta kontrola raw residual.
+  - Opis: Opcjonalne zwalnianie bazy, osobne logi i historyczny resident run; nowa referencja W.3 w native-complex-coarse.
 - [M1: korekta referencji i wznowienie](reference-correction.md)
   - Czytaj gdy: oceniasz raw residual, warm start lub timeout pełnej korekty
   - Opis: Filtry RIGHT/ostrzejszy LEFT, dwa pełne deadline FAIL i logowanie bez opóźnionych linii.
 - [M1: profile referencji i coarse solve](reference-profiles.md)
   - Czytaj gdy: oceniasz CPU/hybrid execute, dokładny complex coarse lub zwalnianie solvera
-  - Opis: EXP15–17, kwalifikacja tiny, pełne OOM/guard i następna hipoteza reprezentacji faktorów.
+  - Opis: Historyczne EXP15–17, kwalifikacja tiny i pełne OOM/guard; późniejsza realizacja hipotezy w EXP18–19.
+- [M1: native complex coarse i nowa referencja](native-complex-coarse.md)
+  - Czytaj gdy: używasz eksperymentalnego coarse FP64 albo porównujesz jakość pełnego W.3
+  - Opis: EXP18–19, naprawa ABI CUDA, probe/TEM/fallback, pełny solver i kontrola względem ostrzejszej referencji.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

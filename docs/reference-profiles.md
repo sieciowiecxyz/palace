@@ -1,8 +1,9 @@
-# M1 — profile referencji i coarse solve
+# M1 — historyczne profile referencji i coarse solve
 
-2026-10-18. Eksperymenty opt-in, bez promocji defaultów ani zakończenia M1.
-Medium przestrzenne i równanie A pozostają bez zmian. Rejestr i ścieżki
-artefaktów: [PROGRESS](../PROGRESS.md), EXP15–17.
+2026-10-18. Historyczne eksperymenty EXP15–17; opcje były opt-in i nie
+zmieniły defaultów. Medium przestrzenne i równanie A pozostały bez zmian.
+Późniejszy native complex coarse EXP18–19 oraz W.3 anteny opisano osobno w
+[raporcie native complex](native-complex-coarse.md). M1 nadal otwarty.
 
 ## Opcje i granice
 
@@ -35,7 +36,7 @@ artefaktów: [PROGRESS](../PROGRESS.md), EXP15–17.
 | CPU full replay | OOM,247,6s,cap60GiB | Brak S/pól, brak promocji |
 | Complex-coarse tiny | 153iteracje vs233 (−34,3%),12,534s | Faktory167,9MB vs61,5MB (2,732×) |
 | Final release tiny | 6/6,12,567s; E/B różnica≤1,508e−13 | Oddaje258,9MB przed postprocess; wcześniejszy global peak nie spadł |
-| Complex-coarse full | Host guard,399,828s,iter16 | Faktory30,64GB; brak końcowych raw/S/pól |
+| Exact real-block complex-coarse full | Host guard,399,828s,iter16 | Faktory30,64GB; brak końcowych raw/S/pól; odrębne od native N×N |
 
 Tiny complex-coarse raw relative względem RHS≤9,101e−7. Root przeliczył
 S z dB/stopni na liczby zespolone: |ΔS|≤2,511e−8, ΔVSWR≤2,641e−8,
@@ -48,12 +49,13 @@ pochodzi z ostatniego markera **sprzed** GMRES; nie znamy terminalnego
 managed peak. CuDSS już zawiera się w managed; nie sumować tych liczników.
 Nie uruchomiono ponownie tego samego wariantu ani nie podniesiono limitów.
 
-## Następna hipoteza — NOT RUN
+## Hipoteza zrealizowana później
 
-Sprawdzić bezpośredni coarse FP64 complex N×N zamiast realnego2N×2N.
-Najpierw mały znany układ, re-factor/RHS/cleanup i residuum, potem coax/TEM.
-Nie zakładamy oszczędności przed pomiarem. Dla Maxwell complex-symmetric
-nie wolno bez dowodu użyć Hermitian; punktem startowym jest GENERAL.
+Propozycja bezpośredniego coarse FP64 complex N×N została zbadana w EXP18–19.
+Wyniki probe, coax/TEM, fallback i pełnego W.3 anteny są w
+[raporcie native complex coarse](native-complex-coarse.md). Nie przenosić
+wyniku tej ścieżki na historyczny real-block wariant ani na domyślną
+konfigurację.
 
 Źródła sprawdzone2026-10-18: pinned MFEM4.9 `linalg/cudss.cpp` oraz
 `palace/linalg/solver.cpp`, NVIDIA/cuDSS0.7 w archiwum CUDA12.9.1:

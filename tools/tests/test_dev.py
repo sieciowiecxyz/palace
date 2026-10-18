@@ -12,6 +12,32 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_native_complex_coarse_is_explicit_and_requires_gpu_cudss(self):
+        _, info, config = dev.fixture('coax-tiny')
+        old = json.loads(json.dumps(config))
+        updated = dev.diagnostic_config('coax-tiny', config, native_complex_coarse=True)
+        self.assertTrue(updated['Solver']['Linear']['ComplexCoarseSolve'])
+        self.assertFalse(updated['Solver']['Linear']['PCMatShifted'])
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        self.assertEqual(dev.field_identity(updated, info, build), dev.field_identity(old, info, build))
+        with self.assertRaises(ValueError):
+            dev.diagnostic_config('coax-tiny', config, cpu_reference=True, native_complex_coarse=True)
+        old['Solver']['Linear']['Type'] = 'AMS'
+        with self.assertRaises(ValueError):
+            dev.diagnostic_config('coax-tiny', old, native_complex_coarse=True)
+        for flags in [dict(basis='fp32'), dict(basis='fp64', cpu_reference=True), dict(basis='fp64', ceed_qpool=True)]:
+            with patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
+                with self.assertRaises(ValueError):
+                    dev.run('coax-tiny', '/unused', 60, native_complex_coarse=True, **flags)
+
+    def test_native_coarse_marker_requires_exact_coverage_and_dtype(self):
+        log = 'PALACE_NATIVE_COMPLEX_COARSE: dimension=20 nnz=100 dtype=complex_fp64 matrix=general\n'
+        self.assertTrue(dev.native_complex_coarse_applied(log*6, 6))
+        self.assertFalse(dev.native_complex_coarse_applied(log*5, 6))
+        self.assertFalse(dev.native_complex_coarse_applied(log*7, 6))
+        self.assertFalse(dev.native_complex_coarse_applied(log.replace('complex_fp64', 'real_fp64'), 1))
+        self.assertFalse(dev.native_complex_coarse_applied(log.replace('dimension=20', 'dimension=0'), 1))
+
     def test_complex_coarse_preserves_operator_and_explicitly_disables_shift(self):
         _, info, config = dev.fixture('coax-tiny')
         original = json.loads(json.dumps(config))
@@ -246,10 +272,18 @@ class ToolRegressionTests(unittest.TestCase):
             changed['Domains']['Materials'][0]['Permittivity'] = 4.4
             with self.assertRaisesRegex(ValueError, 'different physics'):
                 dev.verified_field_reference(root, changed, info, build)
+            with self.assertRaisesRegex(ValueError, 'different physics'):
+                dev.verified_initial_fields(root, changed, info, build)
             dev.write(root/'result.json', {'complete': False})
             with self.assertRaisesRegex(ValueError, 'incomplete'):
                 dev.verified_field_reference(root, config, info, build)
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                dev.verified_initial_fields(root, config, info, build)
             dev.write(root/'result.json', {'complete': True, 'field_accuracy_passed': False})
+            with self.assertRaisesRegex(ValueError, 'incomplete'):
+                dev.verified_field_reference(root, config, info, build)
+            # Failed accuracy may seed a new solve but must remain rejected as a reference.
+            self.assertEqual(dev.verified_initial_fields(root, config, info, build), root)
             with self.assertRaisesRegex(ValueError, 'incomplete'):
                 dev.verified_field_reference(root, config, info, build)
             dev.write(root/'result.json', {'complete': True})
@@ -257,6 +291,8 @@ class ToolRegressionTests(unittest.TestCase):
             path.write_bytes(struct.pack('<8sQdd', b'PALF64V1', 1, 2.0, 0.0))
             with self.assertRaisesRegex(ValueError, 'bytes changed'):
                 dev.verified_field_reference(root, config, info, build)
+            with self.assertRaisesRegex(ValueError, 'bytes changed'):
+                dev.verified_initial_fields(root, config, info, build)
 
     def test_field_comparison_requires_all_solves_regions_and_finite_errors(self):
         _, _, config = dev.fixture('coax-tiny')

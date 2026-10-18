@@ -4,6 +4,8 @@
 #include "ksp.hpp"
 
 #include <mfem.hpp>
+#include <cstdlib>
+#include <string_view>
 #include "fem/fespace.hpp"
 #include "linalg/amg.hpp"
 #include "linalg/ams.hpp"
@@ -193,6 +195,20 @@ ConfigurePreconditionerSolver(const config::LinearSolverData &linear,
       break;
     case LinearSolver::CUDSS:
 #if defined(MFEM_USE_CUDSS)
+      if (const char *native = std::getenv("PALACE_NATIVE_COMPLEX_COARSE");
+          native && std::string_view(native) == "1")
+      {
+        if constexpr (std::is_same<OperType, ComplexOperator>::value)
+        {
+          MFEM_VERIFY(linear.complex_coarse_solve, "Native complex coarse requires ComplexCoarseSolve!");
+          pc = std::make_unique<ComplexCuDSSSolver>(comm, linear.drop_small_entries);
+          break;
+        }
+        else
+        {
+          MFEM_ABORT("Native complex coarse requires a complex operator!");
+        }
+      }
       pc = MakeWrapperSolver<OperType, CuDSSSolver>(
           linear, comm, pc_mat_sym, linear.sym_factorization, linear.reorder_reuse, print);
 #endif
