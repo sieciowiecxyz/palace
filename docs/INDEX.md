@@ -13,6 +13,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.
+- [M1: właściciele alokacji](memory-audit.md)
+  - Czytaj gdy: wybierasz następną optymalizację RAM/VRAM lub oceniasz cuda/gen
+  - Opis: Reprodukowalny audyt zapisanych alloc/free, bufory libCEED i hipoteza współdzielenia workspace.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

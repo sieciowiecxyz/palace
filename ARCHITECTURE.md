@@ -1,6 +1,7 @@
 # Architektura lokalnego forka Palace
 
 Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
+
 ## Zasady
 
 Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reużywaj infrastruktury upstream i bibliotek. Testuj realne ścieżki i regresje; nie dodawaj warstw ani zależności na zapas. Zmiana reprezentacji/precyzji nie może ukrywać zmiany równań.
@@ -15,6 +16,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `palace/utils/fieldcomparison.hpp`: opcjonalne lokalne snapshoty FP64 i różnica E/B ważona istniejącymi operatorami energii; bez modyfikacji rozwiązania. Runner wiąże referencje hashami fizyki/mesh/dependencies.
 - `tools/coax_fields.py`: analityczne porównanie E/B/energii; opt-in native L2 w `palace/utils/coaxdiagnostic.hpp`, tylko znane jednorodne fixtures.
 - `tools/generate_coax_tiny.py`: jednorazowe generowanie mniejszego filtra przez opcjonalny gmsh, nie część runtime.
+- `tools/allocation_audit.py`: analiza zachowanego large-UVM alloc/free trace ze stosami, bez GPU i bez ponownego runu.
 - `tools/mesh_cost.py`: audyt domen Gmsh 2.2 i orientacyjnego kosztu powierzchniowego, bez bibliotek FEM/GPU.
 - `tools/tests/`: regresje narzędzi i mały natywny probe cuDSS.
 - `examples/tshaped-medium/`, `examples/coax-medium/`, `examples/coax-tiny/`: kompletne wejścia z archiwami siatek i sumami kontrolnymi.

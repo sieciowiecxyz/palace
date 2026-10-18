@@ -50,10 +50,14 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy20 mm run q6/10 nie zmieścił się w180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Narzędzia mają teraz10 regresji; cała kampania C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Obecny zestaw narzędzi ma 16 unittestów PASS, w tym regresje audytu alokacji poniżej; pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
-12regresji narzędzi pokrywa SHA/format/nieukończone referencje, inną fizykę i pokrycie regionów oraz NaN/duplikaty. Rzeczywiste tiny testy: snapshotFP64→FP32, bazaFP64disk→resident, domyślny background worker i kontrolowanyB×1,02 (oczekiwany FAILjakości). Native pliki E/B single-rank little-endian są chronione sprawdzaniem źródłowego config i zależności. Szczegóły: [kontrola pól](field-validation.md).
+Regresje snapshotów pokrywają SHA/format/nieukończone referencje, inną fizykę i pokrycie regionów oraz NaN/duplikaty. Rzeczywiste tiny testy: snapshot FP64→FP32, historyczne porównanie disk→resident (storage disk jest wycofany), domyślny background worker i kontrolowane B×1,02 (oczekiwany FAIL jakości). Native pliki E/B single-rank little-endian są chronione sprawdzaniem źródłowego config i zależności. Szczegóły: [kontrola pól](field-validation.md).
 
-Referencja dużej anteny ukończona; FP32 zatrzymany guardem i **niezakwalifikowany**. Nie zgłaszać zielonej kampanii antenowej na podstawie samych tiny/ukończenia referencji. Brakujący cgroup/native allocation budget jest następnym krokiem M1.
+Historyczne referencje/porównania dużej anteny z disk basis są ukończone, ale **REJECT** według wymogu RAM/VRAM; resident FP32 antenna attempt zatrzymał guard i nie ma pól. Nie zgłaszać zielonej kampanii antenowej na podstawie tiny ani historycznych disk wyników. Audyt trace określił ścieżki i rozmiary logicznych managed allocations, ale nie fizyczną rezydencję, semantyczną własność każdego bufora ani dopuszczalny pełny resident budżet. M1 pozostaje otwarty; szczegóły [audytu pamięci](memory-audit.md).
+
+## Analiza alokacji bez GPU
+
+`tools/allocation_audit.py` czyta zachowany trace ≥16MiB; nie uruchamia solvera. Regresje w tools/tests/test_allocation_audit.py obejmują peak w tej samej chwili, pointer reuse, przypisanie późniejszych ramek stosu, interleaved stdout oraz odrzucanie uszkodzonego/starego formatu. Reprodukcja i ograniczenia: [audyt pamięci](memory-audit.md).

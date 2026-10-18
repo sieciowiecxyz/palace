@@ -34,7 +34,8 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Dodać i sprawdzić na tiny normę różnicy całych pól, detekcję kontrolowanego błędu i kontrolę błędu (dawny disk/resident wycofany).
 - [x] Zachować historyczne E/B jako dane porównawcze; referencja korzystała z wycofanego storage dyskowego i nie jest dopuszczalnym nowym runem. Kandydat residentFP32 przerwany guardem przy obciążonym desktopie.
 - [x] Dodać ślady dużych alokacji i pomiar cgroup RAM; interpretacja właścicieli pozostaje otwarta.
-- [ ] Dalej wyłącznie RAM/VRAM: rozliczyć alokacje i zaplanować nowy kandydat przy znanym obciążeniu hosta; bez nowych pełnych runów na tym etapie.
+- [x] Rozliczyć duże alokacje w tej samej chwili i zaplanować hipotezę workspace w RAM/VRAM: docs/memory-audit.md; bez nowej pełnej symulacji.
+- [ ] Zbadać lifetime aktywnych Q-wektorów libCEED przed prototypem współdzielenia/porcjowania; zachować trwałe dane i synchronizację strumienia.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.
