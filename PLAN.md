@@ -61,6 +61,7 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Część PEC: niezależny Miecomplex, zbieżność i1%PASS; pierwszy CPUH-matrix/CUDAapply poprawny, ale9%oszczędności/53×wolniej — bezpromocji. docs/maxwell-oracle.md. Na etapie EXP23–24 dielektryk/interfejs pozostawały otwarte; dalsze wyniki poniżej.
 - [x] EXP25–29: native2kernel/H-matrixeta4−17,31%danych i poprawnyGPUoperator/CPUbasisGMRES; dielectricspherePMCHWT/Miecomplexfar-field/energyPASS ze zbieżnością i jawną regułąobjętości. docs/maxwell-native-dielectric.md. BrakFEMinterface/nearfields/scalableassembly/antenna promotion.
 - [x] EXP30–31: actualMFEMND1/Bemppinterface i zbieżność, trace/pair/energyPASS; całkowity1%E/H**FAIL**(6,12/5,79%), bezpromocji. docs/maxwell-coupling.md. NastępneND2globalDOF i traceprojection, potemdielectricFEM/scalableassembly.
+- [x] EXP32: fizyczneparowanie/BCtransforms/constanttracePASS. GramRWG/SNCtracirank90/120,330/480 — odrzucićjegoosobneodwracanie. RWG/RBCfullrank/κscaled≤2,93 na małychsiatkach; nadalNOTRUNactualND2mortar i antena. docs/maxwell-coupling.md.
 - [ ] Zmierzyć setup+solve, macierz/kompresję/workspace i przewidywany koszt docelowej anteny; gęsta macierz BEM bez kompresji może przegrać.
 - [ ] Jeśli prototyp daje przewagę i poprawne pola/energię, przygotować izolowaną integrację operatora blokowego w Palace i porównać reprezentatywny case. Inaczej zapisać odrzucenie/ograniczenie; wynik Helmholtz nie kwalifikuje Maxwell.
 

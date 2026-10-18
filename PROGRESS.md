@@ -17,10 +17,10 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP24: rzeczywisty H-matrix exact-near/complexSVDfar iCUDAapply jakościowoPASS; macierz−9,16%, ale52,68×wolniejszy apply na małej kuli. Niepromowany; brak peakRAMoszczędności, dielektryka/interfejsu ianteny.
 - EXP25–29: native2kernel/H-matrixeta4 −17,31%matrixdata i poprawnyGPUoperator/CPUbasisGMRES. DielectricPMCHWT/Mie far-fieldPASS0,0223% zregułąobjętości i zbieżnością; stareinscribedmeshscatterFAIL. docs/maxwell-native-dielectric.md.
 - EXP30–31: actualMFEM4.9ND1/Bemppcoupling ze zbieżnością, trace/pair~1e−15/energyPASS. Całkowity1%E/HFAIL:6,12/5,79%, comparatorFEM6,18/5,82%; Δcoupled–FEM0,57/0,76% niekwalifikujeND2/anteny. docs/maxwell-coupling.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.62testówPASS, kod Palace/medium bez zmian.
+- EXP32: primalRWG/SNCGramtracirank90/120,330/480; odrzucićinwersjędoprowadzeniaND2projection. DualRWG/RBCfullrank/κscaled≤2,93, physicalpairing/transforms/constanttracePASS. Plane-traceRWG0błąd20,99→10,43→5,16%, nadalnieND2mortar. docs/maxwell-coupling.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.65testsPASSwpinnedenv; systemowo62PASS/3SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
-
 
 | ID | Wynik i decyzja | Artefakty / ograniczenia |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: ND1interfacewykonany, 1%fieldFAIL. Następne actualMFEMND2/globalDOF+facetransformations i kwalifikowana traceprojection/mortar (RWG0niejestND2trace). Nie zastępować dokladności ND2 dalszym zagęszczaniem ND1. Potem dielectricFEMtransmission, sparseSchur/scalableBEMassembly/skalowanie/antena. M2otwarty, bezpaidcompute.
+2. M2: ND1interfacewykonany, 1%fieldFAIL. EXP32odrzuciłosobnąinwersjęGprimal; GdualRBC małytestPASS. Następne actualMFEMND2/globalDOF+facetransformations i niezależna plane-waveDirichletkontrola, potem fizyczny B/Rmortar i zbieżnośćpowierzchni przy stałymFEM (RWG0niejestND2trace). Nie zastępować dokladności ND2 dalszym zagęszczaniem ND1. Potem dielectricFEMtransmission, sparseSchur/scalableBEMassembly/skalowanie/antena. M2otwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -380,3 +380,29 @@ absfar0,01. DrugiCalderonrowosobno zexactanalyticweakRHS+staryinterpolatedRHS.
 CPUdense6GiB/max180s; mainmatrix/FEMmediumproductionbez zmian.
 
 Level3CPUrun37,742s/1280tet/320tri,FEM1748/BEM480, matrix79,424MB/RSS827MB. Map/pair/MFEMmatrix≤1,46e−15, raw4,74e−14; actualE/H6,116/5,785%vsDirichlet6,177/5,823%: 1%fieldFAIL. Δcoupled–FEM0,5691/0,7571%normalizowanedoexactincident, nieboundcałkowitegobłędu. q4vs6delta2,58e−10; niewymuszonyCalderonrow0,7126%interpH/0,6752%exactweakH. Far384+6max0,001622, σscat7,479e−6/σext9,450e−6,energyerror/π6,275e−7PASS. NoOOM/exit0. RootactiveSource/binarySHA/terminalstate wlevel3/root-analysis.json; dalszeND2globalspace/mortar/stabilnośći kosztanteny.62unitPASS; docs-gardenLuna/rootreview/checker/diffcheckPASS. Lokalnycommitbezpush. Goal/M2aktywne.
+
+### EXP32 — Gram RWG/SNC vs RWG/RBC, prerejestracja i wynik
+
+Hipoteza: nie odwracać Gprimal bez małego testu rank/condition; sprawdzić dualRBC
+przed ND2mortar. Ten samwielościan, poziomy1→2→3 poPASS, bezFEMsolve/GPU/build.
+Dokładneargv wcommand.json: `bempp_oracle.py run artifacts/m2-dual-pairing-level1-20261019
+--physics pairing --level 1 --seconds 120`, potem level1-fixed/2/3 do nowychkatalogów.
+Cap6GiB/4CPU/memory-swap=memory/rootRO/networknone/tmpfs, istniejącyJITcache.
+Przerejestrowanechecks: independentphysicalquad+BCtransforms/dualskewadjoint≤1e−12,
+Gdualfullrank/κmassdiag<100, constanttrace/residual≤1e−12. Plane-tracediagnostic,
+analytic_targetfalse, niezmienioneM2gates.
+
+Pierwszylevel1FAIL23,311s/exit1/noOOM: brak() dla metodybarycentric_representation.
+Błądroota poprawiony bezzmianbackendu/tolerancji; braknumerykidla failedrunu.
+Poprawione3runy25,512/25,345/25,919s,RSS419/420/442MB,exit0/noOOM/interfacePASS.
+Gprimalrank30/30→90/120→330/480, κraw2,25e17/2,85e17 na wyższychpoziomach:
+**REJECT osobnejinwersjiGprimal dla ND2projection**. Nieunieważnia toND1bloku,
+który nieodwracaGprimal. Gdualrank30/30,120/120,480/480 iκmassdiag2,154/2,720/2,922.
+Weakvsphysicalquadrature≤1,32e−15, Gdual=-Greverse^T≤1,81e−16, exactconstanttrace
+L2≤1,13e−15; plane-traceRWG0błąd20,994→10,433→5,157%. To ograniczeniereprezentacji,
+nie kontrolaND2/pólMaxwella. Rootpotwierdziłcase/fem/referenceSHA/terminalstate
+w artifacts/m2-dual-pairing-root-analysis-20261019.json. NastępneactualglobalMFEMND2,
+plane-waveDirichletkontrola, fizyczneB/Rmortar i rozdzieleniebłęduFEM/powierzchni.
+65testsPASSwpinnedenv,systemowo62PASS/3SKIP(SciPy); docs-gardenLuna/rootreviewPASS,
+historycznylicznik62wEXP30–31doprecyzowany. Checker/diffcheckPASS, lokalnycommitbezpush.
+Brakpromocji/natywnegorebuilda/płatnegocompute; M2/goalaktywne.

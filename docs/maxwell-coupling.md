@@ -115,8 +115,59 @@ Level3 dodatkowo:
 
 Artefakty `artifacts/m2-mfem-bem-coupling-level{1,2,3}-20261019`.
 Rootsprawdził aktywne source/binarySHA i terminalstate wlevel3/root-analysis.json.
-62unittestPASS: meshvolume/orientacja/refinement, Whitneycyrkulacje/gradient/
+W chwili EXP30–31:62unittestPASS, meshvolume/orientacja/refinement, Whitneycyrkulacje/gradient/
 mass/curlscaling/stałepole/kwadratury, nowy manifest bridge i wcześniejsze testy.
+
+## EXP32 — kontrola parowania przed projekcją ND2
+
+`tools/experiments/bempp_pairing.py` porównuje dwa weak Gramy:
+Gprimal=<SNC,RWG>, Gdual=<RBC,RWG>, oraz Greverse=<SNC,BC>.
+BC/RBC i reprezentacje barycentryczne RWG/SNC pochodzą z przypiętego
+Bempp-cl. Niezależna całka fizyczna używa trzech punktów stopnia2 na każdym
+z6subtriangle/face i obu pełnych `dof_transformation`. Nie używa samego
+`local2global` jako końcowych DOF przestrzeniBC.
+
+| Ściany / DOF | Rank Gprimal | Rank Gdual | κ₂(Gdual), skala diagonalna mass | Błąd trace fali płaskiej |
+| --- | ---: | ---: | ---: | ---: |
+| 20 / 30 | 30/30 | 30/30 | 2,154 | 20,994% |
+| 80 / 120 | 90/120 | 120/120 | 2,720 | 10,433% |
+| 320 / 480 | 330/480 | 480/480 | 2,922 | 5,157% |
+
+Rank jest liczony z progiem σmax*n*eps64. Gprimal jest skew do2,36e−16;
+κ₂ przy dwóch dokładniejszych siatkach około2,25e17/2,85e17. **Nie odwracać
+Gprimal jako projekcji ND2.** To nie unieważnia EXP30–31: tam Gprimal
+występuje w blokowym równaniu, bez osobnego odwracania.
+
+Gdual i Greverse spełniają Gdual=−Greverseᵀ do1,81e−16. Weakassembly vs
+niezależna całka zgadza się do1,32e−15. Rozwiązanie Gdual*t=b, gdzie
+b=<RBC,E×n>, odtwarza dokładnie reprezentowalny trace stałegoE do1,13e−15
+relative surfaceL2. Residua projekcji≤1,71e−16. Dla exp(iz)*xhat trace nie
+leży dokładnie wRWG0: błąd w tabeli pochodzi z niezależnej fizycznej kwadratury,
+nie z residuum małego układu. Wskazuje koszt niskiego rzędu przestrzeni
+powierzchniowej; ND2 nie wolno uznać za zachowane przez samą dokładną projekcję.
+
+Polecenia po `bempp_oracle.py check`:
+
+```sh
+python3 tools/experiments/bempp_oracle.py run artifacts/new-pairing-l1 --physics pairing --level 1 --seconds 120
+python3 tools/experiments/bempp_oracle.py run artifacts/new-pairing-l2 --physics pairing --level 2 --seconds 120
+python3 tools/experiments/bempp_oracle.py run artifacts/new-pairing-l3 --physics pairing --level 3 --seconds 120
+```
+
+Rzeczywiste artefakty: `artifacts/m2-dual-pairing-{level1-fixed,level2,level3}-20261019`.
+Runner25,51/25,35/25,92s, RSS419/420/442MB, wszystkieexit0/noOOM.
+Root sprawdził źródła/referenceSHA i terminalstate w
+`artifacts/m2-dual-pairing-root-analysis-20261019.json`.
+Pierwszy runlevel1FAIL23,31s: root błędnie potraktował metodę
+`barycentric_representation()` jako property. Poprawka wyłącznie API; brak
+rebuildów lub zmian tolerancji. Pierwszy katalog zachowany.
+
+`interface_target_passed=true` oznacza zgodność parowania, dual fullrank,
+κscaled<100, poprawny stały trace i residua≤1e−12. **Nie wymaga odwracalności
+Gprimal i nie oznacza rozwiązania Maxwella.** `analytic_target_passed=false`
+pozostaje jawne: to test interfejsu, bez pełnych pól/farfield/energii.
+Brak dowodu inf-sup dla siatek graded, portów, stabilizacji lub zysku anteny.
+Wszystkie tablice wRAM, CPU6GiB/4CPU/noaddedSwap/tmpfs; istniejący cacheJIT.
 
 ## Następne konkretne prace — bez zamykania M2
 
@@ -126,12 +177,13 @@ mass/curlscaling/stałepole/kwadratury, nowy manifest bridge i wcześniejsze tes
    kwalifikowany mortar/L2projection na odpowiednią powierzchnię lub zgodne
    BEMwyższegorzędu. Sprawdzić pole, adjointweakpairing, błąd projekcji i stabilność;
    nie utrzymywać deklaracji dokładnego punktowego R dla niezgodnych przestrzeni.
-   Najpierw mały test rank/condition GramRWG-SNC oraz dualRWG-RBC, bez dużego
-   FEMsolve. Gprimal jest skew, nie zakładać SPD/odwracalności. Kandydat na
+   EXP32 wykazał utratęrankuGramRWG-SNC i pełnyrank dualRWG-RBC na trzech
+   małych siatkach. Gprimal jest skew, nie zakładać SPD/odwracalności. Kandydat na
    zgodny mortar: t wRWG, h wBC, testRBC=n×BC; wtedy GdualR=−B^T i
-   B=−R^TGdual^T z fizycznej całki FEMv·BC. To **hipoteza do sprawdzenia**
-   punktowo/kwadraturą, nie gotowy adapter. ŹródłaBC/RBC są już wprzypiętymBempp;
-   sprawdzić ich barycentric transforms i kosztassembly zanim zwiększymyDOF.
+   B=−R^TGdual^T z fizycznej całki FEMv·BC. EXP32 potwierdza znaki, transforms
+   i exactconstanttrace; **rzeczywisty ND2mortar nadal niewdrożony**. Najpierw
+   niezależna kontrola globalMFEMND2 na plane-waveDirichlet, potem B/R i
+   zbieżność powierzchni przy stałymFEM, żeby oddzielić błędy obu przestrzeni.
 3. Podnieść dokładność tegoprzypadku do1%E/H, potem dielectricFEMtransmission
    i kontrola far-field/energii względem niezależnego oracle.
 4. Przy wzroście DOF zachować sparseFEM; rozważyć dokładne Schur/staticcondensation
