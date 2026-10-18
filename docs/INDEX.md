@@ -2,6 +2,14 @@
 
 Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla zmienianej części.
 
+Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
+
+- [M0: dowody zamknięcia](milestones/M0.md)
+  - Czytaj gdy: weryfikujesz zakończenie researchu i migracji
+  - Opis: Powiązanie kryteriów M0 z raportami oraz granice dowodów.
+- [M1: punkt wejścia](milestones/M1.md)
+  - Czytaj gdy: rozpoczynasz kwalifikację referencji i profilowanie
+  - Opis: Nieaktywny checkpoint M1 i pierwszy krok przed eksperymentami.
 - [Build i cache — lokalny SM120](build.md)
   - Czytaj gdy: budujesz, pakujesz lub przenosisz środowisko
   - Opis: Cache, lokalne obrazy, CLI i limity runnera.

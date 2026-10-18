@@ -2,6 +2,8 @@
 
 Plan przeniesiony z repo antenowego. Historyczne ścieżki `infra/palace`, STATE i polecenia odnoszą się do tamtego repo; aktualny build/runner tego forka opisuje [build.md](build.md).
 
+Bieżąca kolejka i stan wykonania w tym forku: [PLAN](../PLAN.md), [MILESTONES](../MILESTONES.md), [PROGRESS](../PROGRESS.md). Sekcja 8 poniżej zachowuje plan badawczy z chwili opracowania; jej checkboxy nie są aktualnym rejestrem postępu.
+
 Data opracowania: 2026-10-18. Status: **research i plan; nowe etapy wykonawcze nie są rozpoczęte**.
 Dokument zbiera cele użytkownika, wyniki wcześniejszych prób, weryfikację załącznika i plan dalszej pracy.
 Nie jest raportem z nowych benchmarków ani uruchomieniem nowego goal mode.
