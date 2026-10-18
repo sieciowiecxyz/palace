@@ -16,7 +16,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP23: PEC Maxwell/Mie zbieżność i1%PASS na1920RWGDOF/33,89s; Bempp/H2Opus przypięte, izolowany Python/JITcache. docs/maxwell-oracle.md.
 - EXP24: rzeczywisty H-matrix exact-near/complexSVDfar iCUDAapply jakościowoPASS; macierz−9,16%, ale52,68×wolniejszy apply na małej kuli. Niepromowany; brak peakRAMoszczędności, dielektryka/interfejsu ianteny.
 - EXP25–29: native2kernel/H-matrixeta4 −17,31%matrixdata i poprawnyGPUoperator/CPUbasisGMRES. DielectricPMCHWT/Mie far-fieldPASS0,0223% zregułąobjętości i zbieżnością; stareinscribedmeshscatterFAIL. docs/maxwell-native-dielectric.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.58testówPASS, kod Palace/medium bez zmian.
+- EXP30–31: actualMFEM4.9ND1/Bemppcoupling ze zbieżnością, trace/pair~1e−15/energyPASS. Całkowity1%E/HFAIL:6,12/5,79%, comparatorFEM6,18/5,82%; Δcoupled–FEM0,57/0,76% niekwalifikujeND2/anteny. docs/maxwell-coupling.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.62testówPASS, kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -37,7 +38,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: następny rzeczywisty mały H(curl) FEM–BEMinterface (normalne/orientacja/normalizacja) vspełnyFEM/niezależnepole. Nativeapply i dielectricfar-fieldgotowe; nadalbraknearfieldE/B/scalableassembly/skalowania/anteny. Nie stroićdalejmałejkuli zamiastinterface. M2otwarty, bezpaidcompute.
+2. M2: ND1interfacewykonany, 1%fieldFAIL. Następne actualMFEMND2/globalDOF+facetransformations i kwalifikowana traceprojection/mortar (RWG0niejestND2trace). Nie zastępować dokladności ND2 dalszym zagęszczaniem ND1. Potem dielectricFEMtransmission, sparseSchur/scalableBEMassembly/skalowanie/antena. M2otwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -349,3 +350,33 @@ progów. Jeden level3run≤180s/6GiB, cachedSO, kontrolaactualsourcesSHA/native
 manifest, raw/complexFF i noOOM. Nie jest to nowy benchmarkanteny.
 
 KońcowaintegracjaactualcodePASS/noOOM/40,784s, field0,5643%/scatter0,96565%. Nativeeta4apply0,2242ms vsdense0,1035ms; residentGPUevent0,1498ms. CPUcompressedGMRES0,5986s vsGPUoperator+CPUbasis0,07777s/170iter/rawOriginal3,218e−9. Rootsprawdziłsource/binarySHA i terminalstate w m2-native-dielectric-root-analysis-20261019.json.58unitPASS; M2/goalaktywne, brakFEMinterface/scalableassembly/antenna speedup. Docs-gardenLuna/checker/diffcheckPASS; rootreview kodu/manifestów/wykonanychźródeł zakończony. Nativecache i referencjaPalace zachowane, brakpushdo upstream. Goal/M2nadalaktywne.
+
+
+## EXP30 — plan i wynik
+
+EXP30 planprzedrunem: rzeczywisty mały MaxwellFEM–BEM transparent ε=μ=1/ka1.
+Instalowany MFEM4.9 ND1 integratorymasy/curlcurl, niezależnyWhitneycheck,
+punktowe mapowanie E×n→RWG ze znakami i1/edgeLength, osobny check
+FEMboundarypairing=R^TGramSNC/RWG. Nonsymmetric1rowCalderon+FEMGreen, CPUdense.
+Pierwszylevel1(20tet/20boundarytri), potemrefinebez zmianywielościanu.
+Analytic1%E/H_L2, absfar<0,01, raw1e−10, map/pair1e−12,q4vs6delta1e−6.
+CoarseFAILnieoznaczaPASS; osobnyFEMzexactDirichlet pozwalaoddzielićFEerrorodcoupling.
+ND1wyłącznieprobe, produkcyjnymediumND2bez zmian; nieGPU/ports/antennaqualification.
+Limit180s/6GiB/noextraswap/RAMonly, bridgeTU2,597s+cachehit, bezPalacerebuild.
+PierwszybridgebuildFAILbrakcudss.h; dodanoistniejącyinclude/opt/cudss/include,
+niebudowano zależności.61unitPASS. Research: Bemppfenicsnc1trace i Maxwell
+multitraceexample, MFEMheaders/notes, Hiptmair2007stabilizedcoupling (doocenystability).
+
+Bridge2,597s/cachehit,MFEMv4.9release/GetGitStrpusty. Level1/2CPUruny30,793/31,800s,noOOM/exit0.20/160tet,20/80tri,FEM42/254,BEM30/120. MFEM↔Whitney/trace/pair≤1,35e−15, raw1,14e−15/8,34e−15. CoupledE/H20,45/21,73→11,74/11,44%; comparatorFEM21,36/21,92→12,00/11,56%. Zbieżnośćpoprawna, oba1%analyticFAIL. Poziom2far6dir0,006323PASS. Niepromować.
+
+
+## EXP31 — plan i wynik
+
+EXP31planprzedrunem: poEXP30level1/2map1e−15 i zbieżnościE/H20/22→11,7/11,4%
+(FEMDirichlet21/22→12,0/11,6%) uruchomić refinement2wtejsamejgeometrii.
+1%E/Hnadalobowiązuje, niepromowaćND1 przezsamrawPASS. Dodaćpełniejszyfar-field
+16×24+6kierunków i optycznybilansenergii względemπincpower (gate1e−3), nadal
+absfar0,01. DrugiCalderonrowosobno zexactanalyticweakRHS+staryinterpolatedRHS.
+CPUdense6GiB/max180s; mainmatrix/FEMmediumproductionbez zmian.
+
+Level3CPUrun37,742s/1280tet/320tri,FEM1748/BEM480, matrix79,424MB/RSS827MB. Map/pair/MFEMmatrix≤1,46e−15, raw4,74e−14; actualE/H6,116/5,785%vsDirichlet6,177/5,823%: 1%fieldFAIL. Δcoupled–FEM0,5691/0,7571%normalizowanedoexactincident, nieboundcałkowitegobłędu. q4vs6delta2,58e−10; niewymuszonyCalderonrow0,7126%interpH/0,6752%exactweakH. Far384+6max0,001622, σscat7,479e−6/σext9,450e−6,energyerror/π6,275e−7PASS. NoOOM/exit0. RootactiveSource/binarySHA/terminalstate wlevel3/root-analysis.json; dalszeND2globalspace/mortar/stabilnośći kosztanteny.62unitPASS; docs-gardenLuna/rootreview/checker/diffcheckPASS. Lokalnycommitbezpush. Goal/M2aktywne.

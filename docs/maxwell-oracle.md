@@ -2,7 +2,8 @@
 
 2026-10-19, historyczne EXP23–24: **PEC oracle PASS; per-block CUDA apply niepromowany**.
 Aktualne native apply i kontrola dielektryka w [EXP25–29](maxwell-native-dielectric.md).
-M2 otwarty: brak interfejsu FEM–BEM i kosztu anteny. Palace, medium i kontrakt K
+M2 otwarty: brak zakwalifikowanegoND2interfejsu i kosztu anteny. MałyND1interface
+opisano później w [EXP30–31](maxwell-coupling.md). Palace, medium i kontrakt K
 bez zmian. Te wyniki nie dotyczą portów anteny.
 
 ## Źródła i wybór

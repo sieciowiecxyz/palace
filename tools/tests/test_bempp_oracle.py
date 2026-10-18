@@ -40,6 +40,20 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_mfem_bridge_manifest_rejects_modified_binary(self):
+        bridge = oracle.mfem_bridge
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            library = root/'mfem.so'
+            library.write_bytes(b'MFEM bridge')
+            recipe = {'source':'mfem-source','runtime':'pinned'}
+            oracle.dev.write(root/'manifest.json',dict(recipe=recipe,binary_sha256=oracle.dev.sha(library)))
+            with patch.object(bridge,'BASE',root),patch.object(bridge,'LIBRARY',library),\
+                 patch.object(bridge,'recipe',return_value=recipe):
+                self.assertEqual(bridge.verified()['recipe'],recipe)
+                library.write_bytes(b'changed')
+                with self.assertRaises(ValueError): bridge.verified()
+
     def test_native_binary_and_recipe_are_both_verified(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -19,6 +19,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M2: native CUDA i dielektryk](maxwell-native-dielectric.md)
   - Czytaj gdy: wznawiasz aktualny prototyp lub planujesz interfejs FEM–BEM
   - Opis: Dwa kernele FP64, hybrid GMRES, −17% danych operatora oraz PMCHWT/Mie i audyt błędu geometrii; brak promocji anteny.
+- [M2: interfejs MFEM–Bempp](maxwell-coupling.md)
+  - Czytaj gdy: wznawiasz sprzężony prototyp lub przygotowujesz trace ND2
+  - Opis: Rzeczywiste integratory MFEM/Calderón, mapowanie i energia PASS, zbieżność ND1 oraz nadal FAIL progu 1% całych pól; następne ND2 i projekcja.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

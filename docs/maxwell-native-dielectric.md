@@ -3,7 +3,9 @@
 2026-10-19, EXP25–29. **Dalszy prototyp; brak promocji solvera anteny.**
 Kontynuacja [pierwszego oracle](maxwell-oracle.md). PEC i dielektryk mają
 kontrolę zespolonego far-field/Mie i optical theorem. Brak FEM–BEM interface,
-kwalifikacji portów, near-field E/B oraz assembly bez pełnej gęstej macierzy.
+kwalifikacji portów, near-field E/B oraz assembly bez pełnej gęstej macierzy
+w zakresieEXP25–29. Późniejszy [EXP30–31](maxwell-coupling.md) uruchamia
+rzeczywisty ND1FEM–BEM, ale nie spełnia jeszcze1% pól.
 
 ## Native apply: usunięcie wywołania Python/cuBLAS na każdy blok
 
@@ -122,7 +124,7 @@ Artefakty `artifacts/m2-dielectric-{level2,level3,volume-level1,volume-level2}-2
 sprawdził SHA wykonanych źródeł, `.so`, terminalstate i wyniki w
 `artifacts/m2-native-dielectric-root-analysis-20261019.json`.
 Niewykonywany H-matrix module w CPUdielectric nie jest zależnością jego wyniku.
-M2 pozostaje aktywny. Kolejne zadanie to **rzeczywisty mały interface H(curl)
-FEM–BEM z poprawną orientacją/normalizacją trace**, porównanie z pełnymFEM i
-zewnętrznym polem. Osobnej kontroli wymaga assembly bez pełnego dense oraz pamięci/rang przy rozmiarze anteny. Portów,
+M2 pozostaje aktywny. Mały interface H(curl)zbadano w [EXP30–31](maxwell-coupling.md);
+następneND2/globalorientation i projekcja, niepromowaćND1z6%błędem.
+Osobnej kontroli wymaga assembly bez pełnego dense oraz pamięci/rang przy rozmiarze anteny. Portów,
 E/Bprzyfeedzie, skalowania i produkcyjnego speedupu nadal nie zakwalifikowano.
