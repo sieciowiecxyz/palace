@@ -1,8 +1,9 @@
 # M2 — niezależny Maxwell i próba kompresji
 
-2026-10-19: **PEC oracle PASS; prosty H-matrix CUDA apply niepromowany**.
-M2 otwarty: brak dielektryka, interfejsu FEM–BEM i kosztu anteny. Palace,
-medium i kontrakt K bez zmian. Te wyniki nie dotyczą portów anteny.
+2026-10-19, historyczne EXP23–24: **PEC oracle PASS; per-block CUDA apply niepromowany**.
+Aktualne native apply i kontrola dielektryka w [EXP25–29](maxwell-native-dielectric.md).
+M2 otwarty: brak interfejsu FEM–BEM i kosztu anteny. Palace, medium i kontrakt K
+bez zmian. Te wyniki nie dotyczą portów anteny.
 
 ## Źródła i wybór
 
@@ -10,7 +11,7 @@ Audyt przypiętych lokalnych źródeł upstream, 2026-10-19:
 
 | Implementacja / rewizja / licencja | Dowód i decyzja |
 | --- | --- |
-| [Bempp-cl](https://github.com/bempp/bempp-cl/tree/a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0), `a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0`, 0.4.2, MIT | `api/operators/boundary/maxwell.py`: EFIE/MFIE/multitrace; `core/numba_kernels.py`: singular/far-field kernels; `api/space/maxwell_spaces.py`: RWG/SNC/BC. Numba CPU/OpenCL, nie native CUDA. Wybrany jako CPU oracle, bez zależności w Palace. `examples/maxwell/maxwell_dielectric.py` dostępny, ale NOT RUN; MFEM trace/porty niepotwierdzone. |
+| [Bempp-cl](https://github.com/bempp/bempp-cl/tree/a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0), `a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0`, 0.4.2, MIT | `api/operators/boundary/maxwell.py`: EFIE/MFIE/multitrace; `core/numba_kernels.py`: singular/far-field kernels; `api/space/maxwell_spaces.py`: RWG/SNC/BC. Numba CPU/OpenCL, nie native CUDA. Wybrany jako CPU oracle, bez zależności w Palace. `examples/maxwell/maxwell_dielectric.py` posłużył późniejszej kontroli PMCHWT (EXP27–28); MFEM trace/porty niepotwierdzone. |
 | [H2Opus](https://github.com/ecrc/h2opus/tree/cbc7985d9716e015c019003073a6f1f5c53dd2fc), `cbc7985d9716e015c019003073a6f1f5c53dd2fc`, BSD-3-Clause | `include/h2opus/core/h2opus_defs.h:21–26`: H2Opus_Real double/float, CUDA/MAGMA/KBLAS. Nie znaleziono gotowego zespolonego Maxwell. Potrzebna reprezentacja zespolona lub osobne real/imag; nie zakładać drop-in complex/TF32 i nie budować pełnego stosu przed wykazaniem sensu. |
 
 **RAM-only:** `bempp_cl/api/fmm/exafmm.py` tworzy `cwd/.exafmm/*.tmp`
@@ -98,7 +99,6 @@ column-major, host scalars, default stream. Brak zmiany precyzji.
 
 **Decyzja:** nie integrować per-block dispatch jako speedupu. Mała kompresja
 i setki wywołań przegrywają z dense. Nie odrzuca to dużego skompresowanego BEM;
-nie ekstrapolować9%/53×na antenę. Następne: grupowane/natywne CUDA apply,
-skalowanie rang/kosztów, dielectric Mie i mały FEM–BEM interface. Następnie
-assembly bez pełnego dense, pamięć/workspace i porównywalny błąd anteny.
-PEC PASS nie zamyka M2.2, nie uprawnia do promocji ani przejścia doM3.
+nie ekstrapolować9%/53×na antenę. Native apply i dielectric Mie wykonano później
+w [EXP25–29](maxwell-native-dielectric.md); interfejs FEM–BEM, assembly bezdense,
+skalowanie i porównanie anteny pozostają otwarte. PEC PASS nie zamyka M2.2.

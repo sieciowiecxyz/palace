@@ -10,6 +10,22 @@ spec.loader.exec_module(ref)
 
 
 class MaxwellReferenceTests(unittest.TestCase):
+    def test_dielectric_transparent_lossless_and_passive_conventions(self):
+        a,b = ref.dielectric_coefficients(1,1)
+        self.assertEqual(a+b,[0j]*32)
+        for x in [0.1,1.0,2.5]:
+            scatter,extinction = ref.cross_sections(radius=x,epsilon_r=2.94)
+            forward = ref.far_field([(0,0,1)],radius=x,epsilon_r=2.94)[0]
+            self.assertAlmostEqual(scatter,extinction,places=12)
+            self.assertAlmostEqual(extinction,4*math.pi*forward[0].imag,places=12)
+        scatter,extinction = ref.cross_sections(epsilon_r=2.94+0.03j)
+        self.assertGreater(extinction,scatter)
+        x,eps = 1e-3,2.94
+        scatter,_ = ref.cross_sections(radius=x,epsilon_r=eps)
+        rayleigh = (8*math.pi/3)*x**6*((eps-1)/(eps+2))**2
+        self.assertAlmostEqual(scatter/rayleigh,1,places=5)
+        with self.assertRaises(ValueError): ref.dielectric_coefficients(1,2.94-0.03j)
+
     def test_lossless_energy_and_forward_optical_theorem(self):
         for x in [0.1,1.0,2.5]:
             scatter,extinction = ref.cross_sections(radius=x)
@@ -44,3 +60,16 @@ class MaxwellReferenceTests(unittest.TestCase):
             with self.assertRaises(ValueError): ref.coefficients(x)
         for level in [-1,4,True]:
             with self.assertRaises(ValueError): ref.icosphere(level)
+
+    def test_volume_preserving_rule_uses_geometry_only(self):
+        radii = []
+        for level in [1,2,3]:
+            original,faces = ref.icosphere(level)
+            vertices,corrected_faces = ref.icosphere(level,volume_preserving=True)
+            self.assertEqual(faces,corrected_faces)
+            self.assertLess(ref.signed_volume(original,faces),4*math.pi/3)
+            self.assertAlmostEqual(ref.signed_volume(vertices,faces),4*math.pi/3,places=12)
+            radii.append(math.sqrt(sum(x*x for x in vertices[0])))
+        self.assertGreater(radii[0],radii[1])
+        self.assertGreater(radii[1],radii[2])
+        self.assertGreater(radii[2],1)

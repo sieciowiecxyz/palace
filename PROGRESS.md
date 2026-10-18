@@ -15,9 +15,11 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - CUDA-only+afinicznyhostclock krótki profil W.3PASS, bezwarnings:2iteracje17,665s, P16,278sinclusive,295,472GBUVMmigrations. Held-out1,127µs<10µsmarginesu;1/4939kerneli nieprzypisany przygranicy. docs/profiling-window.md. Historyczne NVTX i failedclock zachowaneREJECT.
 - EXP23: PEC Maxwell/Mie zbieżność i1%PASS na1920RWGDOF/33,89s; Bempp/H2Opus przypięte, izolowany Python/JITcache. docs/maxwell-oracle.md.
 - EXP24: rzeczywisty H-matrix exact-near/complexSVDfar iCUDAapply jakościowoPASS; macierz−9,16%, ale52,68×wolniejszy apply na małej kuli. Niepromowany; brak peakRAMoszczędności, dielektryka/interfejsu ianteny.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.55testówPASS, kod Palace/medium bez zmian.
+- EXP25–29: native2kernel/H-matrixeta4 −17,31%matrixdata i poprawnyGPUoperator/CPUbasisGMRES. DielectricPMCHWT/Mie far-fieldPASS0,0223% zregułąobjętości i zbieżnością; stareinscribedmeshscatterFAIL. docs/maxwell-native-dielectric.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.58testówPASS, kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
+
 
 | ID | Wynik i decyzja | Artefakty / ograniczenia |
 | --- | --- | --- |
@@ -35,7 +37,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: PECMie iCUDAapplygotowe; najpierw grupowane/natywne apply i sensowna kompresja bezdenseassembly, potem dielectricMie/interfejs oraz skalowanie/porównywalnyFEM. M2nadalotwarty, bezpaidcompute.
+2. M2: następny rzeczywisty mały H(curl) FEM–BEMinterface (normalne/orientacja/normalizacja) vspełnyFEM/niezależnepole. Nativeapply i dielectricfar-fieldgotowe; nadalbraknearfieldE/B/scalableassembly/skalowania/anteny. Nie stroićdalejmałejkuli zamiastinterface. M2otwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -289,3 +291,61 @@ Pierwszylaunch m2-pec-sphere-level1-cold-20261018 FAILexit127/Pid0/0,19s: brakmo
 Root: geometricalcluster wsparćRWG/exactnear/complexSVDfar, Frobenius1e−6/leaf64/eta2. Przedrunem progiaction1e−5/rawOriginal1e−6/Δsolution1e−3/Δfar-field1e−4. Pierwszargv z kropką kończącą zdanie: argparseFAIL, nicnieuruchomione. Jawnaargvlista→m2-pec-hmatrix-cuda-level3-20261019 ukończony40,868s/noOOM.984bloki/248compressed, compression0,1556s, CPUGMRES170iter/0,6423s. Matrix58,9824→53,5795MB(−9,16%), originalraw1,591e−9/Δsolution2,275e−8/Δfar-field1,096e−11, analyticfield0,5643%; qualitygatesPASS.
 
 CUDAcomplex128cublasZgemvapplyonly: explicitalloc59,0439→53,6414MB;8warmroundtrips0,1010→5,3194ms,52,68×wolniej. Python/PCIe/sync+CUDA, niekernel-only; brakTC/UVM. Denseoracle/kopiepozostająwRAM,RSS1,404GB; brakpeakRAMsaving. Nieintegrowaćper-blockdispatch jako speedupu i nieekstrapolowaćnaantenę. Dalej batch/nativeapply, kompresja/scalableassembly, dielectricMie/FEM–BEMinterface. M2.1–M2.4 nadalniepełne,M3nieaktywny.55unitPASS, bezpaidcompute/closedapps/diskworkspace; Palace/mediumdefaultsbez zmian. Docs-gardenLuna/checker/diffcheckPASS; rootpoprawiłstarylicznik47→55 wtesting i sprawdziłkod/źródła/SHAartefaktów. Lokalnycommitbezpush; goal/M2aktywne.
+
+
+## EXP25 — plan i wynik
+
+EXP25 plan przed runem (2026-10-19): izolować koszt dispatch od matematyki
+EXP24. Ta sama H-matrix FP64/leaf64/eta2/tolerancje; native packing i dwa
+kernele CUDA zamiast984Python/cuBLAScall. Porównać exactdense/cuBLASperblock/
+native w jednym procesie, action≤1e−5 i dotychczasowe raw/fieldbez zmian;
+zmierzyć wszystkie jawne alokacje wraz z metadanymi i round-trip osobno od
+GPUeventtime. CachedjednoTUbuild≤120s, oracle≤180s/6GiB/noSwap, RAM/VRAMonly.
+Brak promocji anteny na podstawie małego operatora; wynik i decyzja poniżej.
+
+Native2kernelkompilacja1,752s/cachehit; max180soracle40,565s/noOOM. Ta samaeta2: nativeapply0,2114ms vsper-block5,2371ms i dense0,1220ms. HybridGPUoperator/CPUbasisGMRES170iter/0,07770s, rawOriginal1,591e−9/Δsolution2,275e−8. Bezpromocjianteny; niepełnyGPUsolver.
+
+
+## EXP26 — plan i wynik
+
+EXP26 planprzedrunem: po udanym EXP25native sprawdzić jedną zmianę eta2→4
+(szersza dopuszczalność kompresji wyłącznie rozłącznych supports). Leaf64,
+SVD1e−6, cała geometria i qualitygatesbez zmian. Sprawdzić dane/meta/workspace,
+nativeapply/cublasdense/CPU iGPUoperatorGMRES. Limit180s/6GiB/noextraswap;
+budżet natywnej biblioteki bezrebuilda, bezpromocjianteny zmałegotestu.
+
+Eta4PASS/noOOM/40,819s. Matrixdata58,9824→48,7699MB(−17,31%); nativealloc49,5404MBwrazmetadata/workspace. Nativeapply0,1875ms vsdense0,1016ms, więc nadalwolniej. Hybrid0,07494s/170iter/raw3,218e−9; farfielddelta2,681e−11. PeakRAMniespadł, fullassemblydensepozostaje.
+
+
+## EXP27 — plan i wynik
+
+EXP27 planprzedrunem: kontrola dielektryka PMCHWT/Maxwell na kuli ka1/εr2,94/μr1,
+według scaledmultitrace przypiętego Bemppdielectricexample, allRWG/SNC.
+Nowy niezależny dielectricMie (transparent/Rayleigh/opticaltheorem/passivity
+unitchecks). Najpierwlevel2/960DOF podwójnegośladu, potemlevel3jeśliznaki/faza/
+energiapoprawne. Zamrożonypróg1%complexfield/scattering/energy i raw1e−10,
+bezfitufazy. CPUonly/6GiB/noextraswap/≤180s, braknativebuildów.
+
+ObaCPUruny technicallycomplete/noOOM:level2/3 35,285/108,849s. Complexfield3,354→0,8495%, scattering6,308→1,6154%: obaanalyticFAILpróg1%, energiapoprawna/raw≤9,08e−15. Geometryauditbezfituprzewiduje−6,2728/−1,6106%scatter; stareFAILzachowane. Danepełnewdocs/maxwell-native-dielectric.md.
+
+
+## EXP28 — plan i wynik
+
+EXP28 planprzedrunem: EXP27level3pole0,8495%PASS,scatter1,6154%FAIL. Geometryczny
+audyt daje Vmesh/Vsphere0,991394, aeq0,997123; Mieaeq przewiduje−1,6106%scatter,
+bezfitu. Testować jawną siatkę volume-preserving: skala=(Vsphere/Vmesh)^(1/3),
+niezależnaodε/freq/pól, target nadal kula r1 i te sameprogi1%/raw1e−10.
+NieprzemianowywaćstaregoFAIL. Najpierwlevel1potem2, każda≤120s/6GiB CPUonly,
+sprawdzićzbieżnośćpolazespolonego/energii. Nie jest to zmiana fizykianteny.
+
+Jawnyvolume-preservingflatmeshPASSdlaobu siatek, niezmienionyMier1/progi1%. Level1/2 27,318/35,553s,field0,1764→0,02228%,scatter0,3067→0,03856%,energy1,142e−5→1,286e−7;raw≤5,35e−15/noOOM. Radiusvertex1,046133/1,011541wyłączniezobjętości. Niekwalifikuje near-fieldaniPCB/anteny.
+
+
+## EXP29 — plan i wynik
+
+EXP29 planprzedrunem: końcowa kontrola integracyjna PECnativeeta4 po dodaniu
+dielectricmode/sharedMiehelper/geometryflag. Nie zmieniać matematykiPEC ani
+progów. Jeden level3run≤180s/6GiB, cachedSO, kontrolaactualsourcesSHA/native
+manifest, raw/complexFF i noOOM. Nie jest to nowy benchmarkanteny.
+
+KońcowaintegracjaactualcodePASS/noOOM/40,784s, field0,5643%/scatter0,96565%. Nativeeta4apply0,2242ms vsdense0,1035ms; residentGPUevent0,1498ms. CPUcompressedGMRES0,5986s vsGPUoperator+CPUbasis0,07777s/170iter/rawOriginal3,218e−9. Rootsprawdziłsource/binarySHA i terminalstate w m2-native-dielectric-root-analysis-20261019.json.58unitPASS; M2/goalaktywne, brakFEMinterface/scalableassembly/antenna speedup. Docs-gardenLuna/checker/diffcheckPASS; rootreview kodu/manifestów/wykonanychźródeł zakończony. Nativecache i referencjaPalace zachowane, brakpushdo upstream. Goal/M2nadalaktywne.

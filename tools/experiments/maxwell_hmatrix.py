@@ -163,10 +163,53 @@ class CUDAApply:
         self.allocations.clear()
 
 
-def probe(matrix,boxes,rhs,solution):
+class NativeCUDAApply:
+    class HostBlock(ct.Structure):
+        _fields_ = [(name,ct.c_int) for name in ['i','j','m','n','rank']]+[
+                    ('left',ct.c_void_p),('right',ct.c_void_p)]
+
+    def __init__(self,blocks,n):
+        self.library = ct.CDLL('/native/libmaxwell_apply.so')
+        self.library.hm_block_size.argtypes,self.library.hm_block_size.restype = [],ct.c_size_t
+        self.library.hm_create.argtypes = [ct.POINTER(self.HostBlock),ct.c_int,ct.c_int,
+                                           ct.POINTER(ct.c_void_p),ct.POINTER(ct.c_size_t)]
+        self.library.hm_create.restype = ct.c_int
+        self.library.hm_apply.argtypes = [ct.c_void_p,ct.c_void_p,ct.c_void_p,ct.c_int,ct.POINTER(ct.c_float)]
+        self.library.hm_apply.restype = ct.c_int
+        self.library.hm_destroy.argtypes,self.library.hm_destroy.restype = [ct.c_void_p],None
+        if self.library.hm_block_size()!=ct.sizeof(self.HostBlock): raise ValueError('Native block ABI mismatch')
+        descriptors = []
+        for i,j,a,b in blocks:
+            for value in [a]+([] if b is None else [b]):
+                if not value.flags.f_contiguous or value.dtype!=np.complex128:
+                    raise ValueError('Native input requires column-major complex128')
+            descriptors.append(self.HostBlock(i,j,a.shape[0],a.shape[1] if b is None else b.shape[1],
+                                              0 if b is None else b.shape[0],a.ctypes.data,
+                                              None if b is None else b.ctypes.data))
+        self.handle,self.n = ct.c_void_p(),n
+        allocated = ct.c_size_t()
+        CUDAApply._check(self.library.hm_create((self.HostBlock*len(blocks))(*descriptors),len(blocks),n,
+                                               ct.byref(self.handle),ct.byref(allocated)))
+        self.bytes = allocated.value
+
+    def apply(self,x,repeat=1):
+        x = np.ascontiguousarray(x,dtype=np.complex128)
+        if x.shape!=(self.n,): raise ValueError('Unexpected vector shape')
+        y = np.empty_like(x)
+        elapsed = ct.c_float()
+        CUDAApply._check(self.library.hm_apply(self.handle,x.ctypes.data,y.ctypes.data,repeat,ct.byref(elapsed)))
+        self.resident_apply_seconds = elapsed.value/1000
+        return y
+
+    def close(self):
+        self.library.hm_destroy(self.handle)
+        self.handle = ct.c_void_p()
+
+
+def probe(matrix,boxes,rhs,solution,native=False,eta=2.0):
     from scipy.sparse.linalg import LinearOperator,gmres
     started = time.monotonic()
-    h = HMatrix(matrix,boxes)
+    h = HMatrix(matrix,boxes,eta=eta)
     compression_seconds = time.monotonic()-started
     ordered = matrix[np.ix_(h.order,h.order)]
     rng = np.random.default_rng(7019)
@@ -180,7 +223,8 @@ def probe(matrix,boxes,rhs,solution):
     solve_seconds = time.monotonic()-began
     raw = float(np.linalg.norm(ordered@candidate-rhs[h.order])/np.linalg.norm(rhs))
     delta = float(np.linalg.norm(candidate-solution[h.order])/np.linalg.norm(solution))
-    gpu = dict(backend='complex128 cuBLAS Zgemv; no Tensor Cores',scope='apply only, not GPU solve')
+    gpu = dict(backend='complex128; cuBLAS or optional native CUDA; no Tensor Cores',
+               scope='cuBLAS apply only; native optionally GPU apply + CPU SciPy GMRES basis')
     # Same GPU, data stay resident between calls; round-trip timings include PCIe,
     # Python dispatch, cuBLAS launches and sync, not just kernel event time.
     for label,blocks in [('dense',[(0,0,np.asfortranarray(ordered),None)]),('compressed',h.blocks)]:
@@ -196,8 +240,35 @@ def probe(matrix,boxes,rhs,solution):
                               max_relative_action_error=error)
         finally:
             device.close()
+    if native:
+        device = NativeCUDAApply(h.blocks,len(rhs))
+        try:
+            measured = [device.apply(x) for x in vectors]
+            error = max(float(np.linalg.norm(a-ordered@x)/np.linalg.norm(ordered@x)) for a,x in zip(measured,vectors))
+            begin = time.monotonic()
+            for _ in range(8): device.apply(vectors[0])
+            gpu['native_compressed'] = dict(explicit_device_allocation_bytes=device.bytes,
+                                           average_round_trip_apply_seconds=(time.monotonic()-begin)/8,
+                                           max_relative_action_error=error)
+            device.apply(vectors[0],repeat=64)
+            gpu['native_compressed']['resident_gpu_apply_seconds'] = device.resident_apply_seconds
+            gpu['native_compressed']['scope'] = 'two FP64 CUDA kernels + memset; event time excludes vector PCIe'
+            iterations = []
+            begin = time.monotonic()
+            native_candidate,native_info = gmres(
+                LinearOperator(matrix.shape,matvec=device.apply,dtype=np.complex128),rhs[h.order],
+                rtol=1e-10,atol=0,restart=100,maxiter=10,callback=iterations.append,callback_type='pr_norm')
+            native_seconds = time.monotonic()-begin
+            native_raw = float(np.linalg.norm(ordered@native_candidate-rhs[h.order])/np.linalg.norm(rhs))
+            native_delta = float(np.linalg.norm(native_candidate-solution[h.order])/np.linalg.norm(solution))
+            gpu['native_compressed']['hybrid_solve'] = dict(scope='GPU operator; CPU SciPy GMRES basis/orthogonalization',
+                seconds=native_seconds,iterations=len(iterations),info=native_info,
+                raw_original_rhs_relative=native_raw,relative_solution_difference=native_delta)
+            candidate = native_candidate
+        finally:
+            device.close()
     report = dict(scope='RAM-assembled PEC Maxwell H-matrix probe; no scalable assembly or FEM interface',
-                  local_relative_frobenius_tolerance=1e-6,leaf=64,eta=2.0,
+                  local_relative_frobenius_tolerance=1e-6,leaf=64,eta=eta,
                   blocks=len(h.blocks),compressed_blocks=sum(b is not None for _,_,a,b in h.blocks),
                   admissible_blocks=h.admissible_count,max_local_compression_error=h.max_block_error,
                   dense_matrix_bytes=h.dense_bytes,compressed_matrix_bytes=h.storage_bytes,
@@ -211,6 +282,10 @@ def probe(matrix,boxes,rhs,solution):
                   limitations=['Dense assembly and oracle retained in RAM; peak RAM not reduced',
                                'Small CUDA apply timing does not predict antenna or full solve speed',
                                'Operator allocation excludes CUDA context/cuBLAS internal workspace'])
+    if native:
+        report['quality_passed'] = bool(report['quality_passed'] and gpu['native_compressed']['max_relative_action_error']<1e-5
+                                        and native_info==0 and native_raw<1e-6 and native_delta<1e-3)
+    report['far_field_solution'] = 'GPU operator / CPU SciPy GMRES basis' if native else 'CPU compressed GMRES'
     restored = np.empty_like(candidate)
     restored[h.order] = candidate
     return report,restored

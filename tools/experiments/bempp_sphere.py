@@ -13,7 +13,7 @@ import maxwell_reference as reference
 K = 1.0
 
 
-def run(level,output,compression=False):
+def run(level,output,compression=False,native=False,eta=2.0):
     started = time.monotonic()
     def stage(name):
         row = dict(stage=name,elapsed_s=time.monotonic()-started)
@@ -61,7 +61,7 @@ def run(level,output,compression=False):
     if compression:
         from maxwell_hmatrix import probe,support_boxes
         stage('compression_begin')
-        compressed,candidate = probe(matrix,support_boxes(grid,rwg),rhs,coefficients)
+        compressed,candidate = probe(matrix,support_boxes(grid,rwg),rhs,coefficients,native=native,eta=eta)
         (output/'compression.json').write_text(json.dumps(compressed,indent=2)+'\n')
         stage('compression_cuda_complete')
     u,wu = np.polynomial.legendre.leggauss(16)
@@ -115,5 +115,8 @@ if __name__=='__main__':
     parser.add_argument('--level',type=int,choices=[1,2,3],required=True)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--compression',action='store_true')
+    parser.add_argument('--native-apply',action='store_true')
+    parser.add_argument('--compression-eta',type=float,default=2.0)
     args = parser.parse_args()
-    run(args.level,args.output,args.compression)
+    if args.native_apply and not args.compression: parser.error('--native-apply requires --compression')
+    run(args.level,args.output,args.compression,args.native_apply,args.compression_eta)

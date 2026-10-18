@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pinned, isolated CPU Maxwell oracle; no new dependencies in Palace builds."""
 import argparse
+import fcntl
 import hashlib
 import json
 from pathlib import Path
@@ -17,8 +18,62 @@ SOURCE = dev.ROOT/'.cache/m2-sources/bempp-cl'
 COMMIT = 'a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0'
 REQUIREMENTS = dev.ROOT/'tools/experiments/bempp-requirements.txt'
 CASE = dev.ROOT/'tools/experiments/bempp_sphere.py'
+DIELECTRIC_CASE = dev.ROOT/'tools/experiments/bempp_dielectric.py'
 REFERENCE = dev.ROOT/'tools/maxwell_reference.py'
 COMPRESSION = dev.ROOT/'tools/experiments/maxwell_hmatrix.py'
+CUDA_SOURCE = dev.ROOT/'tools/experiments/maxwell_apply.cu'
+CUDA_BUILD = BASE/'cuda'
+CUDA_LIBRARY = CUDA_BUILD/'libmaxwell_apply.so'
+
+
+def cuda_recipe():
+    settings = dev.read(dev.SETTINGS)
+    return dict(source_sha256=dev.sha(CUDA_SOURCE),architecture=settings['architecture'],
+                builder_image_id=dev.image_id(settings['builder_image']),
+                runtime_image_id=dev.image_id(settings['runtime_image']),
+                flags=['-std=c++17','-O3','-Xcompiler=-fPIC','--cudart=shared'])
+
+
+def verified_cuda():
+    manifest = dev.read(CUDA_BUILD/'manifest.json')
+    if manifest['recipe']!=cuda_recipe() or manifest['binary_sha256']!=dev.sha(CUDA_LIBRARY):
+        raise ValueError('Native Maxwell apply stale; run build-cuda')
+    return manifest
+
+
+def build_cuda():
+    CUDA_BUILD.mkdir(parents=True,exist_ok=True)
+    with (dev.BUILD/'build.lock').open('w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if (CUDA_BUILD/'manifest.json').exists() and CUDA_LIBRARY.exists():
+            try: verified_cuda()
+            except ValueError: pass
+            else:
+                print('Native Maxwell apply unchanged: cached library retained')
+                return
+        recipe = cuda_recipe()
+        settings = dev.read(dev.SETTINGS)
+        started = time.monotonic()
+        name = dev.builder(settings)
+        target = '/tmp/palace-maxwell-apply'
+        try:
+            with (CUDA_BUILD/'build.log').open('w') as log:
+                def execute(argv):
+                    remaining = 120-(time.monotonic()-started)
+                    if remaining<=0: raise TimeoutError('Native CUDA build exceeded 120s budget')
+                    dev.command(argv,stdout=log,stderr=subprocess.STDOUT,timeout=remaining)
+                execute(['podman','exec',name,'ccache','/usr/local/cuda/bin/nvcc',
+                             *recipe['flags'],'-arch=sm_'+settings['architecture'],'-c',
+                             '/src/palace/'+str(CUDA_SOURCE.relative_to(dev.ROOT)),'-o',target+'.o'])
+                execute(['podman','exec',name,'/usr/local/cuda/bin/nvcc','-shared','--cudart=shared',
+                             target+'.o','-o',target+'.so'])
+                execute(['podman','cp',name+':'+target+'.so',CUDA_LIBRARY])
+            if cuda_recipe()!=recipe: raise ValueError('CUDA source changed during build')
+            dev.write(CUDA_BUILD/'manifest.json',dict(recipe=recipe,binary_sha256=dev.sha(CUDA_LIBRARY),
+                                                    build_seconds=time.monotonic()-started))
+        finally:
+            subprocess.run(['podman','stop','--time','3',name],stdout=subprocess.DEVNULL,check=True)
+        print(json.dumps(verified_cuda(),indent=2))
 
 
 def environment():
@@ -91,11 +146,18 @@ def python_mounts(env, base):
     return [arg for source,target in mounts for arg in ['-v',f'{source}:{target}:ro']]
 
 
-def run(output,level,seconds,compression=False):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
+    if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
+    if physics not in ['pec','dielectric'] or (physics=='dielectric' and (compression or native)):
+        raise ValueError('Dielectric oracle is CPU dense only; compression applies to PEC')
+    if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
+    source = CASE if physics=='pec' else DIELECTRIC_CASE
     dev.require_host_memory()
     manifest = verified()
+    if native and not compression: raise ValueError('--native-apply requires --compression')
+    cuda = verified_cuda() if native else None
     output = Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     (BASE/'jit-cache').mkdir(exist_ok=True)
@@ -111,15 +173,19 @@ def run(output,level,seconds,compression=False):
             '-e','PYTHONPATH=/scripts',
             *python_mounts(ENV,base_python),
             '-v',f'{BASE/"jit-cache"}:/jit-cache','-v',f'{output}:/work',
-            '-v',f'{CASE}:/scripts/bempp_sphere.py:ro','-v',f'{REFERENCE}:/scripts/maxwell_reference.py:ro',
+            '-v',f'{source}:/scripts/case.py:ro','-v',f'{REFERENCE}:/scripts/maxwell_reference.py:ro',
             '-v',f'{COMPRESSION}:/scripts/maxwell_hmatrix.py:ro',
             *(['--device','nvidia.com/gpu=all'] if compression else []),
+            *(['-v',f'{CUDA_LIBRARY}:/native/libmaxwell_apply.so:ro'] if native else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
-            '-u','/scripts/bempp_sphere.py','--level',str(level),'--output','/work',
-            *(['--compression'] if compression else [])]
+            '-u','/scripts/case.py','--level',str(level),'--output','/work',
+            *(['--compression'] if compression else []),*(['--native-apply'] if native else []),
+            *(['--compression-eta',str(eta)] if physics=='pec' else []),
+            *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
-                                      case_sha256=dev.sha(CASE),reference_sha256=dev.sha(REFERENCE),
+                                      physics=physics,case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
+                                      native_cuda=cuda,
                                       scope='CPU Maxwell oracle, optional CUDA compressed apply; no antenna promotion'))
     started = time.monotonic()
     result = dict(complete=False,analytic_target_passed=False,level=level)
@@ -146,13 +212,18 @@ def run(output,level,seconds,compression=False):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['setup','check','run'])
+    parser.add_argument('action',choices=['setup','check','run','build-cuda'])
     parser.add_argument('output',type=Path,nargs='?')
     parser.add_argument('--level',type=int,default=1)
     parser.add_argument('--seconds',type=int,default=120)
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
+    parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
+    parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
+    parser.add_argument('--physics',choices=['pec','dielectric'],default='pec')
+    parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     args = parser.parse_args()
     if args.action=='setup': setup()
+    elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving)

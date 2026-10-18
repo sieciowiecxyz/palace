@@ -15,7 +15,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Hipoteza, mała drabina walidacji Maxwell, wstępne repozytoria i warunki odrzucenia.
 - [M2: Maxwell oracle i kompresja](maxwell-oracle.md)
   - Czytaj gdy: uruchamiasz PEC/Mie lub oceniasz pierwszy H-matrix CUDA apply
-  - Opis: Przypięte źródła/cache, zbieżność PEC PASS oraz mała oszczędność i wolny per-block apply; brak dielektryka/interfejsu.
+  - Opis: Przypięte źródła/cache, historyczne EXP23–24 PEC PASS i wolny per-block apply; dalsze wyniki w EXP25–29.
+- [M2: native CUDA i dielektryk](maxwell-native-dielectric.md)
+  - Czytaj gdy: wznawiasz aktualny prototyp lub planujesz interfejs FEM–BEM
+  - Opis: Dwa kernele FP64, hybrid GMRES, −17% danych operatora oraz PMCHWT/Mie i audyt błędu geometrii; brak promocji anteny.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

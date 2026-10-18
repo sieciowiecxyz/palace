@@ -2,6 +2,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1]/'experiments/bempp_oracle.py'
@@ -36,3 +37,21 @@ class PythonMountTests(unittest.TestCase):
             (env/'pyvenv.cfg').write_text(f'home = {root}/other/bin\n')
             with self.assertRaises(ValueError):
                 oracle.python_mounts(env,root/'base')
+
+
+class NativeManifestTests(unittest.TestCase):
+    def test_native_binary_and_recipe_are_both_verified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            library = root/'native.so'
+            library.write_bytes(b'cached binary')
+            recipe = {'source':'revision-a'}
+            oracle.dev.write(root/'manifest.json',dict(recipe=recipe,binary_sha256=oracle.dev.sha(library)))
+            with patch.object(oracle,'CUDA_BUILD',root),patch.object(oracle,'CUDA_LIBRARY',library),\
+                 patch.object(oracle,'cuda_recipe',return_value=recipe) as current:
+                self.assertEqual(oracle.verified_cuda()['recipe'],recipe)
+                current.return_value = {'source':'revision-b'}
+                with self.assertRaises(ValueError): oracle.verified_cuda()
+                current.return_value = recipe
+                library.write_bytes(b'changed binary')
+                with self.assertRaises(ValueError): oracle.verified_cuda()
