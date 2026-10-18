@@ -3,6 +3,9 @@
 
 #include "solver.hpp"
 
+#include <cstdio>
+#include <cstdlib>
+#include <string_view>
 #include "linalg/mumps.hpp"
 #include "linalg/rap.hpp"
 
@@ -147,6 +150,24 @@ void MfemWrapperSolver<ComplexOperator>::Mult(const ComplexVector &x,
 {
   if (pc->Height() == x.Size())
   {
+#if defined(MFEM_USE_CUDSS)
+    const char *hybrid_execute = std::getenv("PALACE_CUDSS_HYBRID_EXECUTE");
+    if (hybrid_execute && std::string_view(hybrid_execute) == "1" &&
+        dynamic_cast<const mfem::CuDSSSolver *>(pc.get()))
+    {
+      // cuDSS 0.7 hybrid execute accepts host dense vectors only for nrhs=1.
+      // This real preconditioner acts independently on the real/imaginary parts.
+      static const bool reported = []()
+      {
+        std::fprintf(stderr, "PALACE_CUDSS_SERIAL_RHS: enabled=1\n");
+        return true;
+      }();
+      (void)reported;
+      pc->Mult(x.Real(), y.Real());
+      pc->Mult(x.Imag(), y.Imag());
+      return;
+    }
+#endif
     mfem::Array<const Vector *> X(2);
     mfem::Array<Vector *> Y(2);
     X[0] = &x.Real();

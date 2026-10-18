@@ -50,13 +50,15 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Według bieżącego checkpointu 25 unittestów narzędzi PASS; pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Bieżący checkpoint raportuje 29 unittestów narzędzi PASS; pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
 Regresje snapshotów pokrywają SHA/format/nieukończone referencje, inną fizykę i pokrycie regionów oraz NaN/duplikaty. Rzeczywiste tiny testy: snapshot FP64→FP32, historyczne porównanie disk→resident (storage disk jest wycofany), domyślny background worker i kontrolowane B×1,02 (oczekiwany FAIL jakości). Native pliki E/B single-rank little-endian są chronione sprawdzaniem źródłowego config i zależności. Szczegóły: [kontrola pól](field-validation.md).
 
 Historyczne referencje/porównania dużej anteny z disk basis są **REJECT** według wymogu RAM/VRAM. Wcześniejszy resident FP32 attempt zatrzymał guard. Resident FP64 EXP12 ukończył jeden punkt i zapisał snapshoty, lecz raw relative residual wyniósł około 0,1253 i nie ma niezależnej referencji pól. Dwie późniejsze korekty full antenna EXP13/14 zakończyły się limitem 1800 s: brak kompletnego solve, S i kontroli pól. Ich niepełne `field-comparison.json` oznaczają brak pomiaru błędu, nie przekroczenie progu. Ostatni log z buforowanych runów nie potwierdza faktycznej końcowej iteracji; widoczna niepełna linia 140 nie jest licznikiem iteracji. Line-buffered replay na tiny przeszedł, ale nie jest wynikiem anteny. Nie zgłaszać zielonej kampanii ani promocji precyzji. Fazy mierzą logiczne managed allocations, nie fizyczną rezydencję. M1 pozostaje otwarty; szczegóły [audytu pamięci](memory-audit.md), [pomiaru faz](memory-phases.md) i [korekty referencji](reference-correction.md).
+
+Późniejsze opt-in profile CPU/cuDSS, `ComplexCoarseSolve` i zwalniania finalnego solvera są w [profilach referencji](reference-profiles.md). CPU tiny i zespolony coarse tiny przeszły filtry; pełny CPU replay zakończył się OOM, a full complex-coarse host guardem. Nie ma z nich końcowej jakości RF pełnej anteny ani promocji nowego defaultu.
 
 ## Analiza alokacji bez GPU
 

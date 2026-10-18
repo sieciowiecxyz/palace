@@ -28,6 +28,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M1: korekta referencji i wznowienie](reference-correction.md)
   - Czytaj gdy: oceniasz raw residual, warm start lub timeout pełnej korekty
   - Opis: Filtry RIGHT/ostrzejszy LEFT, dwa pełne deadline FAIL i logowanie bez opóźnionych linii.
+- [M1: profile referencji i coarse solve](reference-profiles.md)
+  - Czytaj gdy: oceniasz CPU/hybrid execute, dokładny complex coarse lub zwalnianie solvera
+  - Opis: EXP15–17, kwalifikacja tiny, pełne OOM/guard i następna hipoteza reprezentacji faktorów.
 - [Porównanie całych pól](field-validation.md)
   - Czytaj gdy: kwalifikujesz zmianę precyzji/pamięci względem referencji
   - Opis: FP64 snapshoty, normy energetyczne, zgodność wejść i odłączone runy.

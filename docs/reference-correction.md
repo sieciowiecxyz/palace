@@ -68,7 +68,8 @@ Lokalny runner jawnie ustawia `PALACE_LINE_BUFFERED_LOG=1`.
 Oddzielne stdout/stderr nadal zapobiegają przecinaniu diagnostyki.
 Końcowy `palace.log` nadal jest konkatenacją, nie wspólną chronologią.
 
-Nowy build8,298 s; 25 unittestów PASS. Replay
+Historyczny replay build8,298 s; wówczas 25 unittestów PASS. Bieżący
+checkpoint profilowania raportuje 29 unittestów narzędzi PASS. Replay
 `artifacts/m1-line-buffered-replay-tiny-20261018/`: complete=true,
 11,437 s, sześć zerowych iteracji i pełne checks/coverage/porównania pól.
 Potwierdza nowe logowanie i wznowienie; nie ustanawia nowego benchmarku anteny.
@@ -79,9 +80,9 @@ Nie ponawiać obecnych pełnych wariantów ani nie zmniejszać progu raw1e−6,
 aby zaliczyć próbę. Pozostaje dopuszczalna referencja **wykonania** FP64
 LEFT1e−6 z [EXP12](memory-phases.md), z raw≈0,125 i otwartą jakością.
 
-Przed kolejną pełną korektą: krótki profil preconditionera, libCEED i
-orthogonalizacji; źródłowa ocena wariantu referencyjnego CPU/RAM z cuDSS
-oraz liniowości i składowych residuum. GPU100% nie rozstrzyga, czy koszt to
-arytmetyka, migracje UVM czy inne oczekiwanie. Wnioski o przyczynie wymagają
-nowego pomiaru, nie samego timeoutu. Nie pomijać M2 FEM–BEM ani promować
-TF32/FP32/BF16 na podstawie małych filtrów.
+Późniejsze profile CPU/cuDSS, zespolonego coarse solve i finalnego release są
+zapisane w [reference-profiles.md](reference-profiles.md). CPU full replay
+został zabity przez OOM po ok.247,6s; complex-coarse full zatrzymał host guard
+po ok.399,8s. To nie są ukończone wyniki anteny. Małe filtry nie zamykają
+jakości EXP12 ani M1; nie pomijać M2 FEM–BEM i nie promować TF32/FP32/BF16
+na podstawie małych przypadków.

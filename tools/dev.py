@@ -271,8 +271,14 @@ def coax_geometry(name):
 
 
 def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size=None,
-                      initial_fields=False, linear_tol=None):
+                      initial_fields=False, linear_tol=None, cpu_reference=False,
+                      complex_coarse=False):
     """Explicit runtime diagnostics; never change a frozen fixture on disk."""
+    if cpu_reference:
+        config['Solver']['Device'] = 'CPU'
+        config['Solver']['Backend'] = '/cpu/self'
+    if complex_coarse:
+        config['Solver']['Linear'].update({'ComplexCoarseSolve': True, 'PCMatShifted': False})
     if linear_tol is not None:
         if (isinstance(linear_tol, bool) or not isinstance(linear_tol, (int, float))
                 or not math.isfinite(linear_tol)
@@ -377,6 +383,16 @@ def field_restart_applied(log, config):
             all(math.isfinite(float(n)) and float(n) >= 0 for s, f, n in matches))
 
 
+def cpu_reference_applied(log):
+    devices = re.findall(r'^Device configuration: ([^\n]+)', log, re.MULTILINE)
+    backends = re.findall(r'^libCEED backend: ([^\n]+)', log, re.MULTILINE)
+    actual = {v.strip() for v in devices[0].split(',')} if len(devices) == 1 else set()
+    return (bool(actual) and 'cpu' in actual and actual <= {'cpu', 'omp'}
+            and len(backends) == 1 and backends[0].startswith('/cpu/')
+            and log.count('CUDSS_HYBRID_EXECUTE: enabled=1\n') == 1
+            and log.count('PALACE_CUDSS_SERIAL_RHS: enabled=1\n') == 1)
+
+
 def field_comparisons(work, config):
     entries = [dict(excitation=int(e), frequency_index=int(f), region=int(r),
                     relative_E=float(a), relative_B=float(b))
@@ -444,7 +460,7 @@ def process_gpu_memory(pid):
         return None
 
 
-def memory_phase_report(log, solves, fields=False, release=False):
+def memory_phase_report(log, solves, fields=False, release=False, release_final=False):
     events, errors = [], []
     decoder = json.JSONDecoder()
     for line in log.splitlines():
@@ -475,6 +491,8 @@ def memory_phase_report(log, solves, fields=False, release=False):
         required.update({'field_diagnostics.begin': solves, 'field_diagnostics.end': solves})
     if release:
         required.update({'gmres.basis_release.begin': solves, 'gmres.basis_release.end': solves})
+    if release_final:
+        required.update({'linear_workspace_release.begin': 1, 'linear_workspace_release.end': 1})
     coverage = {label: sum(e['to'] == label for e in events) for label in required}
     complete = not errors and coverage == required
     return dict(complete=complete, events=events, required=required, coverage=coverage, errors=errors,
@@ -504,9 +522,12 @@ def verified_qpool(native):
 
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
-        initial_fields=None, krylov_size=None, linear_tol=None):
+        initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
+        phase_trace=False, complex_coarse=False, release_final_solver=False):
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
+    if cpu_reference and (ceed_qpool or basis != 'fp64' or complex_coarse):
+        raise ValueError('CPU reference requires FP64 basis without GPU Q-pool or complex-coarse profile')
     if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
                                        or not 16 <= hypre_pool_mib <= 4096):
         raise ValueError('HYPRE pool must be an integer from 16 to 4096 MiB')
@@ -515,7 +536,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
-                               bool(initial_fields), linear_tol)
+                               bool(initial_fields), linear_tol, cpu_reference, complex_coarse)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -547,12 +568,19 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
              'PALACE_CUDA_MANAGED': '1', 'PALACE_CUDSS_TRACK': '1',
              'PALACE_LINE_BUFFERED_LOG': '1',
              'PALACE_SKIP_ESTIMATOR': '1', 'PALACE_VERIFY_RESIDUAL': '1'}
+    if cpu_reference:
+        flags.update({'MFEM_MEMORY': 'host', 'PALACE_CUDSS_HYBRID_EXECUTE': '1',
+                      'OMP_NUM_THREADS': '8', 'OPENBLAS_NUM_THREADS': '1'})
+    if phase_trace:
+        flags['PALACE_PHASE_TRACE'] = '1'
     if hypre_pool_mib is not None:
         flags['PALACE_HYPRE_DEVICE_POOL_MIB'] = str(hypre_pool_mib)
     if memory_marks:
         flags['PALACE_MEMORY_MARKS'] = '1'
     if release_gmres_basis:
         flags['PALACE_RELEASE_GMRES_BASIS'] = '1'
+    if release_final_solver:
+        flags['PALACE_RELEASE_FINAL_SOLVER'] = '1'
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
     if allocation_trace:
@@ -573,7 +601,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
+            '--unsetenv', 'PALACE_RELEASE_FINAL_SOLVER',
             '--unsetenv', 'PALACE_LINE_BUFFERED_LOG',
+            '--unsetenv', 'PALACE_CUDSS_HYBRID_EXECUTE', '--unsetenv', 'PALACE_CUDSS_HYBRID_MIB',
+            '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -598,7 +629,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
                                                   'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
                                                   'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
-                                                  'release_gmres_basis': release_gmres_basis},
+                                                  'release_gmres_basis': release_gmres_basis,
+                                                  'release_final_solver': release_final_solver},
+                                   'cpu_reference': cpu_reference,
+                                   'phase_trace': phase_trace,
                                    'initial_fields': str(initial) if initial else None,
                                    'initial_fields_metadata_sha256': sha(initial/'fields.json') if initial else None,
                                    'actual_config_sha256': sha(output / 'config.json')})
@@ -647,6 +681,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         inspected = read_output(['podman', 'inspect', container])[0]
         write(output / 'container-state.json', inspected['State'])
         status.update(validate_output(output, config, returncode))
+        if cpu_reference:
+            status['cpu_reference_applied'] = cpu_reference_applied((output/'palace.log').read_text())
+            status['complete'] = status['complete'] and status['cpu_reference_applied']
         status['line_buffered_log_applied'] = ((output/'palace.stderr.log').read_text()
                                               .count('PALACE_LOG_BUFFERING: stdout=line\n') == 1)
         status['complete'] = status['complete'] and status['line_buffered_log_applied']
@@ -655,10 +692,15 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['complete'] = status['complete'] and status['field_restart_applied']
         if memory_marks:
             phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
-                                         bool(save_fields or reference), release_gmres_basis)
+                                         bool(save_fields or reference), release_gmres_basis,
+                                         release_final_solver)
             write(output/'memory-phases.json', phases)
             status['memory_marks_passed'] = phases['complete']
             status['complete'] = status['complete'] and phases['complete']
+        if release_final_solver:
+            status['final_solver_released'] = ((output/'palace.log').read_text()
+                                               .count('PALACE_FINAL_SOLVER_RELEASED: enabled=1\n') == 1)
+            status['complete'] = status['complete'] and status['final_solver_released']
         if release_gmres_basis:
             releases = re.findall(r'PALACE_GMRES_BASIS_RELEASED: vectors=(\d+) logical_fp64_bytes=(\d+)',
                                   (output/'palace.log').read_text())
@@ -726,6 +768,7 @@ def main():
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
+    r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
     r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
     r.add_argument('--allocation-trace', action='store_true', help='Trace large UVM allocations and caller stacks; diagnostic only')
@@ -739,6 +782,9 @@ def main():
     r.add_argument('--initial-fields', type=Path, help='Verified same-mesh snapshot input, read once per solve as initial E')
     r.add_argument('--krylov-size', type=int, help='Explicit diagnostic GMRES restart size, 1..240; leaves medium mesh/tolerance unchanged')
     r.add_argument('--linear-tol', type=float, help='Stricter reference tolerance, 1e-14 up to fixture Tol; leaves spatial medium unchanged')
+    r.add_argument('--cpu-reference', action='store_true', help='Experimental FP64 host FEM/GMRES with cuDSS hybrid execute; not the CUDA baseline')
+    r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
+    r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
     sub.add_parser('status')
@@ -775,7 +821,8 @@ def main():
             return
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
-            args.initial_fields, args.krylov_size, args.linear_tol)
+            args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
+            args.complex_coarse, args.release_final_solver)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

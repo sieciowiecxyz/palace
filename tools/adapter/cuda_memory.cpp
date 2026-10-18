@@ -122,7 +122,19 @@ extern "C" void PalaceMemoryMark(const char *label) {
 extern "C" cudssStatus_t cudssConfigCreate(cudssConfig_t *config) {
   static auto fn=next<decltype(&cudssConfigCreate)>("cudssConfigCreate");
   auto status=fn(config);
-  if(status!=CUDSS_STATUS_SUCCESS || !hybrid())return status;
+  if(status!=CUDSS_STATUS_SUCCESS)return status;
+  if(flag("PALACE_CUDSS_HYBRID_EXECUTE")) {
+    if(hybrid()) {
+      std::fprintf(stderr,"Hybrid execute and hybrid memory cannot be combined in this profile.\n");
+      cudssConfigDestroy(*config);return CUDSS_STATUS_INVALID_VALUE;
+    }
+    int enabled=1;
+    status=cudssConfigSet(*config,CUDSS_CONFIG_HYBRID_EXECUTE_MODE,&enabled,sizeof(enabled));
+    if(status!=CUDSS_STATUS_SUCCESS)cudssConfigDestroy(*config);
+    else std::fprintf(stderr,"CUDSS_HYBRID_EXECUTE: enabled=1\n");
+    return status;
+  }
+  if(!hybrid())return status;
   char *end=nullptr;
   auto mib=std::strtoull(std::getenv("PALACE_CUDSS_HYBRID_MIB"),&end,10);
   if(*end || mib<256 || mib>16384) {

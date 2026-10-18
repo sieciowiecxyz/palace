@@ -38,7 +38,8 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] Zbadać lifetime i przygotować izolowany Q-pool: oryginalne assembly/passive zachowane, sync przed/po, mały probe PASS; docs/ceed-qpool.md.
 - [x] Q-pool przeszedł coax/TEM, lecz zwiększył logical UVM peak w coax-tiny o 5,8% i nie zmniejszył sampled VRAM; brak promocji.
 - [x] Osobny seed HYPRE 256 MiB: coax/TEM PASS, sampled VRAM procesu niższy o 3,75 GiB na małym fixture, porty/energie zgodne; pełna antena niezakwalifikowana.
-- [ ] Rozdzielić peak pamięci faz solve i postprocessingu przez jawne znaczniki. Historyczny peak 45 GiB wyzwoliło `CompareFieldSnapshots`; nie jest to dowód peak samego GMRES. Oszacować RAM/VRAM przed referencją FP64 rezydującą wyłącznie w pamięci.
+- [x] Rozdzielić fazy solve/postprocessingu: EXP12 resident FP64 i jawne znaczniki; zwalnianie bazy GMRES oraz opt-in finalnego solvera. Zysk lifetime zweryfikowany na tiny, pełne complex-coarse EXP17 zatrzymane guardem (bez promocji).
+- [ ] Zmniejszyć koszt dokładnego coarse solve: zbadać native FP64 complex N×N zamiast realnego bloku 2N×2N; najpierw mały probe cuDSS i normy, potem coax/TEM. Nie powtarzać EXP17 ani podnosić cap/guard.
 
 - [x] Dodać osobne logowanie raw/LEFT residual i sprawdzić wpływ strony preconditionera na znanym TEM.
 - [x] Przygotować szybki coax-tiny oraz porównanie analitycznego E/B i całego L2, jawnie oddzielone od anteny.

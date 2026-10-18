@@ -1,0 +1,65 @@
+# M1 — profile referencji i coarse solve
+
+2026-10-18. Eksperymenty opt-in, bez promocji defaultów ani zakończenia M1.
+Medium przestrzenne i równanie A pozostają bez zmian. Rejestr i ścieżki
+artefaktów: [PROGRESS](../PROGRESS.md), EXP15–17.
+
+## Opcje i granice
+
+- `--cpu-reference`: Device CPU, backend `/cpu/self`, host MFEM,
+  8 wątków OMP i 1 BLAS; FP64 baza i cuDSS hybrid **execute**.
+  To inny tryb niż hybrid **memory**; ich łączenie jest odrzucane.
+  Nie łączymy tego profilu z Q-pool ani complex-coarse.
+- W przypiętym cuDSS0.7 host dense vectors w execute wymagają nrhs=1.
+  Dlatego realny coarse wrapper wykonuje oddzielne solve real/imag zamiast
+  ArrayMult2. Runner wymaga markerów rzeczywistego CPU/backend/execute/serialRHS.
+  Pierwsza próba nrhs2 pozostała FAIL/NOT_SUPPORTED, nie jest wynikiem RF.
+- `--complex-coarse`: istniejące upstream ComplexCoarseSolve=true,
+  PCMatShifted=false. Wrapper rozwiązuje blok `[Ar Ai; Ai −Ar]`
+  dla `[xr;−xi]`. Oryginalny operator A i precyzja FP64 pozostają.
+- `--release-final-solver`: tylko fixed-mesh uniform sweep; po ostatnim
+  rzeczywistym solve i kontroli residuum zapisuje metadata, niszczy solver
+  przed A/P/A2/K/C/M. Zachowuje Curl, pola i przestrzenie do postprocess.
+  Marker występuje raz, także przy wielu portach/freq; fazy opcjonalne przez
+  `--memory-marks`. AMR/adaptive niezakwalifikowane.
+- `--phase-trace`: istniejące nested BlockTimer/NVTX, host monotonic intervals,
+  bez dodatkowego GPU sync. Czas coarse mieści się w czasie preconditionera.
+  To nie jest pomiar samych kerneli.
+
+## Dowody
+
+| Próba | Wynik | Ograniczenie |
+|---|---|---|
+| CPU RIGHT tiny | 6/6,19,678s,233iteracji; S/pola zgodne z GPU | Wolniej niż mały GPU run |
+| CPU TEM | 2/2,19,843s; E/B L2<1% | Nie kwalifikuje anteny |
+| CPU full replay | OOM,247,6s,cap60GiB | Brak S/pól, brak promocji |
+| Complex-coarse tiny | 153iteracje vs233 (−34,3%),12,534s | Faktory167,9MB vs61,5MB (2,732×) |
+| Final release tiny | 6/6,12,567s; E/B różnica≤1,508e−13 | Oddaje258,9MB przed postprocess; wcześniejszy global peak nie spadł |
+| Complex-coarse full | Host guard,399,828s,iter16 | Faktory30,64GB; brak końcowych raw/S/pól |
+
+Tiny complex-coarse raw relative względem RHS≤9,101e−7. Root przeliczył
+S z dB/stopni na liczby zespolone: |ΔS|≤2,511e−8, ΔVSWR≤2,641e−8,
+Δmocy≤2,952e−8; względna różnica energii≤1,277e−7, E/B≤2,286e−7.
+Final release zmienił CSV jedynie na poziomie zaokrągleń (nie bitwise).
+
+Full guard: exit137, OOMKilled=false, cgrouppeak61,55GB. Ostatni wypisany
+residual1,339e−2 jest rekurencyjny, nie końcowy raw. Managed HWM49,0GB
+pochodzi z ostatniego markera **sprzed** GMRES; nie znamy terminalnego
+managed peak. CuDSS już zawiera się w managed; nie sumować tych liczników.
+Nie uruchomiono ponownie tego samego wariantu ani nie podniesiono limitów.
+
+## Następna hipoteza — NOT RUN
+
+Sprawdzić bezpośredni coarse FP64 complex N×N zamiast realnego2N×2N.
+Najpierw mały znany układ, re-factor/RHS/cleanup i residuum, potem coax/TEM.
+Nie zakładamy oszczędności przed pomiarem. Dla Maxwell complex-symmetric
+nie wolno bez dowodu użyć Hermitian; punktem startowym jest GENERAL.
+
+Źródła sprawdzone2026-10-18: pinned MFEM4.9 `linalg/cudss.cpp` oraz
+`palace/linalg/solver.cpp`, NVIDIA/cuDSS0.7 w archiwum CUDA12.9.1:
+[hybrid execute](https://docs.nvidia.com/cuda/archive/12.9.1/cudss/advanced_features.html),
+[typy i ograniczenia](https://docs.nvidia.com/cuda/archive/12.9.1/cudss/types.html).
+API cuDSS nie należy utożsamiać z najnowszą wersją dokumentacji.
+
+Pamięć robocza wyłącznie RAM/VRAM, bez scratch/offload/swap na dysk.
+Cała niezależna kontrola jakości anteny pozostaje otwarta.

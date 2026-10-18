@@ -12,6 +12,42 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_complex_coarse_preserves_operator_and_explicitly_disables_shift(self):
+        _, info, config = dev.fixture('coax-tiny')
+        original = json.loads(json.dumps(config))
+        updated = dev.diagnostic_config('coax-tiny', config, complex_coarse=True)
+        self.assertTrue(updated['Solver']['Linear']['ComplexCoarseSolve'])
+        self.assertFalse(updated['Solver']['Linear']['PCMatShifted'])
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        self.assertEqual(dev.field_identity(updated, info, build), dev.field_identity(original, info, build))
+        with patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
+            with self.assertRaises(ValueError):
+                dev.run('coax-tiny', '/unused', 60, basis='fp64', cpu_reference=True, complex_coarse=True)
+
+    def test_cpu_reference_requires_real_host_device_backend_and_one_execute_marker(self):
+        log = ('Device configuration: omp,cpu\nlibCEED backend: /cpu/self/avx/blocked\n'
+               'CUDSS_HYBRID_EXECUTE: enabled=1\nPALACE_CUDSS_SERIAL_RHS: enabled=1\n')
+        self.assertTrue(dev.cpu_reference_applied(log))
+        self.assertFalse(dev.cpu_reference_applied(log.replace('omp,cpu', 'cuda,omp,cpu')))
+        self.assertFalse(dev.cpu_reference_applied(log.replace('/cpu/self/avx/blocked', '/gpu/cuda/magma')))
+        self.assertFalse(dev.cpu_reference_applied(log.replace('enabled=1', 'enabled=0')))
+        self.assertFalse(dev.cpu_reference_applied(log.replace('PALACE_CUDSS_SERIAL_RHS: enabled=1\n', '')))
+        self.assertFalse(dev.cpu_reference_applied(log + log))
+
+    def test_cpu_reference_is_explicit_same_physics_and_rejects_other_precision(self):
+        _, info, config = dev.fixture('coax-tiny')
+        original = json.loads(json.dumps(config))
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        updated = dev.diagnostic_config('coax-tiny', config, cpu_reference=True)
+        self.assertEqual(updated['Solver']['Device'], 'CPU')
+        self.assertEqual(updated['Solver']['Backend'], '/cpu/self')
+        self.assertEqual(dev.field_identity(updated, info, build), dev.field_identity(original, info, build))
+        with patch.object(dev, 'verified_build', side_effect=AssertionError('must not start')):
+            with self.assertRaisesRegex(ValueError, 'requires FP64'):
+                dev.run('coax-tiny', '/unused', 60, cpu_reference=True)
+            with self.assertRaisesRegex(ValueError, 'without GPU'):
+                dev.run('coax-tiny', '/unused', 60, basis='fp64', cpu_reference=True, ceed_qpool=True)
+
     def test_explicit_restart_controls_preserve_physics_and_require_field_coverage(self):
         _, info, config = dev.fixture('coax-tiny')
         original = json.loads(json.dumps(config))
@@ -76,6 +112,7 @@ class ToolRegressionTests(unittest.TestCase):
         def log(items):
             return '\n'.join('interleaved stdout PALACE_MEMORY_PHASE ' + json.dumps(e) for e in items)
         self.assertTrue(dev.memory_phase_report(log(events), 1, fields=True, release=True)['complete'])
+        self.assertFalse(dev.memory_phase_report(log(events), 1, release_final=True)['complete'])
         self.assertFalse(dev.memory_phase_report(log(events[:-1]), 1, fields=True, release=True)['complete'])
         self.assertFalse(dev.memory_phase_report(log(events), 2, fields=True, release=True)['complete'])
         broken = json.loads(json.dumps(events))
@@ -84,6 +121,28 @@ class ToolRegressionTests(unittest.TestCase):
         broken = json.loads(json.dumps(events))
         broken[5]['from'] = 'wrong phase'
         self.assertFalse(dev.memory_phase_report(log(broken), 1, fields=True, release=True)['complete'])
+
+    def test_final_workspace_phase_is_required_exactly_once(self):
+        labels = ['setup.begin', 'setup.end', 'operators.begin']
+        solve = ['preconditioner.begin', 'preconditioner.end', 'gmres.begin', 'gmres.end']
+        post = ['postprocess.begin', 'postprocess.end']
+        labels += solve + post + solve + ['linear_workspace_release.begin',
+                                         'linear_workspace_release.end'] + post + ['driven.end']
+        def report(names):
+            previous = 'unmarked'
+            events = []
+            for i, label in enumerate(names):
+                events.append('PALACE_MEMORY_PHASE ' + json.dumps(dict(
+                    to=label, **{'from': previous}, t_s=i, elapsed_s=1,
+                    managed_live_bytes=10, managed_interval_peak_bytes=20,
+                    managed_process_peak_bytes=30, cudss_live_bytes=5)))
+                previous = label
+            return dev.memory_phase_report('\n'.join(events), 2, release_final=True)
+        self.assertTrue(report(labels)['complete'])
+        self.assertFalse(report(labels[:-1])['complete'])
+        doubled = labels[:-1] + ['linear_workspace_release.begin',
+                                 'linear_workspace_release.end', 'driven.end']
+        self.assertFalse(report(doubled)['complete'])
 
     def test_process_gpu_memory_uses_only_own_pid_and_real_units(self):
         query = type('Query', (), dict(returncode=0, stdout='9, 4000\n42, 256\n'))()

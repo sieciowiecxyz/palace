@@ -104,7 +104,12 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   // Set up the linear solver.
   // The operators are constructed for each frequency step and used to initialize the ksp.
-  ComplexKspSolver ksp(iodata, space_op.GetNDSpaces(), &space_op.GetH1Spaces());
+  auto ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
+                                               &space_op.GetH1Spaces());
+  const char *release_env = std::getenv("PALACE_RELEASE_FINAL_SOLVER");
+  const bool release_final_solver = release_env && std::string(release_env) == "1";
+  MFEM_VERIFY(!release_final_solver || iodata.model.refinement.max_it == 0,
+              "Final solver release requires fixed mesh (AMR disabled)!");
 
   // Set up RHS vector for the incident field at port boundaries, and the vector for the
   // first frequency step.
@@ -192,7 +197,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                                         K.get(), C.get(), M.get(), A2.get());
       auto P = space_op.GetPreconditionerMatrix<ComplexOperator>(
           1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, omega);
-      ksp.SetOperators(*A, *P);
+      ksp->SetOperators(*A, *P);
       MemoryMark("preconditioner.end");
 
       Mpi::Print(
@@ -225,8 +230,26 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       Mpi::Print("\n");
       MemoryMark("gmres.begin");
-      ksp.Mult(RHS, E);
+      ksp->Mult(RHS, E);
       MemoryMark("gmres.end");
+
+      // No later solve needs this workspace. Destroy the solver before its referenced
+      // operators, retaining Curl, fields and spaces for postprocessing.
+      if (release_final_solver && excitation_counter == port_excitations.Size() &&
+          omega_i + 1 == omega_sample.size())
+      {
+        MemoryMark("linear_workspace_release.begin");
+        SaveMetadata(*ksp);
+        ksp.reset();
+        A.reset();
+        P.reset();
+        A2.reset();
+        K.reset();
+        C.reset();
+        M.reset();
+        Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
+        MemoryMark("linear_workspace_release.end");
+      }
 
       MemoryMark("postprocess.begin");
       // Start Post-processing.
@@ -283,7 +306,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
     // Final postprocessing & printing.
     BlockTimer bt0(Timer::POSTPRO);
-    SaveMetadata(ksp);
+    if (ksp) SaveMetadata(*ksp);
   }
   post_op.MeasureFinalize(indicator);
   return indicator;

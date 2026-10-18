@@ -14,6 +14,7 @@ Aktualizacja: 2026-10-18. Mode: goal, Active: M1. [PLAN](PLAN.md), [MILESTONES](
 - Nowa referencja wykonania anteny **FP64 resident-only** ukończona: 1089,964 s, 151 iteracji, VSWR P2@3,50 GHz=1,672123; snapshot E/B kompletny. Cgroup peak57,72 GiB, logical managed54,74 GiB, sampled GPU procesu4,89 GiB. Artefakt `artifacts/m1-antenna-resident-fp64-20261018/`; niezależna jakość anteny nadal otwarta, więc nie jest to kwalifikowana referencja dokładności.
 - Trace alokacji dużej anteny pozostaje materiałem audytowym. Ostatni disk run miał cgroup peak 49,24 GiB, logical managed high-water ~45,17 GiB i cuDSS peak 7,52 GiB; telemetry obejmowała także globalny desktop. Nie traktować tych danych jako budżetu resident wariantu ani czystego benchmarku.
 - Otwarta kwestia jakości: raw residual ~0,125 różni się od stopping norm LEFT. Kontrole TEM i całych pól na małym coaxie przechodzą, ale nie dowodzą poprawności fizycznej ani błędu pełnej anteny.
+- EXP15–17: CPU/reference tiny+TEM PASS, fullCPU OOM; complex-coarse tiny233→153iteracji i jakościowoPASS, ale full guard po399,828s (cuDSS30,64GB). Final solver release zwalnia258,9MB na tiny bez zmiany numeryki; pełny zysk niezmierzony. Następna hipoteza: native complex FP64coarse zamiast realnego2Nbloku; najpierw małyprobe, bez ponownego dużegorunu.
 
 ## Rejestr eksperymentów
 
@@ -33,7 +34,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. Zamrozić nową referencję wykonania FP64 resident, nie kwalifikować jej automatycznie: raw0,125267 vs LEFT stopping9,956e−7.
-2. RIGHT/K64 i ostrzejszy LEFT/K128 przeszły małe filtry, lecz pełne korekty przerwał deadline. Nie ponawiać ich bez nowej diagnozy. Następnie krótki profil preconditionera/CEED/orthogonalizacji z logiem liniowym oraz źródłowa ocena alternatywnej referencji CPU/RAM i składowych residuum; szczegóły w docs/reference-correction.md.
+2. Nie powtarzać pełnych EXP13/14(deadline), EXP15(CPU OOM) ani EXP17(guard) bez zmiany algorytmu/reprezentacji. Zbadać native complex-coarse FP64 N×N; zacząć od małego znanego układu i re-factor/RHS/cleanup, następnie coax/TEM. Szczegóły i źródła pinnedcuDSS w docs/reference-profiles.md. Nie zakładać 2×oszczędności ani nie mylić complex-symmetric z Hermitian.
 3. Po zamknięciu jakości wykorzystać profil: setup54,85 s, GMRES950,96 s, z tego timery preconditionera603,23 s i coarse79,57 s; baza155 wektorów zajmuje logicznie27,82 GB. Nie mylić całego solve z samym coarse/cuDSS.
 4. Zamknąć M1 przed obowiązkowym prototypem Maxwell FEM–BEM/MoM; M2 i dalsze etapy nie są pomijane.
 
@@ -140,3 +141,53 @@ Dodano jawny PALACE_LINE_BUFFERED_LOG w lokalnym runnerze: native main ustawia l
 Dalszy kierunek M1: bez kolejnych30-minutowych prób w ciemno. Krótki profil preconditioner/CEED/orthogonalizacja przy wczesnych iteracjach z wiarygodnym logiem; sprawdzić w źródłach, czy niezależna referencja FP64 na CPU RAM może uniknąć thrashingu UVM i jaki jest koszt transferu do cuDSS. Osobno sprawdzić liniowość/złożenie preconditionera oraz rozkład residuum (w tym gradient/charge), zanim dobierzemy korektę. To hipotezy NOT RUN, nie przyczyny potwierdzone. M1 nadal blokuje promocję precyzji i M2, ale nie pomijamy obowiązkowego FEM–BEM.
 
 Końcowa regresja logów/replay PASS: `artifacts/m1-line-buffered-replay-tiny-20261018/`,11,437s,6×0iter, markerlinebuffer/restart/pola/fazy wszystkie true. Żadna pełna symulacja obecnie nie działa. [Wyniki EXP13/14 i ograniczenia](docs/reference-correction.md).
+
+
+## EXP15 — źródłowo potwierdzony CPU/RAM reference + cuDSS hybrid execute (PLANNED)
+
+Przegląd przypiętego MFEM4.9.0 `linalg/cudss.cpp`: CuDSSSolver::ArrayMult przekazuje RHS.Read()/SOL.Write(), więc ich miejsce zależy od MFEM Device. Dokumentacja odpowiadająca CUDA12.9.1 potwierdza host pointers dla CUDSS_CONFIG_HYBRID_EXECUTE_MODE, odróżniając go od HYBRID_MODE przechowującego faktory w RAM: https://docs.nvidia.com/cuda/archive/12.9.1/cudss/types.html . Sprawdzony kod GMG zeruje initial guess przy pierwszym presmooth; nie dowodzi to pełnej liniowości, ale nie ma podstaw do twierdzenia, że carryover jest potwierdzoną przyczyną.
+
+Nowa hipoteza przed rozbudową mikrobenchmarku: CPU libCEED i FP64 GMRES w RAM + coarse cuDSS hybrid execute mogą uniknąć GPU-UVM working set wielokrotnie większego od16GiB. To wariant REFERENCYJNY M1, nie porzucenie celu CUDA ani promocja produkcyjna. Dodano opt-in --cpu-reference: DeviceCPU,Backend/cpu/self,MFEM_MEMORYhost,8OMP/1OpenBLAS thread, FP64basis, cuDSS execute1. GPU default bez zmian. Niedozwolone FP32basis i GPUQpool wtymtrybie; hybridexecute i hybridmemory nie łączymy. Runner wymaga rzeczywistych markerów CPU backendu i cuDSSexecute, nie ufa samej fladze. --phase-trace włącza istniejący BlockTimer/NVTX trace; osobne logi i linebuffer pozostają. Pamięć robocza wyłącznie RAM/VRAM, CUDAalokacje cuDSS nadal śledzone, brak offloadu/swap.
+
+Cached build8,973s,27unittestów PASS. Najpierw CPU tiny RIGHT warm z LEFTinput i GPU RIGHTfield-reference,6solve, limit120s; raw≤1e−6 i te same progi K.4. Następnie tylko poPASS CPU knownTEM RIGHT/L2,2solve,limit120s,analityczneE/B≤1%. Te krótkie próby jednocześnie sprawdzają zgodność cuDSS0.7.1.4 i hostpointer, zanim wydamy czas na pełną antenę. Dopiero po rootanalizie dobrać jedną dużą kontrolę. Osobny pomiar A/P i liniowości pozostaje dalszą możliwością, nie został zaimplementowany ani uznany za wykonany.
+
+
+EXP15 pierwszy tiny **FAIL** po3,245s,code4=NOT_SUPPORTED na coarseSOLVE,beziteracji. CPU/backend/execute markery były obecne; nie mylić poprawnego wybrania trybu z ukończeniem solve. Przyczyna źródłowo ustalona: `MfemWrapperSolver<ComplexOperator>::Mult` wysyła nrhs=2 (real+imag), a archiwalna dokumentacja odpowiadająca cuDSS0.7 pozwala hostowe dense vectors tylko dla nrhs=1 (https://docs.nvidia.com/cuda/archive/12.9.1/cudss/advanced_features.html). To nie ogólny brak obsługi CPU ani OOM.
+
+Konkretna poprawka przed retry: tylko gdy PALACE_CUDSS_HYBRID_EXECUTE=1 i wrapper używa mfem::CuDSSSolver o rozmiarzeN dla zespolonegoN, wykonujemy dwa niezależne Mult po1RHS. Realny preconditioner algebraicznie działa osobno na real/imag; default ArrayMult2 na CUDA pozostaje. Runner wymaga markera faktycznego przejścia serialRHS. Nie patchujemy/rebudujemy zależnego MFEM. Filtr z nowym sufiksemr2 i znanym patchem, potemTEMwyłączniepoPASS;brakpełnegoGPUretry. 27unittestówPASS.
+
+
+EXP15 r2 oba filtry PASS po serialRHS fix. CPU RIGHT warm tiny19,678s,40/38/37/41/39/38iter; actual raw RELATIVEmax9,7803867e−7 (wartość2,3343e−7 to ABSOLUTE, nie relative). Względem GPU RIGHT max|ΔS|9,156e−16,ΔVSWR1,333e−15,energia0; polaE≤1,934e−14/B≤1,508e−13. Rootanaliza i SHA w `artifacts/m1-cpu-right-tiny-r2-20261018/root-analysis.json`. TEM CPU19,843s,62/64iter; rawrelative8,5273e−7/9,0263e−7, E_L2q6≈0,49531%,B≈0,45578%,oba<1%. Konfiguracjaaktualniefaktycznieomp,cpu/host-std/cpuavx,execute1/serialRHS1. TinyCPU nie jest szybsze od dawnego GPUtiny; to walidacja alternatywnej referencji, nie speedup. Cgroup756/821MB i sampledGPU245MB to mały przypadek, nie budżet pełnej anteny.
+
+Następny POMIAR workset z limitem300s: `python3 tools/dev.py run tshaped-medium artifacts/m1-cpu-antenna-replay-20261018 --seconds 300 --basis fp64 --cpu-reference --hypre-pool-mib 256 --release-gmres-basis --memory-marks --phase-trace --pc-side left --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --field-reference artifacts/m1-antenna-resident-fp64-20261018 --background`. Oczekiwanie0iter jak przy replaytiny, oryginalneTol1e−6 iK240,beznowejreferencjidokładności. Porównaniepól/RFdozaładowanegowynikupotwierdza przeliczenietego samegoFEM,nierozstrzygaraw0,125. PomiarbaseworksetitimerówpierwszychA/P pozwoli dobraćK dlawiarygodnejkontroliprzednastępnąpełnąkorektą. Cgroup60GiB/guard6GiB bez zmian,poFAILstop. Brakpaidcompute/offloadu/swap,niezmieniamyźródełwczasierunu.
+
+
+EXP15 CPU large replay **FAIL/cgroup OOM** po247,6s, exit137 iOOMKilled=true, nie deadline ani hostguard. Osiągnięto0iter i rawRELATIVE0,1252666005, lecz brakS/pólkońcowych;niekwalifikować. Ostatni zaobserwowany cgroupHWM63,102GB(~58,77GiB), próbkowanie może nie uchwycić chwilowego szczytu przedOOM przycap60GiB; minhostavail7,47GiB>guard6. Managedpeak8,901GB nie obejmuje CPUheap; nie sumować z cgroup. Telemetria: około30GiB przedGMRES, około40GiB po pierwszych aplikacjachP, szybkiwzrost>58GiB przy postprocess. To mierzalnie wyklucza prostąCPUreferencję wtymprofilubezmodyfikacjipamięci.
+
+Krótki profile trace dał dwie inkluzywne aplikacjeP13,616/12,464s;coarse1,182/0,133s zawiera się wP. PozostałyczasP≈12,43/12,33s,jednak dwa różneinputy i warmupnie są benchmarkiemmedianowym. CPU nie promować: fullOOM i brakprzewagiczasu. Napotkaneproblemy nieuzasadniają zwiększaniacap/guard ani powtarzaniapełnychrunów. Rootanaliza+SHAw artifact/root-analysis.json. OsobnytestliniowościA/P nadalNOTRUN.
+
+## EXP16 — dokładny zespolony coarse solve (TINY FILTER PASS)
+
+Kod currentMfemWrapperSolver<ComplexOperator>::SetOperator przy ComplexCoarseSolve=false tworzy realAr+Ai; przytrue tworzy równoważny rzeczywisty blok [Ar Ai;Ai −Ar] i odtwarza znak imag. To istniejąceAPIupstream, nie nowysolverani zmianarównaniaA. Hipoteza: lepsza reprezentacja fazy coarse zmniejszy liczbę iteracji RIGHT do wiarygodnego raw, kosztemwiększychfaktorów. Nowyopt-in --complex-coarse wymusza ComplexCoarseSolvetrue/PCMatShiftedfalse,inneparametrymediumbez zmian. Na razieniełączymyCPUprofile (niekwalifikowanekombinacje),GPUdefault bez zmian.
+
+Najpierwten sam GPUtinyRIGHTwarm6solve coEXP13/K128,limit120s,FP64/seed256/release/marks/trace,inputLEFTold,referenceGPURIGHT. Qualitygates:raw≤1e−6,complexS≤1e−3,VSWR≤0,01,energia/power≤1e−3,polaE/B≤1%. Promisingfilterprzedjakąkolwiekpełnąpróbą: suma iteracji≤70% z233w zwykłymRIGHTwarm i faktorpeak≤3×tinydefault. To filtrkosztu, nie gwarancja skalowania dużejanteny. Jeśli nieprzejdzie, zapisaćodrzuceniei nie uruchamiać dużej. 28unittestówPASS,zmianyrunnera nie wymagająprzebudowynative.
+
+
+EXP16 tiny RIGHT **PASS filtr**, nie promocja anteny: 153 iteracje vs233 (−34,3%), 12,534s; raw relative≤9,101e−7. Root sprawdził S z prawidłowym przeliczeniem dB/stopnie→complex (nie Re/Im): max|ΔS|2,511e−8, ΔVSWR2,641e−8, Δpower2,952e−8, względna energia1,277e−7. PolaE≤2,240e−7/B≤2,286e−7. FaktorycuDSS167934380B vs61473620B, 2,732×: mieści filtr≤3×, ale większa antena może mieć inny fill. Rootanaliza+SHA w artifacts/m1-complex-coarse-right-tiny-20261018/root-analysis.json.
+
+## EXP17 — zwolnienie finalnego solvera (TINY PASS, FULL GUARD)
+
+Opt-in --release-final-solver tylko fixed-mesh uniform sweep. Po ostatnim rzeczywistym porcie/freq i kompletnych kontrolach GMRES zapisuje metadata, niszczy KSP (z faktorami) przed A/P/A2/K/C/M; zachowuje Curl, E/B, RHS, przestrzenie i materiały potrzebne pomiarom. Default bez zmiany matematyki/lifetime; brak AMR/adaptive qualification. Marker dokładnie1× i opcjonalne fazy linear_workspace_release.begin/end. Cel: nie trzymać martwych faktorów podczas dużych buforów pomiaru pól. Nie ograniczamy jakości, nie wyłączamy walidacji pól. Pamięć wyłącznie RAM/VRAM, bez dyskowego workspace/swap.
+
+Build cached9,635s,29unittestówPASS. Pierwszy filtr: ten samtiny6solveRIGHT/FP64/K128/complexcoarse, dodane release-final-solver; reference pola z EXP16. Tolerancje RF jakEXP16; identyczne iteracje i S/energie oczekiwane, tylko zmiana lifetime. Jeśli FAIL stop. Dopiero poPASS jeden full GPU RIGHT/complexcoarse/K64,1800s,cap60GiB/guard6GiB,initial/referenceEXP12. Warmstart nie dowodzi jakości referencji; raw≤1e−6 i pola/RF pozostają wymagane. Szacunek pamięci nie jest dowodem dopasowania pełnego przypadku.
+
+
+EXP17 tiny **PASS**: identyczne153iteracje,12,567s, raw≤9,101e−7. Pola względemEXP16 E≤3,069e−15/B≤1,508e−13. Root CSV: max zmiana S w jednostkach dB/stopnie2,501e−10, I4,801e−18A,V2,411e−16V, energia0; zgodność do zaokrągleń, nie bitwise. Final release dokładnie1×: managed386820886→127942182B (−258878704B); cuDSS167934380→0B. Peak tiny nie zmniejszył się (występuje wcześniej), więc nie obiecywać redukcji globalpeak. Cgroup578367488B/GPU631242752B. Rootanaliza w artifact. Następny full zgodnie z predeclared1800s/K64; bez zmian źródeł podczasrunu.
+
+
+EXP17 full complex-coarse RIGHT/K64 **FAIL host_memory_guard** po399,828s,exit137,OOMKilled=false. ContainerExited/PID0potwierdzone. Ostatnia rzeczywista wypisana iteracja16/restart0, recurrence1,339219e−2; brak końcowego raw/S/pól. Zbieżność częściowa silniejsza niż realcoarse EXP13, ale nie jest PASS ani porównaniem czasu do wyniku. Cgroup61550936064B(~57,33GiB), GPU-process5280628736B. Przy preconditioner.end cuDSS live30641370420B, setup110,957s. Ostatni zaraportowany logical managed HWM48998044042B pochodzi sprzedGMRES, nie z końca runu; nie sumować faktorów (są wewnątrz managed). Nie podnosimycap/guard, nie zamykamyaplikacjiużytkownika i nie retry tego samegokonfigu. Rootanaliza+SHA w artifact.
+
+Następny najmniejszy krok M1: zbadać bezpośredni FP64 complex-coarseN×N zamiast obecnego realnego bloku2N×2N; najpierw mały, wytworzony układ/probe API pinnedcuDSS0.7 i pomiar, następnie coax/TEM tylko poPASS. Archiwum dokumentacji12.9.1 types opisuje SYMMETRIC jako realny, HERMITIAN nie jest właściwy dla ogólnego kompleksowo-symetrycznego Maxwell; dla prototypu zacząć od poprawnego GENERAL/CUDA_C_64F, nie narzucać Hermitian ani obiecywać 2×oszczędności. Źródło wrappera palace/linalg/solver.cpp tworzy[Ar Ai;Ai−Ar]. To hipoteza zmniejszenia faktorów bez obniżenia precyzji, nie wykonany eksperyment. FP32coarse/TCnadalniepromowane; M1otwarty.
+
+
+Checkpoint integracji EXP15–17: docs-garden LunaPASS, rootdiffreviewPASS,29unittestówPASS,docscheckerPASS (istniejące miękkie591tokAGENTS),gitdiffcheckPASS,manifest source/native/depsPASS. Cachednativebuild9,635s. Zmianywyłącznieopt-in; fullqualityM1nadalOPEN. Żadnej symulacji pozostawionej live; bezcloud/paidcompute. Commitlokalny, niepushupstream. Następnie przygotować mały nativecomplex FP64probe; nie ponawiaćfullblokowego wariantu.
