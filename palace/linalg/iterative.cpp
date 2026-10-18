@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <cstddef>
 #include <limits>
 #include <string>
@@ -482,7 +483,7 @@ void GmresSolver<OperType>::Initialize() const
   }
   constexpr int init_size = 5;
   V.resize(max_dim + 1);
-  for (int j = 0; j < std::min(init_size, max_dim + 1); j++)
+  for (int j = 0; j < std::min((std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) ? 1 : init_size, max_dim + 1); j++)
   {
     V[j].SetSize(A->Height());
     V[j].UseDevice(true);
@@ -500,7 +501,7 @@ void GmresSolver<OperType>::Update(int j) const
 {
   // Add storage for basis vectors, Hessenberg columns, and rotations in increments.
   constexpr int add_size = 10;
-  for (int k = j + 1; k < std::min(j + 1 + add_size, max_dim + 1); k++)
+  for (int k = j + 1; !(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) && k < std::min(j + 1 + add_size, max_dim + 1); k++)
   {
     V[k].SetSize(A->Height());
     V[k].UseDevice(true);
@@ -531,6 +532,19 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   r.SetSize(A->Height());
   r.UseDevice(true);
   Initialize();
+  const bool compressed_basis = std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS");
+  MFEM_VERIFY(!compressed_basis || gs_orthog == Orthogonalization::MGS,
+              "FP32 basis pilot currently supports MGS GMRES only!");
+  std::vector<StoredBasisVector> packed_basis(compressed_basis ? max_dim + 1 : 0);
+  VecType basis_read;
+  if (compressed_basis)
+  {
+    basis_read.SetSize(A->Height());
+    basis_read.UseDevice(true);
+    MFEM_VERIFY(!(std::getenv("PALACE_GMRES_FP32_BASIS") && std::getenv("PALACE_GMRES_FP64_DISK_BASIS")), "Select one basis storage mode!");
+    Mpi::Print(comm, "PALACE_STORED_BASIS: storage={}, FP64 arithmetic; K={:d}\n",
+               std::getenv("PALACE_GMRES_FP64_DISK_BASIS") ? "FP64 disk" : "FP32", max_dim);
+  }
 
   // Begin iterations.
   converged = false;
@@ -588,6 +602,7 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 
     V[0] = 0.0;
     V[0].Add(1.0 / beta, r);
+    if (compressed_basis) packed_basis[0].Pack(V[0]);
     std::fill(s.begin(), s.end(), 0.0);
     s[0] = beta;
 
@@ -599,17 +614,36 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
         Mpi::Print(comm, "{}{:{}d} (restart {:d}) KSP residual norm {:.6e}\n",
                    std::string(tab_width, ' '), it, int_width, restart, beta);
       }
-      VecType &w = V[j + 1];
-      if (w.Size() == 0)
+      VecType &w = compressed_basis ? V[0] : V[j + 1];
+      if ((!compressed_basis && w.Size() == 0) ||
+          (compressed_basis && H.size() < static_cast<std::size_t>((j + 1) * (max_dim + 1))))
       {
         Update(j);
       }
-      ApplyBA(pc_side, A, B, V[j], w, r, this->use_timer);
+      if (compressed_basis)
+      {
+        packed_basis[j].Unpack(basis_read);
+        ApplyBA(pc_side, A, B, basis_read, w, r, this->use_timer);
+      }
+      else ApplyBA(pc_side, A, B, V[j], w, r, this->use_timer);
 
       ScalarType *Hj = H.data() + j * (max_dim + 1);
-      linalg::OrthogonalizeColumn(gs_orthog, comm, V, w, Hj, j + 1);
+      const bool trace_orthog = std::getenv("PALACE_PHASE_TRACE") != nullptr;
+      if (trace_orthog) nvtxRangePushA("Krylov orthogonalization");
+      if (compressed_basis)
+      {
+        for (int k = 0; k <= j; k++)
+        {
+          packed_basis[k].Unpack(basis_read);
+          Hj[k] = linalg::Dot(comm, w, basis_read);
+          w.Add(-Hj[k], basis_read);
+        }
+      }
+      else linalg::OrthogonalizeColumn(gs_orthog, comm, V, w, Hj, j + 1);
+      if (trace_orthog) nvtxRangePop();
       Hj[j + 1] = linalg::Norml2(comm, w);
       w *= 1.0 / Hj[j + 1];
+      if (compressed_basis) packed_basis[j + 1].Pack(w);
 
       for (int k = 0; k < j; k++)
       {
@@ -643,7 +677,12 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
     {
       for (int k = 0; k <= j; k++)
       {
-        x.Add(s[k], V[k]);
+        if (compressed_basis)
+        {
+          packed_basis[k].Unpack(basis_read);
+          x.Add(s[k], basis_read);
+        }
+        else x.Add(s[k], V[k]);
       }
     }
     else  // B && pc_side == PreconditionerSide::RIGHT
@@ -651,10 +690,31 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       r = 0.0;
       for (int k = 0; k <= j; k++)
       {
-        r.Add(s[k], V[k]);
+        if (compressed_basis)
+        {
+          packed_basis[k].Unpack(basis_read);
+          r.Add(s[k], basis_read);
+        }
+        else r.Add(s[k], V[k]);
       }
       ApplyB(B, r, V[0], this->use_timer);
       x += V[0];
+    }
+    if (converged && (compressed_basis || std::getenv("PALACE_VERIFY_RESIDUAL")))
+    {
+      // Recompute the actual stopping norm, not only the Arnoldi recurrence.
+      // Float basis storage can introduce a residual gap on ill-conditioned FEM.
+      InitialResidual(pc_side, A, B, b, x, r, V[0], true, this->use_timer);
+      const auto checked_beta = linalg::Norml2(comm, r);
+      CheckDot(checked_beta, "Verified GMRES residual is not valid: ");
+      Mpi::Print(comm, "PALACE_KSP_CHECK: absolute={:.12e} relative_initial={:.12e} threshold={:.12e}\n",
+                 checked_beta, checked_beta / initial_res, eps);
+      if (compressed_basis)
+      {
+        beta = checked_beta;
+        converged = beta < eps;
+        if (!converged) Mpi::Print(comm, "PALACE_RELIABLE_RESTART: compressed basis residual gap\n");
+      }
     }
     if (converged)
     {
@@ -665,6 +725,15 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   {
     Mpi::Print(comm, "{}{:{}d} (restart {:d}) KSP residual norm {:.6e}\n",
                std::string(tab_width, ' '), it, int_width, restart, beta);
+  }
+  if (std::getenv("PALACE_VERIFY_RESIDUAL"))
+  {
+    A->Mult(x, r);
+    r.Add(-1.0, b);
+    auto nr = linalg::Norml2(comm, r);
+    auto nb = linalg::Norml2(comm, b);
+    Mpi::Print(comm, "PALACE_TRUE_RESIDUAL: norm_Ax_minus_b={:.12e} norm_b={:.12e} relative={:.12e}\n",
+               nr, nb, nr / std::max(nb, std::numeric_limits<RealType>::min()));
   }
   if (print_opts.summary || (print_opts.warnings && eps > 0.0 && !converged))
   {
@@ -690,7 +759,7 @@ void FgmresSolver<OperType>::Initialize() const
   GmresSolver<OperType>::Initialize();
   constexpr int init_size = 5;
   Z.resize(max_dim + 1);
-  for (int j = 0; j < std::min(init_size, max_dim + 1); j++)
+  for (int j = 0; j < std::min((std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) ? 1 : init_size, max_dim + 1); j++)
   {
     Z[j].SetSize(A->Height());
     Z[j].UseDevice(true);
@@ -703,7 +772,7 @@ void FgmresSolver<OperType>::Update(int j) const
   // Add storage for basis vectors in increments.
   GmresSolver<OperType>::Update(j);
   constexpr int add_size = 10;
-  for (int k = j + 1; k < std::min(j + 1 + add_size, max_dim + 1); k++)
+  for (int k = j + 1; !(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")) && k < std::min(j + 1 + add_size, max_dim + 1); k++)
   {
     Z[k].SetSize(A->Height());
     Z[k].UseDevice(true);
@@ -713,6 +782,8 @@ void FgmresSolver<OperType>::Update(int j) const
 template <typename OperType>
 void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 {
+  MFEM_VERIFY(!(std::getenv("PALACE_GMRES_FP32_BASIS") || std::getenv("PALACE_GMRES_FP64_DISK_BASIS")),
+              "FP32 basis pilot does not support FGMRES!");
   // Set up workspace.
   RealType beta = 0.0, true_beta, eps = 0.0;
   MFEM_VERIFY(A && B, "Operator and preconditioner must be set for FgmresSolver::Mult!");
@@ -786,7 +857,10 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       ApplyBA(PreconditionerSide::RIGHT, A, B, V[j], w, Z[j], this->use_timer);
 
       ScalarType *Hj = H.data() + j * (max_dim + 1);
+      const bool trace_orthog = std::getenv("PALACE_PHASE_TRACE") != nullptr;
+      if (trace_orthog) nvtxRangePushA("Krylov orthogonalization");
       linalg::OrthogonalizeColumn(gs_orthog, comm, V, w, Hj, j + 1);
+      if (trace_orthog) nvtxRangePop();
       Hj[j + 1] = linalg::Norml2(comm, w);
       w *= 1.0 / Hj[j + 1];
 

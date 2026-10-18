@@ -236,7 +236,7 @@ void BaseSolver::SolveEstimateMarkRefine(std::vector<std::unique_ptr<Mesh>> &mes
 
   // Perform initial solve and estimation.
   auto [indicators, ntdof] = Solve(mesh);
-  double err = indicators.Norml2(comm);
+  double err = indicators.Local().Size() ? indicators.Norml2(comm) : std::numeric_limits<double>::quiet_NaN();
 
   // Record the initial solve as iteration 1 (matching the "iteration01" archive
   // subdirectory written for adaptive runs).

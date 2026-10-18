@@ -4,6 +4,7 @@
 #include "drivensolver.hpp"
 
 #include <complex>
+#include <cstdlib>
 #include <cstddef>
 #include <iostream>
 #include <Eigen/Dense>
@@ -108,17 +109,23 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   B = 0.0;
 
   // Initialize structures for storing and reducing the results of error estimation.
+  const char *skip_env = std::getenv("PALACE_SKIP_ESTIMATOR");
+  const bool skip_estimator = skip_env && skip_env[0] == '1';
+  MFEM_VERIFY(!skip_estimator || iodata.model.refinement.max_it == 0,
+              "PALACE_SKIP_ESTIMATOR requires fixed mesh (AMR disabled)!");
+  if (skip_estimator)
+    Mpi::Print("PALACE_EXPERIMENT: error estimator disabled; FEM/GMRES/port outputs unchanged; no estimator qualification\n");
   const bool is_2d = (space_op.GetNDSpace().Dimension() < 3);
   std::unique_ptr<TimeDependentFluxErrorEstimator<ComplexVector>> estimator_3d;
   std::unique_ptr<BoundaryModeFluxErrorEstimator<ComplexVector>> estimator_2d;
-  if (is_2d)
+  if (!skip_estimator && is_2d)
   {
     estimator_2d = std::make_unique<BoundaryModeFluxErrorEstimator<ComplexVector>>(
         space_op.GetMaterialOp(), space_op.GetNDSpaces(), space_op.GetRTSpaces(),
         space_op.GetCurlSpace(), space_op.GetH1Spaces(), iodata.solver.linear.estimator_tol,
         iodata.solver.linear.estimator_max_it, 0, iodata.solver.linear.estimator_mg);
   }
-  else
+  else if (!skip_estimator)
   {
     estimator_3d = std::make_unique<TimeDependentFluxErrorEstimator<ComplexVector>>(
         space_op.GetMaterialOp(), space_op.GetNDSpaces(), space_op.GetRTSpaces(),
@@ -128,6 +135,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   auto AddEstimate =
       [&](const ComplexVector &E, const ComplexVector &B, double Et, ErrorIndicator &ind)
   {
+    if (skip_estimator) return;
     if (is_2d)
       estimator_2d->AddErrorIndicator(E, B, Et, ind);
     else

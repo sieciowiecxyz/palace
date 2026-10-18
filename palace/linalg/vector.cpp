@@ -4,6 +4,9 @@
 #include "vector.hpp"
 
 #include <cstdint>
+#include <cerrno>
+#include <cstdlib>
+#include <unistd.h>
 #include <random>
 #include <mfem/general/forall.hpp>
 #include "linalg/hypre.hpp"
@@ -11,6 +14,108 @@
 
 namespace palace
 {
+
+namespace
+{
+void PackBasisPart(const Vector &full, mfem::Memory<float> &packed)
+{
+  const int n = full.Size();
+  const bool dev = full.UseDevice();
+  if (packed.Capacity() != n)
+  {
+    packed.Delete();
+    packed.New(n, mfem::Device::GetMemoryType());
+    packed.UseDevice(dev);
+  }
+  const auto *src = full.Read(dev);
+  auto *dst = packed.Write(dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST, n);
+  mfem::forall_switch(dev, n, [=] MFEM_HOST_DEVICE(int i) {
+    dst[i] = static_cast<float>(src[i]);
+  });
+}
+void UnpackBasisPart(const mfem::Memory<float> &packed, Vector &full)
+{
+  const int n = full.Size();
+  MFEM_VERIFY(packed.Capacity() == n, "Compressed basis dimension mismatch!");
+  const bool dev = full.UseDevice();
+  const auto *src = packed.Read(dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST, n);
+  auto *dst = full.Write(dev);
+  mfem::forall_switch(dev, n, [=] MFEM_HOST_DEVICE(int i) {
+    dst[i] = static_cast<double>(src[i]);
+  });
+}
+}
+StoredBasisVector::~StoredBasisVector()
+{
+  xr.Delete(); xi.Delete();
+  if (disk_fd >= 0) { close(disk_fd); unlink(disk_path.c_str()); }
+}
+void StoredBasisVector::OpenDisk(int n, bool complex)
+{
+  if (disk_fd >= 0)
+  {
+    MFEM_VERIFY(n == disk_size && complex == disk_complex, "Disk basis size changed!");
+    return;
+  }
+  const char *dir = std::getenv("PALACE_GMRES_FP64_DISK_BASIS");
+  MFEM_VERIFY(dir && *dir, "Missing disk basis directory!");
+  std::string pattern = std::string(dir) + "/basis-XXXXXX";
+  std::vector<char> name(pattern.begin(), pattern.end()); name.push_back(0);
+  disk_fd = mkstemp(name.data());
+  MFEM_VERIFY(disk_fd >= 0, "Cannot create FP64 basis scratch file!");
+  disk_path = name.data(); disk_size = n; disk_complex = complex;
+}
+void StoredBasisVector::DiskIO(void *ptr, std::size_t bytes, std::size_t offset, bool write) const
+{
+  auto *p = static_cast<char *>(ptr);
+  while (bytes)
+  {
+    const auto got = write ? pwrite(disk_fd, p, bytes, offset) : pread(disk_fd, p, bytes, offset);
+    if (got < 0 && errno == EINTR) continue;
+    MFEM_VERIFY(got > 0, "FP64 disk basis I/O failed or unexpected EOF!");
+    p += got; offset += got; bytes -= got;
+  }
+}
+void StoredBasisVector::Pack(const Vector &full)
+{
+  if (std::getenv("PALACE_GMRES_FP64_DISK_BASIS"))
+  {
+    OpenDisk(full.Size(), false);
+    DiskIO(const_cast<double *>(full.HostRead()), sizeof(double) * full.Size(), 0, true);
+  }
+  else PackBasisPart(full, xr);
+}
+void StoredBasisVector::Unpack(Vector &full) const
+{
+  if (disk_fd >= 0)
+  {
+    MFEM_VERIFY(full.Size() == disk_size && !disk_complex, "Disk basis size mismatch!");
+    DiskIO(full.HostWrite(), sizeof(double) * full.Size(), 0, false);
+  }
+  else UnpackBasisPart(xr, full);
+}
+void StoredBasisVector::Pack(const ComplexVector &full)
+{
+  if (std::getenv("PALACE_GMRES_FP64_DISK_BASIS"))
+  {
+    OpenDisk(full.Size(), true);
+    const std::size_t nbytes = sizeof(double) * full.Size();
+    DiskIO(const_cast<double *>(full.Real().HostRead()), nbytes, 0, true);
+    DiskIO(const_cast<double *>(full.Imag().HostRead()), nbytes, nbytes, true);
+  }
+  else { PackBasisPart(full.Real(), xr); PackBasisPart(full.Imag(), xi); }
+}
+void StoredBasisVector::Unpack(ComplexVector &full) const
+{
+  if (disk_fd >= 0)
+  {
+    MFEM_VERIFY(full.Size() == disk_size && disk_complex, "Disk basis size mismatch!");
+    const std::size_t nbytes = sizeof(double) * full.Size();
+    DiskIO(full.Real().HostWrite(), nbytes, 0, false);
+    DiskIO(full.Imag().HostWrite(), nbytes, nbytes, false);
+  }
+  else { UnpackBasisPart(xr, full.Real()); UnpackBasisPart(xi, full.Imag()); }
+}
 
 ComplexVector::ComplexVector(int size) : xr(size), xi(size) {}
 

@@ -5,6 +5,7 @@
 #define PALACE_LINALG_VECTOR_HPP
 
 #include <complex>
+#include <string>
 #include <vector>
 #include <mfem.hpp>
 #include "utils/communication.hpp"
@@ -18,6 +19,7 @@ namespace palace
 //
 
 using Vector = mfem::Vector;
+
 
 // A complex-valued vector represented as two real vectors, one for each component.
 class ComplexVector
@@ -347,6 +349,27 @@ void Cross3(const VecTypeA &A, const VecTypeB &B, VecTypeC &C, bool add = false)
 }
 
 }  // namespace linalg
+
+// Opt-in FP32 storage with real float allocations and RAII ownership. No ABI casts.
+class StoredBasisVector
+{
+  mfem::Memory<float> xr, xi;
+  int disk_fd = -1;
+  std::string disk_path;
+  int disk_size = 0;
+  bool disk_complex = false;
+  void OpenDisk(int n, bool complex);
+  void DiskIO(void *ptr, std::size_t bytes, std::size_t offset, bool write) const;
+public:
+  StoredBasisVector() = default;
+  StoredBasisVector(const StoredBasisVector &) = delete;
+  StoredBasisVector &operator=(const StoredBasisVector &) = delete;
+  ~StoredBasisVector();
+  void Pack(const Vector &full);
+  void Unpack(Vector &full) const;
+  void Pack(const ComplexVector &full);
+  void Unpack(ComplexVector &full) const;
+};
 
 }  // namespace palace
 

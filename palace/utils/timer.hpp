@@ -5,6 +5,9 @@
 #define PALACE_UTILS_TIMER_HPP
 
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <nvtx3/nvToolsExt.h>
 #include <stack>
 #include <string>
 #include <tuple>
@@ -182,6 +185,9 @@ private:
   inline static Timer timer;
   inline static std::stack<Index> stack;
   bool count;
+  bool trace = false;
+  Index trace_index;
+  Timer::TimePoint trace_start;
 
   // Stored reduction results (populated by Finalize).
   struct ReducedData
@@ -233,8 +239,18 @@ private:
   }
 
 public:
-  BlockTimer(Index i, bool count = true) : count(count)
+  BlockTimer(Index i, bool count = true) : count(count), trace_index(i)
   {
+    const char *env = std::getenv("PALACE_PHASE_TRACE");
+    trace = count && env && env[0] == '1';
+    if (trace)
+    {
+      trace_start = Timer::Now();
+      nvtxRangePushA(Timer::descriptions[i].c_str());
+      std::fprintf(stderr, "PALACE_PHASE {\"event\":\"begin\",\"phase\":%d,\"name\":\"%s\",\"t_s\":%.9f}\n",
+                   int(i), Timer::descriptions[i].c_str(),
+                   Timer::Duration(trace_start.time_since_epoch()).count());
+    }
     // Start timing when entering the block, interrupting whatever we were timing before.
     if (count)
     {
@@ -254,6 +270,15 @@ public:
 
   ~BlockTimer()
   {
+    if (trace)
+    {
+      auto now = Timer::Now();
+      std::fprintf(stderr, "PALACE_PHASE {\"event\":\"end\",\"phase\":%d,\"name\":\"%s\",\"t_s\":%.9f,\"inclusive_s\":%.9f}\n",
+                   int(trace_index), Timer::descriptions[trace_index].c_str(),
+                   Timer::Duration(now.time_since_epoch()).count(),
+                   Timer::Duration(now - trace_start).count());
+      nvtxRangePop();
+    }
     // When a BlockTimer is no longer in scope, record the time and memory growth.
     if (count && !stack.empty())
     {
