@@ -25,7 +25,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP42–43: saved-solution volume replay640/2240pts. Degree5 E/H2,888/1,612%, refchange1,945/1,158%, potentialqdelta~7,4e−4 FAIL. Root SHA/state/complexintegral verificationPASS; H_FEM własnanorma q2/q5 zgadza się2,11e−15. Następna hipoteza adaptive near-panel correction; niepromować i nie skalować ślepo referencji.
 - EXP44–47: RWGpanel/native i niezależny static-normalcontrolPASS, ratio2 czterokrotnie mniejliści. FullfineB4nearcorrection117,617s/217MB adaptive/cutoffPASS, E/H2,888/1,611% nadal FAIL. Root allpoint/weights/input/sourceSHA/complexnorm/subsetregression PASS. Dalsze EXP48–53 poniżej, docs/maxwell-near-panels.md.
 - EXP48–53: cached NumBa native/parityPASS, pełny coarse replay18,089s/RSS217MB (NumPyTIMEOUT180s). Obie strony adaptivePASS; correctedreferencechange degree5E/H1,647/0,781%FAIL0,3%, volume2/5agreementFAIL, brakpromocjianteny. docs/maxwell-near-panels.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.88testsPASSwpinnedenv; systemowo74PASS/14SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP54–58: epsilon2,94 analyticF3 E/H.443/.717%PASS, actualcoupledF3/B3 i fixed640probes.664/.597% vsB4. Nie pełnyL2; reference/volume convergence nadalFAIL. DefaultND2eps1 regressionPASS. docs/maxwell-fem-refinement.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.92testsPASSwpinnedenv; systemowo76PASS/16SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -45,7 +46,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. Następne kontrolowane oszacowanie błędu objętości/referencji, potem niezależny FEM. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
+2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. EXP54–58 niezależnyFEM3/fixedprobesPASS; następne właściwaF3volume rule i reference przy powierzchni bez nowego solve. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -961,3 +962,92 @@ Walidacja końcowa:88unitPASS pinned/system74PASS14SKIP, docschecker i diffcheck
 Ta sama Luna wykonała read-only docs-garden: zgodność wyniku/kodu/scopePASS;
 wskazała trzy nieaktualne bieżące liczniki, root poprawił je i checkpoint/nextstep.
 Historyczne liczniki EXP zachowano. Lokalne źródła/cache, bezpush.
+
+
+### EXP54–55 — prerejestracja: niezależny analityczny FEM dla epsilon2,94
+
+Poprzedni turn PROGRESS: commit410a854, cached nearJIT i corrected B3/B4/degree2/5;
+niepromowany prototyp. Root teraz rozłożył zapisane błędy wg odległości od20planes
+tej samej bryły (modelunits): degree5distance>.2 ma E/H1,791/1,539%, ale
+B3→B4change tylko.101/.048%; distance<.05: E/H5,032/1,932%, refchange3,506/1,665%.
+Artifact m2-near-boundary-error-analysis-20261019.json; emptybins=null, niepełnenormy.
+Hipoteza: FEMresolution jest istotna niezależnie od brzegowego błędu referencji.
+Nie rozstrzygać po dopasowaniu trendu: sprawdzić tę samą ND2bryłę F2/F3
+z dokładnym Ex=exp(i*sqrt(eps)*z), physicalHy=sqrt(eps)*Ex i Dirichletdata.
+Operator curlcurl-eps*M; helper raportuje H/sqrt(eps), względny błąd fizycznegoH
+jest taki sam. Eps1 default ND2 i eps2,94 default transmission bez zmian.
+Nowy parametr jedynie w analyticND2probe; stare guardedgeometryhelpers bez zmian.
+Każdy run raw<1e-10,basis<1e-11,quad6/8delta<1e-6; fieldtarget1% unchanged.
+Test nie jest transmisją przez interfejs ani pełną kwalifikacjąM2. 89unitPASS.
+120s EACH/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build; exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-eps294-f2-20261019 --physics nd2 --level 2 --epsilon-r 2.94 --seconds 120`.
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-eps294-f3-20261019 --physics nd2 --level 3 --epsilon-r 2.94 --seconds 120`.
+Run55 only after54 terminal; failureexecution stops sequence, fieldFAIL retained.
+
+EXP54/55 executionPASS noOOM1,071/5,572s,RSS287/432MB. F2DirichletE/H
+1,7363/2,4894%FAIL1%; F3 .4431/.7171%PASS1%. Raw<=5,73e-15,q6/8delta<=1,22e-11.
+Root checked terminal/currentcaseSHA/eps/k² and normalizations; artifact
+m2-nd2-eps294-root-analysis-20261019.json. F3 analytic pass motivates actual
+coupledrefinement, not dielectrictransmission qualification or memoryspeedup.
+
+### EXP56 — prerejestracja: dielectric coupled F2→F3 z BEM3 fixed
+
+Jedyna zmiana względem EXP40: FEM2(160tet/1228DOF)→FEM3(1280tet/8936DOF).
+Ten sam epsilon2,94, surfaceB3, paramsq4, BC/RWGmortar/Schur; zachować savedu/t/h.
+Nativecoupling/transmission helpers unchanged. Existing run robi centroidscreening
+vs PMCHWTB2/B3; to nie pełny L2 i nie zastępuje volumeB4reference.
+Hipoteza na podstawie EXP54/55: FEM error maleje, ale reference/coarsemesh
+nadal ogranicza kwalifikację. Raw<1e-9 i mortar<1e-12; dotychczasowe field/energy
+thresholds unchanged, FAIL retained. 180s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build.
+Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-eps294-f3-b3-20261019 --physics transmission --level 3 --surface-level 3 --epsilon-r 2.94 --seconds 180`.
+Po solve bez ślepego ponawiania; ocenić cachedvolume z samą referencjąB4 zEXP41.
+
+EXP56 executionPASS115,0s/RSS1,325GB/noOOM, screeningFAIL zachowany. Centroid1280
+E/H1,4988/1,0847%, referenceB2→B3change7,968/7,643%: not comparable to EXP40
+centroid160sample. Farrelative.04498%, energy/pi1,28e-7/raw1,97e-13 PASS.
+Savedcoupled-solution.npz preserved. Root terminal/sourceSHA checked.
+
+### EXP57 — prerejestracja: stałe640punkty, bez nowego BEMsolve/potential
+
+Aby nie powtarzać kosztownych potencjałów, nowy bounded `fem-replay` bierze
+F3savedu zEXP56 i dokładnie640degree2points/weights zEXP42; referenceB4 currents
+zEXP41 służą guardom fizyki. Root porówna replay z correctedB4EXP52 iF2EXP42
+na identycznych punktach oraz osobno wnętrzu distance>.2 (modelunits).
+Strictbarycentricowner>1e-10 eliminuje niejednoznaczność normalnegoE na faces;
+reject zamiast wybierania wartości arbitralnie. Ten zbiór nie jest zbieżną
+normąFEM3: żadnej kwalifikacji całego pola na podstawie tego screenu.
+Walidacja inputów: terminal/noOOM/sourcehelper/nativeABI/npzSHA/eps/degree2.
+Nie eksportować nowych macierzy, nie solve/BEMassembly; mały GlobalNDconstructor
+nadal assembles mass/curlforms. 92unitPASS.120s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/build.
+Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fem3-fixed-probes-20261019 --physics fem-replay --level 3 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --probe-input artifacts/m2-transmission-volume-degree2-20261019 --seconds 120`.
+
+EXP57 executionPASS0,761s/RSS296MB/noOOM; all640strictowners,minlambda.1708204.
+Root independently compared identicalpoints/weights/current/sourceSHA andallinputSHA.
+F2→F3 vs correctedB4: E2,15175→.66355%,H.86299→.59717% onall640probes.
+Core distance>.2(modelunits),300points/46,875%vol: E1,19656→.18592%,H.75174→.25188%;
+refB3→B4change.05517/.04366%. Near340points: F3E/H.93207/.81265%, refchange1,55555/.62954%.
+Rootanalysis m2-fem3-fixed-probes-root-analysis-20261019.json. RefinedFEM helps,
+but coarseprobes don't establish fullF3L2 or reference/volumeconvergence.
+
+### EXP58 — prerejestracja: domyślny ND2epsilon1 regression
+
+Zmiana parametruepsilon nie może zmienić defaultuND2. Powtórzyć tani F3analytic
+bez flagiepsilon i porównać z zachowanym EXP33 po samejgranicypól/kodunormy.
+Expectedepsilon1,k1,Dirichlet E/H.1505/.3317%, raw/quad/basis gates unchanged.
+120s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build. Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-eps1-default-regression-20261019 --physics nd2 --level 3 --seconds 120`.
+
+EXP58 execution/analyticPASS5,520s/RSS432MB/noOOM,epsilon1/k1. Dirichlet E/H
+.150508/.331747% identyczne z EXP33(m2-global-nd2-level3-q6-20261019/case.json).
+Root ponadto odtworzył physicalprobe coordinates z cell/localmap do<1e-13
+w EXP57; savedinput/sourceSHA/terminalnoOOM verified. Aktualny docs/wyniki i
+nextstep zapisane. Niepromowane: M2volume/reference/rezonanse/koszt nadalotwarte.
+
+Walidacja robocza:92unitPASS pinned; system76PASS16SKIP. Docschecker/diffcheckPASS.
+
+Docs-garden read-only tej samej Luny: PASS, brak sprzeczności scope/kodu/artefaktów.
+Rootreview: physicalpointreconstruction i epsilon1default exactregression sprawdzone;
+żadnego utożsamienia fixedpointów z convergedL2. Checker/diffcheckPASS.
+Lokalny commit bezpush. M2ACTIVE, goal nieukończony; brak zmiany medium/anteny.

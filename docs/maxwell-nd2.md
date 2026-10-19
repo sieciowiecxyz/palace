@@ -103,3 +103,7 @@ Brak paidcompute/wyłączania aplikacji użytkownika/GPUrunów.
    Potem coupledE/H≤1%, farfield/energia,
    dielectricFEMtransmission/stabilizacja/scalableBEMassembly i kosztanteny.
 4. Nie zamykać M2 ani przechodzić do M3 na podstawie tej referencji.
+
+Dalsza kontrola jednorodnego epsilon2,94 i rzeczywista zmianaFEM2→3:
+[EXP54–58](maxwell-fem-refinement.md). Default ND2epsilon1 zachowany;
+stałe próbki coupledF3 nie są kwalifikacją całego pola.

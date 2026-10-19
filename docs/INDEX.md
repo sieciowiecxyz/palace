@@ -37,6 +37,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M2: potencjały bliskich paneli](maxwell-near-panels.md)
   - Czytaj gdy: kontrolujesz near-field reference lub odtwarzasz korekcję savedvolume
   - Opis: EXP44–53 native/solid-angle/JIT controls PASS, korekcja B3/B4 i degree2/5; zbieżność/pola nadal FAIL, bez promocji.
+- [M2: rozdzielczość FEM i stałe próbki](maxwell-fem-refinement.md)
+  - Czytaj gdy: kontynuujesz kwalifikację dielektrycznego F3 lub replay bez nowego BEMsolve
+  - Opis: EXP54–58, analityczny epsilon2,94/FEMrefinement, actual coupled i porównanie640punktów; brak pełnej normy/antenna promotion.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

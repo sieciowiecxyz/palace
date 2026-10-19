@@ -12,6 +12,22 @@ SPEC.loader.exec_module(oracle)
 
 
 class PythonMountTests(unittest.TestCase):
+    def test_analytic_dielectric_epsilon_keeps_case_defaults_and_rejects_invalid(self):
+        self.assertEqual(oracle.case_epsilon('nd2',None),1.)
+        self.assertEqual(oracle.case_epsilon('transmission',None),2.94)
+        self.assertIsNone(oracle.case_epsilon('pec',None))
+        self.assertEqual(oracle.case_epsilon('nd2',2.94),2.94)
+        for physics,epsilon in [('nd2',-1.),('nd2',float('nan')),('pec',1.)]:
+            with self.assertRaises(ValueError):oracle.case_epsilon(physics,epsilon)
+
+    def test_fixed_replay_requires_probes_and_rejects_unused_flags_before_allocation(self):
+        with patch.object(oracle.dev,'require_host_memory') as host:
+            for options in [dict(physics='nd2',probe_input=Path('/unused')),
+                            dict(physics='fem-replay',volume_inputs=['a','b']),
+                            dict(physics='fem-replay',volume_inputs=['a','b'],probe_input=Path('/unused'),volume_degree=5)]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),3,120,**options)
+            host.assert_not_called()
+
     def test_uv_alias_is_mounted_at_configured_home(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

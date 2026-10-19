@@ -145,6 +145,6 @@ Dowody: historyczne `artifacts/m2-near-{control,correction,full}-root-analysis-2
 oraz nowe `artifacts/m2-near-{numba,coarse-full,volume-degree}-root-analysis-20261019.json`.
 EXP44–49 zachowują historyczne SHA; aktualne helpery/sourceSHA zapisano
 w manifestach EXP50–53. Nie przedstawiać historycznego SHA jako bieżącego kodu.
-Następny krok: zaprojektować zbieżne oszacowanie błędu objętości i referencji
-bez ślepego B5/globalq; potem niezależna zmiana FEM, rezonanse i koszt.
+Dalsza niezależna zmiana FEM i fixedpointreplay: [EXP54–58](maxwell-fem-refinement.md).
+Zbieżna norma i reference nadal wymagają kontroli; bez ślepego B5/globalq.
 M2 pozostaje ACTIVE; nie ma pomiaru zysku anteny RAM/VRAM/czas ani promocji.

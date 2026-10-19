@@ -10,7 +10,9 @@ import maxwell_fem as fem
 import maxwell_nd as nd
 
 
-def run(level,output):
+def run(level,output,epsilon=1.):
+    if epsilon not in [1.,2.94]:raise ValueError('Analytic homogeneous probe supports epsilon1/2.94')
+    k=np.sqrt(epsilon)
     started = time.monotonic()
     def stage(name):
         row = dict(stage=name,elapsed_s=time.monotonic()-started)
@@ -26,19 +28,19 @@ def run(level,output):
             raise ValueError('ND2 physical basis/orientation audit failed')
         if space.nonidentity==0: raise ValueError('Mesh did not exercise ND2 face transformations')
         stage('nd2_orientation_polynomial_quadrature_complete')
-        operator = curl-mass
+        operator = curl-epsilon*mass
         boundary = space.boundary()
         interior = np.setdiff1d(np.arange(space.ndofs),boundary)
-        solution = space.project(2)
-        projection_errors = nd.plane_field_errors(space,solution,order=6)
+        solution = space.project(2,k)
+        projection_errors = nd.plane_field_errors(space,solution,k=k,order=6)
         rhs = -operator[interior][:,boundary]@solution[boundary]
         solve_start = time.monotonic()
         solution[interior] = spsolve(operator[interior][:,interior].astype(np.complex128),rhs)
         solve_seconds = time.monotonic()-solve_start
         raw = float(np.linalg.norm((operator@solution)[interior])/np.linalg.norm(rhs))
-        coarse_quad = nd.plane_field_errors(space,solution,order=4)
-        errors = nd.plane_field_errors(space,solution,order=6)
-        quad = nd.plane_field_errors(space,solution,order=8)
+        coarse_quad = nd.plane_field_errors(space,solution,k=k,order=4)
+        errors = nd.plane_field_errors(space,solution,k=k,order=6)
+        quad = nd.plane_field_errors(space,solution,k=k,order=8)
         quad_delta = max(abs(errors[key]-quad[key]) for key in ['relative_E_L2','relative_H_L2'])
         coarse_delta = max(abs(errors[key]-coarse_quad[key]) for key in ['relative_E_L2','relative_H_L2'])
         sparse_bytes = sum(a.data.nbytes+a.indices.nbytes+a.indptr.nbytes for a in [mass,curl])
@@ -47,7 +49,9 @@ def run(level,output):
         if level==1:
             legacy = fem.assemble(vertices,tetrahedra,fem.MFEM())[-1]
         report = dict(scope='Actual global MFEM ND2 plane-wave Dirichlet reference; not FEM-BEM or antenna',
-            level=level,tetrahedra=len(tetrahedra),triangles=len(faces),fem_dofs=space.ndofs,
+            level=level,epsilon_r=epsilon,wave_number=k,
+            magnetic_normalization='curl(E)/(ik)=physical H/sqrt(epsilon), mu=k0=1; relative error unchanged',
+            tetrahedra=len(tetrahedra),triangles=len(faces),fem_dofs=space.ndofs,
             local_dofs=space.local_dofs,boundary_dofs=len(boundary),interior_dofs=len(interior),
             mfem=dict(version=space.version,git=space.git),checks=checks,legacy_nd1_regression=legacy,
             projection_field_errors=projection_errors,dirichlet_field_errors=errors,
@@ -69,5 +73,6 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--level',type=int,choices=[1,2,3],required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--epsilon-r',type=float,choices=[1.,2.94],default=1.)
     args = parser.parse_args()
-    run(args.level,args.output)
+    run(args.level,args.output,args.epsilon_r)
