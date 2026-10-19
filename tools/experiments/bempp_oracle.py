@@ -29,6 +29,8 @@ TRACE_CASE = dev.ROOT/'tools/experiments/bempp_trace_spaces.py'
 TRANSMISSION_CASE = dev.ROOT/'tools/experiments/bempp_transmission.py'
 VOLUME_CASE = dev.ROOT/'tools/experiments/bempp_volume.py'
 FEM_REPLAY_CASE = dev.ROOT/'tools/experiments/mfem_replay.py'
+STREAM_CASE = dev.ROOT/'tools/experiments/bempp_stream.py'
+STREAM_API = dev.ROOT/'tools/experiments/maxwell_stream.py'
 NEAR_CASE = dev.ROOT/'tools/experiments/bempp_near_control.py'
 NEAR_API = dev.ROOT/'tools/experiments/maxwell_near.py'
 NEAR_JIT_API = dev.ROOT/'tools/experiments/maxwell_near_jit.py'
@@ -209,11 +211,11 @@ def case_epsilon(physics,epsilon):
     return None
 
 
-def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32,near_side='fine',near_backend='numpy',probe_input=None):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32,near_side='fine',near_backend='numpy',probe_input=None,stream_variant='base'):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
-    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay'] or (physics!='pec' and (compression or native)):
+    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume'] or (physics!='pec' and (compression or native)):
         raise ValueError('Only PEC supports the optional CUDA compression probe')
     if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
     if duality not in ['electric','magnetic'] or (duality!='electric' and physics!='nd2-coupling'):
@@ -226,20 +228,24 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
         raise ValueError('Transmission requires BEM level2 or3 for a reference hierarchy')
     if reference_only and (physics!='transmission' or epsilon_r not in [1.,2.94]):
         raise ValueError('Reference-only calibration requires explicit transmission epsilon1/2.94')
-    if volume_degree not in [2,5] or (physics not in ['volume','near-correction','fem-replay'] and (volume_inputs is not None or volume_degree!=2)):
+    if volume_degree not in [2,5] or (physics not in ['volume','near-correction','fem-replay','stream-control','stream-volume'] and (volume_inputs is not None or volume_degree!=2)):
         raise ValueError('Volume input/degree options apply only to volume replay')
-    if physics in ['volume','near-correction','fem-replay'] and volume_inputs is None:raise ValueError('Replay requires saved inputs')
+    if physics in ['volume','near-correction','fem-replay','stream-control','stream-volume'] and volume_inputs is None:raise ValueError('Replay requires saved inputs')
     if physics=='near-correction' and volume_degree!=2:raise ValueError('Near correction reuses the saved volume rule; do not override it')
     if physics=='near-control' and level!=1:raise ValueError('Near-panel control is bounded at level1')
-    if near_count not in [0,32] or (physics!='near-correction' and near_count!=32):
+    if near_count not in [0,32] or (physics not in ['near-correction','stream-control','stream-volume'] and near_count!=32):
         raise ValueError('Near count0/all or32 applies only to near correction')
-    if near_side not in ['fine','coarse'] or (physics!='near-correction' and near_side!='fine'):
+    if near_side not in ['fine','coarse'] or (physics not in ['near-correction','stream-control','stream-volume'] and near_side!='fine'):
         raise ValueError('Reference side fine/coarse applies only to near correction')
     if near_backend not in ['numpy','numba'] or (physics not in ['near-control','near-correction'] and near_backend!='numpy'):
         raise ValueError('Near backend numpy/numba applies only to near controls/correction')
+    stream_helper=physics in ['stream-control','stream-volume']
+    if stream_variant not in ['base','near6','radius2','far16'] or (physics!='stream-volume' and stream_variant!='base'):
+        raise ValueError('Stream variant applies only to the streamed volume potential probe')
+    if physics=='stream-control' and (near_count!=32 or volume_degree!=2):raise ValueError('Stream control is bounded to32 saved points without degree override')
     if (physics=='fem-replay')!=(probe_input is not None):raise ValueError('FEM replay requires --probe-input, unused elsewhere')
     if physics=='fem-replay' and volume_degree!=2:raise ValueError('Fixed FEM probes require saved degree2; no degree override')
-    saved=checked_volume_inputs(volume_inputs,level,'volume' if physics=='near-correction' else 'transmission') if physics in ['volume','near-correction','fem-replay'] else None
+    saved=checked_volume_inputs(volume_inputs,level,'volume' if physics in ['near-correction','stream-control'] else 'transmission') if physics in ['volume','near-correction','fem-replay','stream-control','stream-volume'] else None
     probes=None
     if probe_input is not None:
         sample_case=dev.read(Path(probe_input)/'case.json')
@@ -248,18 +254,18 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
         if checked['epsilon_r']!=saved['epsilon_r']:raise ValueError('Probe and candidate materials differ')
         probes=checked['candidate']
     source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,
-              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE,'fem-replay':FEM_REPLAY_CASE}[physics]
-    transmission_helper=physics in ['volume','near-control','near-correction','fem-replay']
+              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE,'fem-replay':FEM_REPLAY_CASE,'stream-control':STREAM_CASE,'stream-volume':STREAM_CASE}[physics]
+    transmission_helper=stream_helper or physics in ['volume','near-control','near-correction','fem-replay']
     nd_coupling_helper=transmission_helper or physics=='transmission'
     pairing_helper=nd_coupling_helper or physics in ['nd2-coupling','traces']
     nd_helper=nd_coupling_helper or physics in ['nd2','nd2-coupling']
     fem_helper=nd_helper or physics in ['coupling','pairing','traces']
-    near_helper=physics in ['near-control','near-correction']
+    near_helper=stream_helper or physics in ['near-control','near-correction']
     dev.require_host_memory()
     manifest = verified()
     if native and not compression: raise ValueError('--native-apply requires --compression')
     cuda = verified_cuda() if native else None
-    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling','transmission','volume','near-correction','fem-replay'] else None
+    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling','transmission','volume','near-correction','fem-replay','stream-control','stream-volume'] else None
     output = Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     (BASE/'jit-cache').mkdir(exist_ok=True)
@@ -286,7 +292,9 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['-v',f'{ND_COUPLING_CASE}:/scripts/bempp_nd2_coupling.py:ro'] if nd_coupling_helper else []),
             *(['-v',f'{TRANSMISSION_CASE}:/scripts/bempp_transmission.py:ro'] if transmission_helper else []),
             *(['-v',f'{NEAR_API}:/scripts/maxwell_near.py:ro'] if near_helper else []),
-            *(['-v',f'{NEAR_JIT_API}:/scripts/maxwell_near_jit.py:ro'] if near_backend=='numba' else []),
+            *(['-v',f'{NEAR_JIT_API}:/scripts/maxwell_near_jit.py:ro'] if near_backend=='numba' or stream_helper else []),
+            *(['-v',f'{STREAM_API}:/scripts/maxwell_stream.py:ro','-v',f'{VOLUME_CASE}:/scripts/bempp_volume.py:ro',
+                '-v',f'{NEAR_CORRECTION_CASE}:/scripts/bempp_near_correction.py:ro'] if stream_helper else []),
             *([arg for role in ['candidate','reference'] for arg in ['-v',f'{saved[role]["path"]}:/{role}:ro']] if saved else []),
             *(['-v',f'{probes["path"]}:/probes:ro'] if probes else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
@@ -298,10 +306,11 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--epsilon-r',str(resolved_epsilon)] if resolved_epsilon is not None else []),
             *(['--reference-only'] if reference_only else []),
             *(['--candidate','/candidate','--reference','/reference'] if saved else []),
-            *(['--volume-degree',str(volume_degree)] if physics=='volume' else []),
+            *(['--volume-degree',str(volume_degree)] if physics in ['volume','stream-volume'] else []),
             *(['--probes','/probes'] if probes else []),
-            *(['--near-count',str(near_count),'--near-side',near_side] if physics=='near-correction' else []),
-            *(['--near-backend',near_backend] if near_helper else []),
+            *(['--near-count',str(near_count),'--near-side',near_side] if physics=='near-correction' or stream_helper else []),
+            *(['--near-backend',near_backend] if physics in ['near-control','near-correction'] else []),
+            *(['--mode','control' if physics=='stream-control' else 'volume','--stream-variant',stream_variant] if stream_helper else []),
             *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
                                       physics=physics,duality=duality if physics=='nd2-coupling' else None,
@@ -311,11 +320,15 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
                                       coupling_api_sha256=dev.sha(ND_COUPLING_CASE) if nd_coupling_helper else None,
                                       transmission_api_sha256=dev.sha(TRANSMISSION_CASE) if transmission_helper else None,
                                       near_api_sha256=dev.sha(NEAR_API) if near_helper else None,
-                                      probe_input=probes,volume_inputs=saved,volume_degree=volume_degree if physics=='volume' else None,
-                                      near_count=near_count if physics=='near-correction' else None,
-                                      near_side=near_side if physics=='near-correction' else None,
-                                      near_backend=near_backend if near_helper else None,
-                                      near_jit_api_sha256=dev.sha(NEAR_JIT_API) if near_backend=='numba' else None,
+                                      probe_input=probes,volume_inputs=saved,volume_degree=volume_degree if physics in ['volume','stream-volume'] else None,
+                                      near_count=near_count if physics=='near-correction' or stream_helper else None,
+                                      near_side=near_side if physics=='near-correction' or stream_helper else None,
+                                      near_backend='numba' if stream_helper else near_backend if near_helper else None,
+                                      near_jit_api_sha256=dev.sha(NEAR_JIT_API) if near_backend=='numba' or stream_helper else None,
+                                      stream_variant=stream_variant if stream_helper else None,
+                                      stream_api_sha256=dev.sha(STREAM_API) if stream_helper else None,
+                                      volume_api_sha256=dev.sha(VOLUME_CASE) if stream_helper else None,
+                                      near_correction_api_sha256=dev.sha(NEAR_CORRECTION_CASE) if stream_helper else None,
                                       case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
                                       native_cuda=cuda,
@@ -355,12 +368,13 @@ if __name__=='__main__':
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
     parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
     parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
-    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay'],default='pec')
+    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume'],default='pec')
     parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     parser.add_argument('--duality',choices=['electric','magnetic'],default='electric')
     parser.add_argument('--surface-level',type=int,choices=[1,2,3,4])
     parser.add_argument('--epsilon-r',type=float,choices=[1.,2.94])
     parser.add_argument('--reference-only',action='store_true')
+    parser.add_argument('--stream-variant',choices=['base','near6','radius2','far16'],default='base')
     parser.add_argument('--probe-input',type=Path)
     parser.add_argument('--volume-inputs',type=Path,nargs=2,metavar=('CANDIDATE','REFERENCE'))
     parser.add_argument('--volume-degree',type=int,choices=[2,5],default=2)
@@ -372,4 +386,4 @@ if __name__=='__main__':
     elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count,args.near_side,args.near_backend,args.probe_input)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count,args.near_side,args.near_backend,args.probe_input,args.stream_variant)

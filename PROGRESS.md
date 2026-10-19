@@ -26,7 +26,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP44–47: RWGpanel/native i niezależny static-normalcontrolPASS, ratio2 czterokrotnie mniejliści. FullfineB4nearcorrection117,617s/217MB adaptive/cutoffPASS, E/H2,888/1,611% nadal FAIL. Root allpoint/weights/input/sourceSHA/complexnorm/subsetregression PASS. Dalsze EXP48–53 poniżej, docs/maxwell-near-panels.md.
 - EXP48–53: cached NumBa native/parityPASS, pełny coarse replay18,089s/RSS217MB (NumPyTIMEOUT180s). Obie strony adaptivePASS; correctedreferencechange degree5E/H1,647/0,781%FAIL0,3%, volume2/5agreementFAIL, brakpromocjianteny. docs/maxwell-near-panels.md.
 - EXP54–58: epsilon2,94 analyticF3 E/H.443/.717%PASS, actualcoupledF3/B3 i fixed640probes.664/.597% vsB4. Nie pełnyL2; reference/volume convergence nadalFAIL. DefaultND2eps1 regressionPASS. docs/maxwell-fem-refinement.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.92testsPASSwpinnedenv; systemowo76PASS/16SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP59–69: fusedT/K matchedCPU32query~2,56×zprzygotowaniem, nieantenna speedup; native teżmatrixfree. OwnF3degree5E/H1,683/.972%, reference/degreeFAIL. DenseB5>cap; następny małyFMMcandidate NOTRUN. docs/maxwell-stream.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.95testsPASSwpinnedenv; systemowo79PASS/16SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -46,7 +47,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. EXP54–58 niezależnyFEM3/fixedprobesPASS; następne właściwaF3volume rule i reference przy powierzchni bez nowego solve. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
+2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. EXP54–58 niezależnyFEM3/fixedprobesPASS; EXP59–69 własnaF3volume/refFAIL. Następny mały MaxwellFMMvsdense/PMCHWT przedwiększą referencją, nie denseB5 ani ponowny solve. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -1051,3 +1052,157 @@ Docs-garden read-only tej samej Luny: PASS, brak sprzeczności scope/kodu/artefa
 Rootreview: physicalpointreconstruction i epsilon1default exactregression sprawdzone;
 żadnego utożsamienia fixedpointów z convergedL2. Checker/diffcheckPASS.
 Lokalny commit bezpush. M2ACTIVE, goal nieukończony; brak zmiany medium/anteny.
+
+
+### EXP59 — prerejestracja: streaming potential, bez macierzy punkt×DOF
+
+Poprzedni turn PROGRESS: commit91b7f5f, rzeczywistyFEM3solve i identical640probes
+poprawiają E/H. Nowa bezpieczna akcja: mała kontrola pełnej sumy potencjałów,
+aby później obliczyć właściwą F3volume rule bez kosztownego nativepotentialmatrix.
+maxwell_stream.py: existing cached nearjit FP64/complex128/no fastmath,
+NumBa parallel over targets (existing threadlimit2), stała kolejność paneli.
+Każdy farpanel liczy regularq12, bliski adaptiveq8/ratio2; selectionradius4.
+Kontrola32saveddegree2points vs cachednativeq12(radius0) i osobno incremental
+qualifiednearcorrection(q8/r4). GatekażdeE/H<1e-12, finite,zeroexhaustion,
+actualnopythonsignature; compile/load i ciepłyapply osobno. 95unitPASS; stubnjit
+wunitach nie jest dowodem LLVM. Zero nowego solve/BEMassembly/GPU/cloud/build.
+120s/6GiB4CPU/tmpfs/noaddedSwap. DaneRAM, cache kodu osobno. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-control-20261019 --physics stream-control --level 2 --volume-inputs artifacts/m2-transmission-volume-degree2-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Po PASS dopiero pilot32na realnej reguleF3degree2; nie uruchamiać full bez oceny kosztu.
+
+EXP59 operator/executionPASS9,157s/RSS250MB/noOOM. Actualnopython,threads2,
+compile/load2,900s. Full32point potentialapply .0582s, native/incremental
+E/H<=8,88e-15, zeroexhaustion. Pilotfieldestimate2,887/.942% biased, not norm.
+Rootauditedallinput/sourceSHA and terminalstates; artifact
+m2-stream-control-root-analysis-20261019.json. No potentialmatrix/solve.
+
+### EXP60 — prerejestracja: kosztowy pilot na własnej reguleF3degree2
+
+SavedF3u(EXP56), PMCHWTB4currents(EXP41), 5120positivecellquadraturepoints;
+wybrać32(16closest20planes+16spanning), bez nowego solve. Ten pilot nie jest
+normąobjętości. Basefarq12/nearquad8/radius4, samequalifiedkernel. Sprawdzić
+finite/nopython/zerodepthhits i czas cieplegoapply/leaves przedfull5120.
+120s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build. Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-pilot-20261019 --physics stream-volume --level 3 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+
+EXP60 executionPASS5,241scase/RSS430MB/noOOM.5120original/32biasedpoints,
+apply.0599s,setup.0160s,maxdepth4,zerohits. PilotE/H3,327/1,596% niepełnanorma.
+Conservativeapply estimate .06*5120/32~9,6s plus setup<10s; supports fullrun
+without extending120s caps. No potentialmatrix/solve.
+
+### EXP61–62 — prerejestracja: własna pełna regułaF3degree2 i nearquadrature
+
+Change only32→all5120points/weights, savedu/currents unchanged. EXP61base:
+farq12/nearquad8/radius4. EXP62near6: farq12/nearquad6/radius4. Root porówna
+weightedcomplexE/Hdelta<1e-6, samepoint/weights/SHA, zeroexhaustion. Wyniknormy
+nadal wymaga radius/far, degree i reference mesh controls; niepromować samychminimów.
+120s EACH/6GiB4CPU/tmpfs/noaddedSwap/noGPU/build. Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-base-20261019 --physics stream-volume --level 3 --near-count 0 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-near6-20261019 --physics stream-volume --level 3 --near-count 0 --stream-variant near6 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+EXP62 po terminalnym executionPASS61; bez retry/extension.
+
+EXP61/62 executionPASS all5120points,case14,417/13,311s,RSS431/433MB,noOOM.
+BaseE/H1,463205/.864503%: EFAIL1%, HscreenPASS; notconvergedvolume.
+Apply9,248/8,166s,zeroexhaustion,maxdepth4,1,101,292leaves.
+Rootweightednear6vs8delta E/H=1.41677e-12/1.41611e-12PASS1e-6,samepointsweights.
+
+### EXP63–65 — prerejestracja: radius/far i reference mesh na tej samej regule
+
+SavedF3coefficients/currentinputs unchanged, all5120degree2. Finevariants radius2
+(qfar12/qnear8/r2) i far16(qfar16/qnear8/r4) porównać zbase weightedE/H<1e-6.
+CoarseB3base vsfineB4 mierzyreferencechange, frozen0,3% niezmieniony.
+120s EACH/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build, bezretry.
+Exactargv63:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-radius2-20261019 --physics stream-volume --level 3 --near-count 0 --stream-variant radius2 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Exactargv64:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-far16-20261019 --physics stream-volume --level 3 --near-count 0 --stream-variant far16 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Exactargv65:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree2-coarse-20261019 --physics stream-volume --level 3 --near-count 0 --near-side coarse --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Sequential after terminalexecutionPASS, interpretation root only. No fieldqualification yet.
+
+EXP63–65 all5120 executionPASS/noOOM,RSS<=434MB. Fine radius2/far16E/H
+1,463205/.864503%; coarse1,583615/.860008%. Case13,864/17,838/10,107s,
+apply8,697/12,668/4,928s,zerohits. Rootweightedbase deltasradius2<=2,21e-14,
+far16<=1,42e-15; near6<=1,42e-12PASS1e-6. ReferenceB3→B4 E/H1,55485/.75206%
+FAIL0,3%; fieldEFAIL1%. Artifact m2-stream-f3-degree2-root-analysis-20261019.json.
+No densepotentialmatrix/solve; notantenna speedup or convergednorm.
+
+### EXP66–67 — prerejestracja: własna regułaF3degree5
+
+Change onlydegree2→5:5120→17920positivepoints, savedF3u andPMCHWTcurrents unchanged.
+FineB4base then coarseB3base. Hypothesis: resolve volumequadrature sensitivity
+and reference mesh change before claiming trueL2. Near/far controls qualified
+on degree2; degree5control remains separate if field/reference promising.
+Costestimate3,5×apply9,25s plus setup~5s, allow~2×extra nearwork<120s; no capraise.
+Frozen field1%/reference.3%/volumeagreement1e-6 unchanged. No solve/GPU/build/cloud.
+120s EACH/6GiB4CPU/tmpfs/noaddedSwap. Exactargv66:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree5-base-20261019 --physics stream-volume --level 3 --near-count 0 --volume-degree 5 --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Exactargv67:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-f3-degree5-coarse-20261019 --physics stream-volume --level 3 --near-count 0 --volume-degree 5 --near-side coarse --volume-inputs artifacts/m2-transmission-eps294-f3-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Next only after terminalexecutionPASS, no autoretry. Rootanalysis only.
+
+EXP66/67 executionPASS all17920degree5points,noOOM,RSS442/440MB,case37,210/22,216s,
+apply31,985/17,035s,zeroexhaustion,maxdepth5/6. FineE/H1,68335/.97150%,
+coarse1,75075/1,04841%. Rootcorrectedreferencechange1,72451/.87598%FAIL0,3%;
+relative degree2→5 fieldestimatechange13,0779/11,0139%FAIL1e-6.
+FEM_Hsquarednorm q2/q5 exactlysame: expected curlND2degree1, |H|²degree2.
+Root allinput/sourceSHA/state, positiveweights4pi/3, pilotfullregression audited;
+artifact m2-stream-f3-volume-root-analysis-20261019.json. Degree5near/farcontrols
+NOTRUN, niepromować. Nie ponawiać tego samego solve/ślepego volumeq.
+
+Źródłowa korekta hipotezy: native Bempp NumBa potential NIE tworzy pełnej
+macierzy punkt×DOF. Pinned core/numba_assemblers.py i numba_kernels.py
+maxwell_efield_potential/maxwell_mfield_potential liczą bezpośrednią aplikację,
+ale mają global_points/tmp/diff w rozmiarze panel×quad i osobne T/K/currents.
+Nowy stream fuses cztery T/K dla2currents i ogranicza pertarget temporary do
+panelu. Wcześniejsze słowa 'nativepotentialmatrix' w EXP59/roadmap były błędną
+hipotezą, nie zmierzoną alokacją. Nie raportować oszczędności macierzy ani
+przyspieszenia względem native bez matchedmeasurement.
+
+### EXP68 — prerejestracja: matched native+correction vs fused apply
+
+Ten sam32pointcontrol/currents/q12+adaptiveq8radius4, dokładność<1e-12.
+Dodać rzeczywistą native q12evaluation (warmup1point/cachetime osobno),
+porównać z cached q12; osobno panelpreparation, fusedapply i incrementalcorrection.
+Native NumBa również matrixfree. Test nie mierzy peakmemorydelta/antenna speed.
+120s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/build; źródła geometry/nearjit bez zmian.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-native-comparison-20261019 --physics stream-control --level 2 --volume-inputs artifacts/m2-transmission-volume-degree2-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+
+FMM feasibility audit only, NOTRUN/notinstalled: pinned Bempp0.4.2 fmm_assembler.py
+supports MaxwellT/K; Dockerfile pins exafmm-t0.1.1. Official Bempp handbook confirms
+assembler='fmm', https://bempp.com/handbook/api/boundary_operators.html and
+https://bempp.com/handbook/core/assembling_operators.html . Local exafmm=None.
+ExafmmInterface creates cwd/.exafmm/*.tmp; must stay /scratch tmpfs under existing
+caps, never disk. Dense referenceB5N7680 has4operators+15360²block≥7,550GB beforeLU,
+over6GiBcap, so no denseB5 attempt. Nextcandidate independent PMCHWT-FMM reference
+with small denseT/K/action/solution controls beforehighermesh; no guarantee of benefit.
+
+EXP68 operatorPASS17,072s/RSS292MB/noOOM. Actualnativeq12 exactlycached,
+othercontrols<=8,88e-15. Nativewarm/load9,064s, first32evaluation2,837s;
+fusedpanelsetup1,758s/apply.05955s, incremental.07555s. Single native32timing
+is not robust warmed benchmark: add3repeats, report samples/median andsetup
+rather than applying microkernelratio to end-to-end. No peakmemorydelta claim.
+
+### EXP69 — prerejestracja: repeat matched warmed potential query
+
+Same32points/currentinputs/numerics asEXP68, only3warmmeasurements permethod,
+withnativewarmup1point andexplicit panelssetup/JITcost. Median/samples reported;
+includesnativeq12+incremental vsfusedpanelsetup+apply; sourcewithoutpointmatrixclaim.
+120s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/build, no retries. Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-stream-native-repeat-20261019 --physics stream-control --level 2 --volume-inputs artifacts/m2-transmission-volume-degree2-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+
+EXP69 PASS22,897s/RSS292MB/noOOM, nativeactualq12exactcached i pozostałe
+controls<=8,88e-15. Nativequeries2,8344/2,8550/2,8697s,fused.05931/.05892/.05861s;
+incremental.07567s,wspólnepanelprep1,77788s. Matched pojedynczequeryzprep:
+4,70855→1,83680s (~2,56x); amortizedquery2,93067→.05892s(~49,7x), tylkoCPU32points.
+Root allinput/sourceSHA/terminalgatesaudited w m2-stream-repeat-root-analysis-20261019.json.
+Nie mierzonodeltapeakRAM aniantenna speedup. Nativealreadymatrixfree fact corrected.
+Docs/INDEX/ARCH/PLAN i nextstep zaktualizowane; nadalM2ACTIVE i nierozwiązane
+field/volume/reference gates. FMMaudytkandydataNOTRUN, bezinstalacjideps.
+
+Walidacja końcowa:95unitPASS pinned/system79PASS16SKIP, checker/diffcheckPASS.
+Ta sama Luna: read-only docs-gardenPASS, bez sprzeczności i bez edycji.
+Rootreview: native-no-pointmatrix correction, matchingcost z commonpanelprep,
+frozenFAILgates i FMM/tmpfsNOTRUN sprawdzone. Commit lokalny, bezpush.
+Następne M2FMMsource/małyMaxwelloracle; brak nowej antena/medium/defaultpromotion.

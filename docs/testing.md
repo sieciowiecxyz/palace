@@ -50,7 +50,7 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 92 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 76 PASS/16 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 95 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 79 PASS/16 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:92testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo76PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:95testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo79PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -97,6 +97,10 @@ w unitach: to nie test LLVM; dowód rzeczywistego JIT jest wyłącznie wEXP50.
 [EXP54–58](maxwell-fem-refinement.md): epsilondefaults/invalidflags unit,
 locator strictowner/face/outside/NaN/chunking unit; actualanalyticF2/F3 i defaultregression,
 coupledF3 oraz fixedpointreplay. Fieldnorm/referenceconvergence nadal niezaliczone.
+[EXP59–69](maxwell-stream.md): stream NumBa actualnopython vsnative/cache/incremental,
+matched3queries, własnaF3volume degree2/5, radius/near/farcontrolsdegree2.
+Unit porównuje pętle/DFSstats z NumPy i odrzuca nieużywane flagi przedalokacją;
+nie kompiluje LLVM. Degree5near/farvariants i FMMNOTRUN, field/reference/degreeFAIL.
 Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
 [oracle](maxwell-oracle.md). Palace nie był zmieniany/przebudowywany.
 

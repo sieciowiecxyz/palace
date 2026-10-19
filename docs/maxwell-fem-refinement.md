@@ -73,11 +73,11 @@ PMCHWT oraz oddzielnego saved volume degree2. Guardy sprawdzają role, fizykę,
 source geometry/basis, native ABI i SHA wszystkich danych. Dane montowane read-only;
 pozostałe physics odrzucają probe-input, nie wolno nadpisać stopnia próbek.
 
-Następny test wymaga punktów i wag na rzeczywistej siatce F3 oraz kontroli
-potencjałów/referencji przy powierzchni. Wykorzystać zachowane u/t/h i cached JIT;
-nie ponawiać solve. Najpierw mały pilot kosztu bez dużego native-potential replay,
-który liniowo skalowany zEXP43 grozi przekroczeniem180s. Nie rozszerzać capów.
-M2 pozostaje ACTIVE; niczego nie promowano do anteny i medium bez zmian.
+Dalsze własne F3volume i kontrola kosztu zostały wykonane w
+[EXP59–69](maxwell-stream.md): reference/volumeFAIL zachowane. Natywny Bempp
+potencjał również matrixfree; wcześniejsza hipoteza o nativepotentialmatrix
+była błędna. Nowy wariant scala T/K i zmniejsza temporarybuffers.
+M2 ACTIVE, bez promocji anteny; medium bez zmian.
 
 Dowody: `artifacts/m2-near-boundary-error-analysis-20261019.json`,
 `artifacts/m2-nd2-eps294-root-analysis-20261019.json`,

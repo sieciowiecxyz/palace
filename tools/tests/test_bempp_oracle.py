@@ -12,6 +12,15 @@ SPEC.loader.exec_module(oracle)
 
 
 class PythonMountTests(unittest.TestCase):
+    def test_stream_probe_rejects_unused_or_unbounded_control_flags(self):
+        with patch.object(oracle.dev,'require_host_memory') as host:
+            for options in [dict(physics='nd2',stream_variant='near6'),
+                            dict(physics='stream-control',volume_inputs=['a','b'],near_count=0),
+                            dict(physics='stream-control',volume_inputs=['a','b'],stream_variant='far16'),
+                            dict(physics='stream-volume',volume_inputs=['a','b'],stream_variant='bad')]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),2,120,**options)
+            host.assert_not_called()
+
     def test_analytic_dielectric_epsilon_keeps_case_defaults_and_rejects_invalid(self):
         self.assertEqual(oracle.case_epsilon('nd2',None),1.)
         self.assertEqual(oracle.case_epsilon('transmission',None),2.94)
