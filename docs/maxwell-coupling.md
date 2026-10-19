@@ -172,7 +172,8 @@ Wszystkie tablice wRAM, CPU6GiB/4CPU/noaddedSwap/tmpfs; istniejący cacheJIT.
 ## Następne konkretne prace — bez zamykania M2
 
 1. MFEM **ND2** z globalnym DOF/orientation (wtym face DOF transformations).
-   Zastąpienie signedpermutationND1 prostą zmianą liczby DOF jest błędne.
+   [EXP33](maxwell-nd2.md) wykonał tę kontrolę oraz boundedDirichletreference
+   z1%PASS całychpól. Zastąpienie signedpermutationND1 prostą zmianą liczby DOF jest błędne.
 2. TraceND2 ma2DOF/edge+2DOF/face, RWG0 tylko1/edge. Potrzebny osobno
    kwalifikowany mortar/L2projection na odpowiednią powierzchnię lub zgodne
    BEMwyższegorzędu. Sprawdzić pole, adjointweakpairing, błąd projekcji i stabilność;
@@ -181,8 +182,8 @@ Wszystkie tablice wRAM, CPU6GiB/4CPU/noaddedSwap/tmpfs; istniejący cacheJIT.
    małych siatkach. Gprimal jest skew, nie zakładać SPD/odwracalności. Kandydat na
    zgodny mortar: t wRWG, h wBC, testRBC=n×BC; wtedy GdualR=−B^T i
    B=−R^TGdual^T z fizycznej całki FEMv·BC. EXP32 potwierdza znaki, transforms
-   i exactconstanttrace; **rzeczywisty ND2mortar nadal niewdrożony**. Najpierw
-   niezależna kontrola globalMFEMND2 na plane-waveDirichlet, potem B/R i
+   i exactconstanttrace; **rzeczywisty ND2mortar nadal niewdrożony**.
+   Niezależna kontrola globalMFEMND2 na plane-waveDirichlet jest jużPASS wEXP33; dalej B/R i
    zbieżność powierzchni przy stałymFEM, żeby oddzielić błędy obu przestrzeni.
 3. Podnieść dokładność tegoprzypadku do1%E/H, potem dielectricFEMtransmission
    i kontrola far-field/energii względem niezależnego oracle.

@@ -21,7 +21,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Dwa kernele FP64, hybrid GMRES, −17% danych operatora oraz PMCHWT/Mie i audyt błędu geometrii; brak promocji anteny.
 - [M2: interfejs MFEM–Bempp](maxwell-coupling.md)
   - Czytaj gdy: wznawiasz sprzężony prototyp lub przygotowujesz trace ND2
-  - Opis: Rzeczywiste integratory MFEM/Calderón, ND1 fieldgate FAIL oraz audyt utraty rzędu RWG/SNC i kandydata RWG/RBC; następne global ND2 i mortar.
+  - Opis: Rzeczywiste integratory MFEM/Calderón, ND1 fieldgate FAIL oraz audyt utraty rzędu RWG/SNC i kandydata RWG/RBC; global ND2 w EXP33, mortar nadal otwarty.
+- [M2: globalne ND2](maxwell-nd2.md)
+  - Czytaj gdy: przygotowujesz rzeczywisty ND2mortar lub kontrolujesz dokładność objętościową
+  - Opis: Globalne MFEM/faceDOFtransforms, sparseCSR i plane-waveDirichletPASS; interpolacja to inny wektor, sprzężenie BEM nadal otwarte.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

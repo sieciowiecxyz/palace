@@ -1,4 +1,4 @@
-"""Cached, isolated MFEM ND1 C API probe using the existing dependency image."""
+"""Cached, isolated MFEM ND1/ND2 C API probes using the dependency image."""
 import fcntl
 import json
 from pathlib import Path
@@ -10,13 +10,14 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import dev
 
 SOURCE = dev.ROOT/'tools/experiments/mfem_bridge.cpp'
+GLOBAL_SOURCE = dev.ROOT/'tools/experiments/mfem_global.cpp'
 BASE = dev.ROOT/'build/m2-oracle/fem'
 LIBRARY = BASE/'libmfem_bridge.so'
 
 
 def recipe():
     settings = dev.read(dev.SETTINGS)
-    return dict(source_sha256=dev.sha(SOURCE),builder=dev.image_id(settings['builder_image']),
+    return dict(source_sha256=dev.sha(SOURCE),global_source_sha256=dev.sha(GLOBAL_SOURCE),builder=dev.image_id(settings['builder_image']),
                 runtime=dev.image_id(settings['runtime_image']),
                 flags=['-std=c++17','-O2','-fPIC','-I/opt/view/include','-I/usr/local/cuda/include','-I/opt/cudss/include'])
 
@@ -50,7 +51,9 @@ def build():
                     dev.command(argv,stdout=log,stderr=subprocess.STDOUT,timeout=remaining)
                 execute(['podman','exec',name,'ccache','/opt/view/bin/mpicxx',*current['flags'],'-c',
                          '/src/palace/'+str(SOURCE.relative_to(dev.ROOT)),'-o',target+'.o'])
-                execute(['podman','exec',name,'/opt/view/bin/mpicxx','-shared',target+'.o',
+                execute(['podman','exec',name,'ccache','/opt/view/bin/mpicxx',*current['flags'],'-c',
+                         '/src/palace/'+str(GLOBAL_SOURCE.relative_to(dev.ROOT)),'-o',target+'-global.o'])
+                execute(['podman','exec',name,'/opt/view/bin/mpicxx','-shared',target+'.o',target+'-global.o',
                          '-L/opt/view/lib','-Wl,-rpath,/opt/view/lib','-lmfem','-o',target+'.so'])
                 execute(['podman','cp',name+':'+target+'.so',LIBRARY])
             if recipe()!=current: raise ValueError('MFEM bridge source changed during build')

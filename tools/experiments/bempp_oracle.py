@@ -23,6 +23,8 @@ CASE = dev.ROOT/'tools/experiments/bempp_sphere.py'
 DIELECTRIC_CASE = dev.ROOT/'tools/experiments/bempp_dielectric.py'
 COUPLING_CASE = dev.ROOT/'tools/experiments/bempp_coupling.py'
 PAIRING_CASE = dev.ROOT/'tools/experiments/bempp_pairing.py'
+ND2_CASE = dev.ROOT/'tools/experiments/mfem_nd2.py'
+ND_API = dev.ROOT/'tools/experiments/maxwell_nd.py'
 FEM_API = dev.ROOT/'tools/experiments/maxwell_fem.py'
 REFERENCE = dev.ROOT/'tools/maxwell_reference.py'
 COMPRESSION = dev.ROOT/'tools/experiments/maxwell_hmatrix.py'
@@ -155,15 +157,15 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
-    if physics not in ['pec','dielectric','coupling','pairing'] or (physics!='pec' and (compression or native)):
-        raise ValueError('Dielectric/coupling/pairing probes CPU only; compression applies to PEC')
+    if physics not in ['pec','dielectric','coupling','pairing','nd2'] or (physics!='pec' and (compression or native)):
+        raise ValueError('Only PEC supports the optional CUDA compression probe')
     if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
-    source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE}[physics]
+    source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,'nd2':ND2_CASE}[physics]
     dev.require_host_memory()
     manifest = verified()
     if native and not compression: raise ValueError('--native-apply requires --compression')
     cuda = verified_cuda() if native else None
-    bridge = mfem_bridge.verified() if physics=='coupling' else None
+    bridge = mfem_bridge.verified() if physics in ['coupling','nd2'] else None
     output = Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     (BASE/'jit-cache').mkdir(exist_ok=True)
@@ -184,7 +186,8 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--device','nvidia.com/gpu=all'] if compression else []),
             *(['-v',f'{CUDA_LIBRARY}:/native/libmaxwell_apply.so:ro'] if native else []),
             *(['-v',f'{mfem_bridge.LIBRARY}:/native/libmfem_bridge.so:ro'] if bridge else []),
-            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if physics in ['coupling','pairing'] else []),
+            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if physics in ['coupling','pairing','nd2'] else []),
+            *(['-v',f'{ND_API}:/scripts/maxwell_nd.py:ro'] if physics=='nd2' else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
             '-u','/scripts/case.py','--level',str(level),'--output','/work',
             *(['--compression'] if compression else []),*(['--native-apply'] if native else []),
@@ -194,7 +197,8 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
                                       physics=physics,case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
                                       native_cuda=cuda,
-                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if physics in ['coupling','pairing'] else None,
+                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if physics in ['coupling','pairing','nd2'] else None,
+                                      nd_api_sha256=dev.sha(ND_API) if physics=='nd2' else None,
                                       scope='CPU Maxwell oracle, optional CUDA compressed apply; no antenna promotion'))
     started = time.monotonic()
     result = dict(complete=False,analytic_target_passed=False,level=level)
@@ -228,7 +232,7 @@ if __name__=='__main__':
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
     parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
     parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
-    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing'],default='pec')
+    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2'],default='pec')
     parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     args = parser.parse_args()
     if args.action=='setup': setup()

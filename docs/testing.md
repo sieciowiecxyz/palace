@@ -50,7 +50,7 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 65 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 62 PASS/3 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 69 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 63 PASS/6 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:65testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo62PASS/3SKIP z brakuSciPy. Trzy dodatkowe testy obejmują kwadraturę
+Aktualny suite:69testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo63PASS/6SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -79,8 +79,11 @@ GMRES i dielectricPMCHWT przetestowane w [EXP25–29](maxwell-native-dielectric.
 Regułaobjętości jawna, staregeometrieFAIL zachowane. ActualMFEMND1interface
 w[EXP30–31](maxwell-coupling.md) ma map/pair/energyPASS i całkowity1%fieldgateFAIL.
 EXP32 ma3prawdziweCPUrunyparowania, odrzuca inwersjęGprimal i wskazujeGdualRBC;
-niejest rozwiązywaniemMaxwella aniND2mortar. To
-niekwalifikujeND2, dielectricFEMtransmission anianteny. Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
+niejest rozwiązywaniemMaxwella aniND2mortar. [EXP33](maxwell-nd2.md) sprawdza
+actualglobalND2/faceorientations/physicalquadrature i sparseDirichletreference:
+1%pólPASS0,151/0,332%, samainterpolacjaH1,468%FAIL. Regresje wejść/topologii/
+referencepoints/closedhandle i cacheglobalCpp są w suite. Nie jest to coupledND2,
+dielectricFEMtransmission aniantena. Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
 [oracle](maxwell-oracle.md). Palace nie był zmieniany/przebudowywany.
 
 ## Eksperymentalne Q-workspace

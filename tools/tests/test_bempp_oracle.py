@@ -40,6 +40,23 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_mfem_cache_recipe_tracks_global_source_separately(self):
+        bridge = oracle.mfem_bridge
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            local,global_source = root/'local.cpp',root/'global.cpp'
+            local.write_text('local API')
+            global_source.write_text('global API version1')
+            settings = {'builder_image':'builder','runtime_image':'runtime'}
+            with patch.object(bridge,'SOURCE',local),patch.object(bridge,'GLOBAL_SOURCE',global_source),\
+                 patch.object(bridge.dev,'read',return_value=settings),\
+                 patch.object(bridge.dev,'image_id',side_effect=lambda image:image):
+                before = bridge.recipe()
+                global_source.write_text('global API version2')
+                after = bridge.recipe()
+                self.assertEqual(before['source_sha256'],after['source_sha256'])
+                self.assertNotEqual(before['global_source_sha256'],after['global_source_sha256'])
+
     def test_mfem_bridge_manifest_rejects_modified_binary(self):
         bridge = oracle.mfem_bridge
         with tempfile.TemporaryDirectory() as directory:

@@ -18,7 +18,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP25–29: native2kernel/H-matrixeta4 −17,31%matrixdata i poprawnyGPUoperator/CPUbasisGMRES. DielectricPMCHWT/Mie far-fieldPASS0,0223% zregułąobjętości i zbieżnością; stareinscribedmeshscatterFAIL. docs/maxwell-native-dielectric.md.
 - EXP30–31: actualMFEM4.9ND1/Bemppcoupling ze zbieżnością, trace/pair~1e−15/energyPASS. Całkowity1%E/HFAIL:6,12/5,79%, comparatorFEM6,18/5,82%; Δcoupled–FEM0,57/0,76% niekwalifikujeND2/anteny. docs/maxwell-coupling.md.
 - EXP32: primalRWG/SNCGramtracirank90/120,330/480; odrzucićinwersjędoprowadzeniaND2projection. DualRWG/RBCfullrank/κscaled≤2,93, physicalpairing/transforms/constanttracePASS. Plane-traceRWG0błąd20,99→10,43→5,16%, nadalnieND2mortar. docs/maxwell-coupling.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.65testsPASSwpinnedenv; systemowo62PASS/3SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP33: actualglobalMFEMND2/faceDOFtransforms/physicalbasis/CSR, Dirichletplane-waveE/H0,1505/0,3317%PASS na8936DOF/1280tet.5,514s/433MB/CSR8,79MB; interpolacjaH1,468%FAIL. BrakcoupledBEM/antenna speedup; docs/maxwell-nd2.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.69testsPASSwpinnedenv; systemowo63PASS/6SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -38,7 +39,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: ND1interfacewykonany, 1%fieldFAIL. EXP32odrzuciłosobnąinwersjęGprimal; GdualRBC małytestPASS. Następne actualMFEMND2/globalDOF+facetransformations i niezależna plane-waveDirichletkontrola, potem fizyczny B/Rmortar i zbieżnośćpowierzchni przy stałymFEM (RWG0niejestND2trace). Nie zastępować dokladności ND2 dalszym zagęszczaniem ND1. Potem dielectricFEMtransmission, sparseSchur/scalableBEMassembly/skalowanie/antena. M2otwarty, bezpaidcompute.
+2. M2: ND1interface1%fieldFAIL. EXP32odrzuciłosobnąinwersjęGprimal; GdualRBC małytestPASS. EXP33actualglobalND2/boundedDirichletreferencePASS. Następne fizyczny B/Dmortar: D=<RBC,v×n>=−B^T, GdualR=D, constanttrace i błądpolynomial/planewavetrace. Potem sparseFEM+Schur kontrolowanywzględemtinydense, coupledE/H≤1%/energy/farfield; zbieżnośćpowierzchni przy stałymFEM (RWG0niejestND2trace). DalejdielectricFEMtransmission/stabilizacja/scalableassembly/antena. M2otwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -406,3 +407,46 @@ plane-waveDirichletkontrola, fizyczneB/Rmortar i rozdzieleniebłęduFEM/powierzc
 65testsPASSwpinnedenv,systemowo62PASS/3SKIP(SciPy); docs-gardenLuna/rootreviewPASS,
 historycznylicznik62wEXP30–31doprecyzowany. Checker/diffcheckPASS, lokalnycommitbezpush.
 Brakpromocji/natywnegorebuilda/płatnegocompute; M2/goalaktywne.
+
+### EXP33 — prerejestracja: actual global MFEM ND2
+
+ZachowaćprodukcyjnymediumND2, nieprzedłużaćND1refinement. Nowy małyCAPI
+`mfem_global.cpp` używa istniejącego MFEM4.9/ND_FECollection(2), globalFESpace,
+rzadkichBilinearForms oraz GetElementDofs/InvTransformPrimal dlafaceDOFs.
+BuildtylkodwaTUs/ccache i linkSO, limit120s, bezrebuildazależności/Palace.
+Nowycase `--physics nd2`: ten samzamkniętywielościan, k1/eps=mu1,
+exactplanewaveEx=exp(iz),Hy=exp(iz), DirichletzprojectedanalyticboundaryDOFs.
+Poziom1→2→3 poexecutionPASS; cap6GiB/4CPU/tmpfs/noaddedSwap/deadline120s.
+Gatephysicalbasis/globalmatrixquad/constant/linear/GridFunction≤1e−11,
+musząwystąpićnonidentityface transforms. CałepolaE/H≤1%, rawinterior≤1e−10,
+q4vs6delta≤1e−6. SparseCSR/lokalnebasiswektorywRAM; brakdenseglobalFEM.
+Rzeczywisteargv `python3 tools/experiments/mfem_bridge.py build`, potem
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-global-nd2-level1-20261019
+--physics nd2 --level 1 --seconds 120`. Wyższepoziomydonowychkatalogówpoanalizieroota.
+Level1takżeregresja staregoND1CAPI. To odniesieniedlapóźniejszegoBCmortar,
+nie FEM–BEMsolve/exterior/ports aniantenna speedup. M2/goalaktywne.
+
+EXP33pierwszybuildPASS3,361s, nowySO35dea8a9…; level1containerexit0/noOOM,
+runnercompletefalse0,527s. ND2184DOF/20tet, checks≤4,44e−15 iND1legacyPASS;
+E/HDirichlet2,204/3,342% (projekcjanie-solve2,451/5,315%). Raw6,83e−16,
+aleq4vs6delta3,19e−6>1e−6: diagnostycznyfiltrFAIL, nie wolnopromować.
+Korekta: wliczaniu błędu pól użyć dokładniejszejkwadraturyq6 z niezależnymq8,
+prógdelta1e−6 bez zmian, poprzedniąróżnicęq4vs6 nadalraportować; niezmienia
+toND2/siatki/operatora ani tolerancji pól. Dokładniejszyaudyt licznika
+faceorientations: MFEMIsIdentity dotyczyklasytransformacji, nie danegoelementu;
+liczyć faktyczne InvTransformPrimal(I) != I. To wymaga jednegoprzyrostowego
+rebuilda wyłącznie małegoCAPI. Nowyrun `artifacts/m2-global-nd2-level1-q6-20261019`.
+
+EXP33q6: rebuild3,310s/nowySO1abaa83a…; level1/2/3exit0/noOOM/executionPASS,
+runner0,536/1,051/5,514s, RSS281/288/433MB. DOF184/1228/8936,boundary100/400/1600;
+actualnonidentitycells19/147/1167, matrixquad≤8,86e−16, polynomials≤3,56e−14.
+DirichletE/H2,2046/3,3413→0,5910/1,0541→0,1505/0,3317%: level3analyticPASS.
+Oddzielna interpolacjaE/Hlevel3=0,1860/1,4681% (HFAIL), nie ta samareferencja.
+Raw6,83e−16/1,73e−15/4,09e−15,q6vs8≤6,94e−12. M/KCSR148552/1128424/8793480B,
+sparseLU0,000327/0,005876/0,5362s. Rootzweryfikowałaktywnesource/binarySHA/
+terminalstate w artifacts/m2-global-nd2-root-analysis-20261019.json.
+69testsPASSwpinnedenv,systemowo63PASS/6SKIP. DalejB/Dmortar/Schur/coupledND2,
+bezprzenoszeniażądań1%na samąinterpolację ani deklaracjiantenna speedup.
+Docs-gardenLuna/rootreview/checker/diffcheckPASS; dodatkowycachecheck
+`MFEM bridge unchanged: cached library retained` bezrekompilacji.
+Lokalnycommitbezpush, goal/M2aktywne.
