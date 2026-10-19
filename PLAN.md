@@ -2,9 +2,9 @@
 
 Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
 Mode: goal
-Active: M2
+Active: M3
 
-Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; aktywny M2: prototyp Maxwell FEM–BEM. Compute lokalny; bez najmu chmury.
+Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, aktywny M3: GMRES/pamięć. Compute lokalny; bez najmu chmury.
 
 ## Cel
 
@@ -18,8 +18,8 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 
 - [x] M0 — Research i samodzielny fork z cache; zakres dowodów w docs/migration.md.
 - [x] M1 — Referencja, niezależna jakość, profil i koszt powietrza w FEM; docs/milestones/M1.md.
-- [ ] M2 — FEM–BEM/MoM: research, prototyp Maxwell i pomiar opłacalności.
-- [ ] M3 — GMRES, kompresja bazy i ograniczenie migracji RAM↔GPU.
+- [x] M2 — ocena FEM–BEM/MoM zakończona REJECT obecnej integracji; bramki promocji pozostają FAIL/niekompletne. docs/milestones/M2-decision.md.
+- [ ] M3 — ACTIVE: GMRES, kompresja bazy i ograniczenie migracji RAM↔GPU; docs/milestones/M3.md.
 - [ ] M4 — Reuse operatorów, preconditionera i faktorów między portami.
 - [ ] M5 — Preconditioner, cuDSS i kontrolowana mixed precision.
 - [ ] M6 — Tensor Cores/TF32/BF16 na zmierzonym gorącym fragmencie.
@@ -71,10 +71,15 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] EXP48–53: kontrolowany cached NumBa near-kernel ~20× w mikropróbie; pełny coarse replay18,089s zamiast TIMEOUT180s. Corrected B3/B4 oraz degree2/5 nadal FAIL zbieżności; pola2,888/1,611% niekwalifikowane. Nie jest to speedup anteny; docs/maxwell-near-panels.md.
 - [x] EXP54–58: analytic epsilon2,94 F3 E/H0,443/0,717%PASS, actualcoupled F3/B3 i replay identycznych640punktów E/H0,664/0,597% vsB4. Wciąż brak zbieżnej normyF3/reference; defaultND2eps1 regressionPASS. docs/maxwell-fem-refinement.md.
 - [x] EXP59–69: fused T/K apply matchesnative/incremental<1e-12, matched32query2,56×zprzygotowaniem. WłasnaF3volume degree2/5 dajeE/H1,463/.865→1,683/.972%; reference/degreeFAIL. DenseB5 ponadcap; następny backend FMM opisany w EXP70–73. docs/maxwell-stream.md.
-- [x] EXP70–73: cached ExaFMM build i p8 Maxwell actionPASS<1e-6; p6FAIL, p8two-cache INVALID przez RAM tmpfs exhaustion. Sekwencyjny cykl życia naprawiony bez zwiększenia cap. PMCHWTsolve/fieldNOTRUN. docs/maxwell-fmm.md.
+- [x] EXP70–73: cached ExaFMM build i p8 Maxwell actionPASS<1e-6; p6FAIL, p8two-cache INVALID przez RAM tmpfs exhaustion. Sekwencyjny cykl życia naprawiony bez zwiększenia cap. Wówczas PMCHWTsolve/fieldNOTRUN; późniejsza decyzja po EXP74–76 poniżej. docs/maxwell-fmm.md.
 - [ ] Zweryfikować sprzężoną transmisję dielektryczną i ryzyko rezonansów; nie utożsamiać osobnego PMCHWT/Mie z interfejsem FEM–BEM.
 - [ ] Zmierzyć setup+solve, macierz/kompresję/workspace i przewidywany koszt docelowej anteny; gęsta macierz BEM bez kompresji może przegrać.
 - [ ] Jeśli prototyp daje przewagę i poprawne pola/energię, przygotować izolowaną integrację operatora blokowego w Palace i porównać reprezentatywny case. Inaczej zapisać odrzucenie/ograniczenie; wynik Helmholtz nie kwalifikuje Maxwell.
+
+M2 decyzja: ocena zamknięta REJECT po EXP74–76, bez promocji/zmiany frozen gates.
+Niezależny FMM residual1,27e-8 nadal>1e-9, pełna transmisja/refinementFAIL.
+M3 zaczyna się po udokumentowanym odrzuceniu zgodnie z zasadą negatywnej oceny
+powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision.md.
 
 ### M3 — największy podejrzany koszt pamięci
 

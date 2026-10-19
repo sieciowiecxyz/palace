@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:101testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo85PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:102testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo86PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -116,3 +116,9 @@ weryfikuje receipt; numeryczny `--physics fmm-control --fmm-order 8 --fmm-ncrit 
 ma120DOF/6GiB/120s i512MiB RAM tmpfs, bez GPU. EXP73 actionPASS nie zastępuje
 PMCHWTsolve/field qualification. Regresje stdlib sprawdzają cache/tampering,
 walidację flag i odrzucenie pełnego tmpfs; nie importują ExaFMM w testach systemowych.
+
+PMCHWT `--physics fmm-solve` pilot B2/p8..9/ncrit32; opcjonalny
+`--fmm-preconditioner near-ilu` bierze sparse singular_part. EXP74–76 executionPASS,
+ale solveFAIL independentraw1e-9; nie kwalifikować na podstawie samego residualu
+FMM lub Δcoeff. Dwa512MiB RAM tmpfs bez capincrease, exact filesize/preflight
+guards; p10NOTRUN ponadcap. [Decyzja M2](milestones/M2-decision.md).

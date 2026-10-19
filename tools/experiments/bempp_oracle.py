@@ -212,11 +212,11 @@ def case_epsilon(physics,epsilon):
     return None
 
 
-def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32,near_side='fine',near_backend='numpy',probe_input=None,stream_variant='base',fmm_order=6,fmm_ncrit=64):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32,near_side='fine',near_backend='numpy',probe_input=None,stream_variant='base',fmm_order=6,fmm_ncrit=64,fmm_preconditioner='none'):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
-    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume','fmm-control'] or (physics!='pec' and (compression or native)):
+    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume','fmm-control','fmm-solve'] or (physics!='pec' and (compression or native)):
         raise ValueError('Only PEC supports the optional CUDA compression probe')
     if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
     if duality not in ['electric','magnetic'] or (duality!='electric' and physics!='nd2-coupling'):
@@ -240,10 +240,13 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
         raise ValueError('Reference side fine/coarse applies only to near correction')
     if near_backend not in ['numpy','numba'] or (physics not in ['near-control','near-correction'] and near_backend!='numpy'):
         raise ValueError('Near backend numpy/numba applies only to near controls/correction')
-    fmm_helper=physics=='fmm-control'
-    if fmm_order not in [4,6,8] or not 16<=fmm_ncrit<=128 or (not fmm_helper and (fmm_order!=6 or fmm_ncrit!=64)):
+    if fmm_preconditioner not in ['none','near-ilu'] or (physics!='fmm-solve' and fmm_preconditioner!='none'):raise ValueError('FMM preconditioner applies only to solve')
+    fmm_helper=physics in ['fmm-control','fmm-solve']
+    if fmm_order not in [4,6,8,9] or not 16<=fmm_ncrit<=128 or (not fmm_helper and (fmm_order!=6 or fmm_ncrit!=64)):
         raise ValueError('FMM options apply only to the bounded FMM control')
+    if physics=='fmm-control' and fmm_order==9:raise ValueError('Order9 restricted to the small solve pilot')
     if fmm_helper and level not in [2,3]:raise ValueError('FMM control requires nontrivial surfacelevel2/3')
+    if physics=='fmm-solve' and (level!=2 or fmm_order not in [8,9] or fmm_ncrit!=32):raise ValueError('FMM solve pilot requires B2/p8..9/ncrit32')
     stream_helper=physics in ['stream-control','stream-volume']
     if stream_variant not in ['base','near6','radius2','far16'] or (physics!='stream-volume' and stream_variant!='base'):
         raise ValueError('Stream variant applies only to the streamed volume potential probe')
@@ -259,7 +262,7 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
         if checked['epsilon_r']!=saved['epsilon_r']:raise ValueError('Probe and candidate materials differ')
         probes=checked['candidate']
     source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,
-              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE,'fem-replay':FEM_REPLAY_CASE,'stream-control':STREAM_CASE,'stream-volume':STREAM_CASE,'fmm-control':FMM_CASE}[physics]
+              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE,'fem-replay':FEM_REPLAY_CASE,'stream-control':STREAM_CASE,'stream-volume':STREAM_CASE,'fmm-control':FMM_CASE,'fmm-solve':FMM_CASE}[physics]
     transmission_helper=fmm_helper or stream_helper or physics in ['volume','near-control','near-correction','fem-replay']
     nd_coupling_helper=transmission_helper or physics=='transmission'
     pairing_helper=nd_coupling_helper or physics in ['nd2-coupling','traces']
@@ -323,6 +326,7 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--near-backend',near_backend] if physics in ['near-control','near-correction'] else []),
             *(['--mode','control' if physics=='stream-control' else 'volume','--stream-variant',stream_variant] if stream_helper else []),
             *(['--fmm-order',str(fmm_order),'--fmm-ncrit',str(fmm_ncrit)] if fmm_helper else []),
+            *(['--solve','--fmm-preconditioner',fmm_preconditioner] if physics=='fmm-solve' else []),
             *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
                                       physics=physics,duality=duality if physics=='nd2-coupling' else None,
@@ -330,6 +334,7 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
                                       epsilon_r=resolved_epsilon,
                                       reference_only=reference_only,exafmm_addon=addon,
                                       fmm_order=fmm_order if fmm_helper else None,fmm_ncrit=fmm_ncrit if fmm_helper else None,
+                                      fmm_preconditioner=fmm_preconditioner if physics=='fmm-solve' else None,
                                       coupling_api_sha256=dev.sha(ND_COUPLING_CASE) if nd_coupling_helper else None,
                                       transmission_api_sha256=dev.sha(TRANSMISSION_CASE) if transmission_helper else None,
                                       near_api_sha256=dev.sha(NEAR_API) if near_helper else None,
@@ -381,14 +386,15 @@ if __name__=='__main__':
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
     parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
     parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
-    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume','fmm-control'],default='pec')
+    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction','fem-replay','stream-control','stream-volume','fmm-control','fmm-solve'],default='pec')
     parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     parser.add_argument('--duality',choices=['electric','magnetic'],default='electric')
     parser.add_argument('--surface-level',type=int,choices=[1,2,3,4])
     parser.add_argument('--epsilon-r',type=float,choices=[1.,2.94])
     parser.add_argument('--reference-only',action='store_true')
-    parser.add_argument('--fmm-order',type=int,choices=[4,6,8],default=6)
+    parser.add_argument('--fmm-order',type=int,choices=[4,6,8,9],default=6)
     parser.add_argument('--fmm-ncrit',type=int,default=64)
+    parser.add_argument('--fmm-preconditioner',choices=['none','near-ilu'],default='none')
     parser.add_argument('--stream-variant',choices=['base','near6','radius2','far16'],default='base')
     parser.add_argument('--probe-input',type=Path)
     parser.add_argument('--volume-inputs',type=Path,nargs=2,metavar=('CANDIDATE','REFERENCE'))
@@ -401,4 +407,4 @@ if __name__=='__main__':
     elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count,args.near_side,args.near_backend,args.probe_input,args.stream_variant,args.fmm_order,args.fmm_ncrit)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count,args.near_side,args.near_backend,args.probe_input,args.stream_variant,args.fmm_order,args.fmm_ncrit,args.fmm_preconditioner)

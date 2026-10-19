@@ -9,6 +9,16 @@ SOURCE=Path(__file__).resolve().parents[1]/'experiments/bempp_fmm_control.py'
 
 
 class ScratchGuardTests(unittest.TestCase):
+    def test_pinned_complex_table_layout_and_budget(self):
+        tree=ast.parse(SOURCE.read_text())
+        function=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='table_bytes')
+        scope={}
+        exec(compile(ast.Module(body=[function],type_ignores=[]),str(SOURCE),'exec'),scope)
+        size=scope['table_bytes']
+        self.assertEqual(size(8,2),302215176)
+        self.assertEqual(size(9,2),453578504)
+        self.assertGreater(size(10,2),512*1024**2)
+
     def call_guard(self,free_blocks):
         tree=ast.parse(SOURCE.read_text())
         function=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='scratch_usage')

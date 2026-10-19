@@ -45,6 +45,8 @@ Wymaga M0. Blokuje wszystkie dalsze optymalizacje.
 
 Wymaga M1. Obowiązkowy research i prototyp, integracja zależy od zmierzonych korzyści.
 
+Ocena M2 zakończona z **REJECT** obecnej integracji; [decyzja](docs/milestones/M2-decision.md). Bramki promocji M2.2/M2.3 pozostają niezaliczone. Zgodnie z istniejącą regułą negatywnej oceny w PLAN decyzja pozwala rozpocząć M3; nie jest promocją ani zmianą tolerancji.
+
 - M2.1: porównano istniejące implementacje Maxwell/FEM–BEM/MoM i akcelerację FMM/H²: CUDA/OpenCL, rzeczywiste GPU matvec/solve, licencja, ślady H(curl), konwencja fazy, porty, dielektryk i cienkie przewodniki. Źródła/rewizje i koszty integracji zapisane.
 - M2.2: rzeczywisty mały prototyp elektromagnetyczny przechodzi odniesienie analityczne kuli PEC oraz kontrolę dielektryka i interfejsu FEM–BEM. Kontrola pól, promieniowania, pasywności/energii i zbieżności; benchmark skalarny to wyłącznie smoke.
 - M2.3: dla porównywalnego błędu policzono pamięć (w tym gęste bloki, kompresję i workspace), setup+solve i koszt rosnącego rozmiaru. Redukcja liczby niewiadomych sama nie dowodzi oszczędności; badanie lokalne, bez chmury.

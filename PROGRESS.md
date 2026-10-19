@@ -1302,3 +1302,82 @@ contradictions; stale current-suite95 corrected to101 (historical e57ba76 count
 retained with explicitlabel). Checker/diffcheckPASS. Root verified currentcaseSHA
 match EXP73command and terminalstate exit0/noOOM. No antenna/promotion/M3 claim.
 Local commit only, no push to public upstream.
+
+### EXP74 — prerejestracja: actual PMCHWT FMM vs independent dense solve
+
+Previous turn progress: f41aeca, cachedaddon/MaxwellactionPASS after RAM-lifetime
+fix. Next full small PMCHWT at sameB2/p8/ncrit32/q4/k1/sqrt2.94/complex128.
+Each wave retains its302MBtable on one existing RAMtmpfs mount: /scratch or/tmp,
+512MiB each, same total6GiB/4CPU/noswap cap. No table/tree rebuild per iteration,
+noSSDscratch. Root prepared exact matrix blocks from frozen transmission helper
+without editing it; bothdense andFMM share geometry/RWG-SNC/projections. Dense
+is independent tiny oracle only, not a scalable preconditioner or FMMfallback.
+Actual LinearOperator GMRES rtol1e-10, restart32/onecycle, max120s. Report raw
+FMM and independentdense residuals, coefficientdifference, iterations/matvec/setup
+cost and sharedRSS. Gates raw<1e-9, coefficientrel<1e-6; no field/Miequalification
+from small solve. Nonconvergence/frozenindependentrawFAIL remainsfailure.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-pmchwt-o8-20261019 --physics fmm-solve --level 2 --fmm-order 8 --fmm-ncrit 32 --seconds 120`.
+
+EXP74 terminalexit0/noOOM, sourceSHA/terminal verified byroot before edits.
+GMRES32/info1, FMMraw.018024085 vs independentraw.018024085, coefficienterr6.484%.
+Dense raw2.467e-15. Solve52.868s,34matvec54.398s(include finalcheck), total81.259s,
+RSS717533184B. Both RAMtmpfs302219264B peak/end0, no overflow/rebuild.
+FAIL is nonconvergence, not evidence that converged FMM solution meets gates.
+
+### EXP75 — prerejestracja: sparse adjacent-panel near-ILU for M2 solve control
+
+One change: leftpreconditioner from existing exact singular_part sparse matrices
+of fourMaxwelloperators, no dense oracle entries, no singularRWGGram inversion.
+Same PMCHWTblocksigns; spilu drop_tol1e-3/fill_factor5. Report actual sparse/factor
+nnz/bytes and setup. Same p8/quad4/B2/32GMRESsteps/rtol1e-10/raw1e-9/coeff1e-6.
+Still M2 solver feasibility (not moving to M3/M5 or promoting preconditioner).
+No cache/dependency rebuild, unchanged6GiB4CPU/tmpfs512MiBeach/noSwap/120s.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-pmchwt-near-ilu-20261019 --physics fmm-solve --level 2 --fmm-order 8 --fmm-ncrit 32 --fmm-preconditioner near-ilu --seconds 120`.
+
+EXP75 terminalexit0/noOOM71.560s/RSS721100800B, solveFAIL. NearILU matrix12960nnz/
+260164B, factors39578nnz/793488B, setup.00960s. GMRES26/info1 stoppedcycle before
+rtol; rawFMM9.464e-10 meets1e-9gate but notrequested1e-10 stopping, independent
+raw1.302e-7 FAIL, coeffrel3.850e-7 PASS. Solve43.060s vs52.868s unpreconditioned
+(bothincomplete, not qualifiedspeedup). Error floor now operatoraccuracy, not
+simply iterationcap. No promotion/relaxedgates.
+
+### EXP76 — prerejestracja: p9 precision step with predicted RAM table budget
+
+One change fromEXP75: order8→9. Pinned fmm.h filelayout predicts complex128
+table:20*nsurf²*(depth+1)*16+26*(2*(2*p)^3*8*8)*depth*8+8,nsurf=6*(p-1)^2+2.
+Geometry.h gives8M2M/26M2Lpositions. Atactualdepth2 p8=302215176B(exactobserved),
+p9=453578504B(fits512MiB); p10=654602248B DOESNOTFIT, do not blindlyrunp10.
+Added preflight budget and exactpostbuildfile-sizeguard, nohighercaps. Same
+nearILU/32steps/rtol/raw/coeffgates, allFP64complex128,120s/6GiB4CPU/noSwap.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-pmchwt-o9-near-ilu-20261019 --physics fmm-solve --level 2 --fmm-order 9 --fmm-ncrit 32 --fmm-preconditioner near-ilu --seconds 120`.
+
+EXP76 terminalexit0/noOOM, rootverifiedsourceSHA/state. p9independentraw1.272e-8
+stillFAIL1e-9, coeff3.004e-8 PASS; info1/26iter, FMMraw9.464e-10 notrtol1e-10.
+Solve59.005s,total88.396s,RSS900726784B. Bothtables453578504B equalpredicted,
+tmpfs453578752B each/end0. p9highercost reducesoperatorfloor but doesnotqualify.
+
+### M2 decision — assessment CLOSED / integration REJECT, M3 ACTIVE
+
+Existing PLAN already allows negative hypothesis closure with evidence; after
+actual CUDA/H-matrix/coupled/transmission/FMM assessments, reject current
+productionintegration. M2.2wholefield/convergence andM2.3matchedqualitycost remain
+FAIL/incomplete, NOTPASS. No gates relaxed and no antenna/BEM promotion.
+Decision audit docs/milestones/M2-decision.md links scope/results and unsupported
+feed/thinmetals; avoid endless p increases without qualified speed/memory.
+ActiveM3 direct FP32basis/FP64 operations in existing FEM, baseline preserved.
+Sourceaudit: iterative.cpp Unpacks StoredBasisVector forbasisread/MGS; vector.cpp
+Pack/Unpack; optin existing but NOTqualified on currentM1reference. NextsmallCUDA
+probe→cachedincrementalbuild→W.1 thenW.2/W.3. PLAN/MILESTONES/INDEX/M2/M3 synced.
+
+Rootcostcaveat: reported RSS includes dense oracle but is not wholecgrouppeak;
+tmpfs pages separate. No claim totalprocessmemory reduced based only onRSS.
+Sourceaudit confirms unpack in everycompressed MGS k-loop and beforeApplyBA;
+direct mixed dot/axpy is intended firstM3 prototype, no newprecision runyet.
+
+Final EXP74–76 validation:102unitPASS pinned; system86PASS/16SKIP. SameLuna
+read-only docs-gardenPASS: M2negativeassessment vs failednumericalgates explicit,
+M3ACTIVE, tmpfs/RSS/p10limits agree withsource/artifacts. Checker/diffcheckPASS.
+Rootreview complete; localcommit only/no push. No fullantenna/speedup promotion.

@@ -12,7 +12,13 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Bramki M1, aktualna referencja/profil/pamięć i granice kwalifikacji jednego fixture.
 - [M2: Maxwell FEM–BEM/MoM](milestones/M2.md)
   - Czytaj gdy: planujesz bieżący prototyp zmniejszenia domeny powietrza
-  - Opis: Hipoteza, mała drabina walidacji Maxwell, wstępne repozytoria i warunki odrzucenia.
+  - Opis: Hipoteza i historia walidacji; ocena zamknięta negatywną decyzją, bramki promocji niezaliczone.
+- [M2: decyzja po ocenie](milestones/M2-decision.md)
+  - Czytaj gdy: wznawiasz pracę i sprawdzasz powód przejścia do M3
+  - Opis: REJECT obecnej integracji; niezaliczone pola/residual i brak kwalifikowanego speedupu.
+- [M3: GMRES i pamięć](milestones/M3.md)
+  - Czytaj gdy: rozpoczynasz aktywną optymalizację bazy GMRES
+  - Opis: Bezpośrednie FP32 storage/FP64 arithmetic, mały CUDA probe, późniejsze K/W.1–W.3.
 - [M2: Maxwell oracle i kompresja](maxwell-oracle.md)
   - Czytaj gdy: uruchamiasz PEC/Mie lub oceniasz pierwszy H-matrix CUDA apply
   - Opis: Przypięte źródła/cache, historyczne EXP23–24 PEC PASS i wolny per-block apply; dalsze wyniki w EXP25–29.
@@ -45,7 +51,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP59–69, matched CPUapply i pełne F3degree2/5; reference/volume FAIL; kolejna kontrola FMM opisana osobno.
 - [M2: Maxwell FMM i cached addon](maxwell-fmm.md)
   - Czytaj gdy: przygotowujesz PMCHWT bez dense B5 lub kontrolujesz RAM tmpfs ExaFMM
-  - Opis: EXP70–73, cached build i mały operator PASS; tmpfs exhaustion wykryty, solve/pola/antena NOT RUN.
+  - Opis: EXP70–73, cached build i mały operator PASS; tmpfs exhaustion wykryty, małe solve FAIL niezależnego residuum, bez promocji pól/anteny.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

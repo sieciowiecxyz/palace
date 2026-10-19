@@ -1,7 +1,8 @@
 # M2 — ExaFMM build i kontrola operatorów Maxwell
 
-Status: mały CPU operator **PASS**; rozwiązanie PMCHWT, pola i antena **NOT RUN**
-w tym backendzie. M2 pozostaje ACTIVE. Wynik nie kwalifikuje nowego solvera.
+Status: mały CPU operator **PASS**; rzeczywiste PMCHWTsolve EXP74–76 **FAIL**
+niezależnego residuum. Ocena M2 zamknięta decyzją REJECT integracji:
+[decyzja](milestones/M2-decision.md). Wynik nie kwalifikuje nowego solvera.
 
 ## Odtwarzanie i cache
 
@@ -53,16 +54,30 @@ Robocze pliki ExaFMM wyłącznie w `/scratch` tmpfs; na dysku tylko zwykłe
 małe wyniki i osobne cache software. Biblioteki FFTW/OpenBLAS są sprawdzane
 w mapach procesu jako prywatne pliki przypiętego dodatku.
 
-## Co pozostaje
+## PMCHWTsolve i granice
 
-Następny krok: rzeczywisty mały PMCHWT FMM vs dense, sprawdzenie residualu
-również niezależnym operatorem oraz wektorów rozwiązania. Sekwencyjne zwalnianie
-niezależnych testów **nie rozwiązuje** problemu przechowywania dwóch k dla
-jednoczesnego operatora PMCHWT. Najpierw trzeba przygotować jawny budżet tablic
-i ich cyklu życia bez dyskowego offloadu; unikać rebuildowania drzew co iterację.
-Nie zakładać, że 1e-6 action gate wystarczy do frozen solve/field gates.
+EXP74–76 wykonują prawdziwy FMM LinearOperator/GMRES vs niezależny dense solve.
+Dwa k są zachowane jednocześnie: po jednej tablicy w istniejących512MiB RAM
+mountach `/scratch` i `/tmp`, bez rebuildowania drzew co iterację. Na obu
+wymagany tmpfs; preflight budżetu i dokładna długość tablic według pinned fmm.h.
+P8depth2 tabela302215176B, p9 tabela453578504B, p10 przewidywane654602248B
+przekracza512MiB i nie był uruchamiany. Oba mounty po runach puste.
 
-Pełna F3 norma, zbieżność referencji, rezonanse, scalable assembly i koszty
-anteny pozostają niezaliczone. Ten CPU backend nie daje CUDA/Tensor Cores.
-Dowody: `artifacts/m2-fmm-maxwell-o{6-n32,8-n32,8-sequential}-20261019/`
-(case/command/container-state), EXP70–73 w PROGRESS.md.
+```sh
+python3 tools/experiments/bempp_oracle.py run artifacts/new-fmm-pmchwt --physics fmm-solve --level 2 --fmm-order 9 --fmm-ncrit 32 --fmm-preconditioner near-ilu --seconds 120
+```
+
+Bez PC32iter daje raw0,018. NearILU z exact sparse adjacent-panel singular_part
+skraca do26iter w jednym cyklu, lecz info1 nadal wskazuje nieosiągnięte rtol1e-10.
+P8 niezależnyraw1,302e-7, p9 1,272e-8, oba FAIL frozen1e-9. Małe błędy
+współczynników3,85e-7/3,00e-8 nie zastępują raw ani fizycznych pól.
+Dokładne czasy/bytes/tabela porównań: [decyzja M2](milestones/M2-decision.md).
+
+Kontrole pełnej F3 normy, zbieżności referencji, rezonanse, scalable assembly
+oraz koszty anteny pozostają niezaliczone/NOT RUN. Ten CPU backend nie daje CUDA
+ani Tensor Cores. Nie integrujemy go z anteną; źródła/cache/prototyp zachowane.
+
+Dowody: `artifacts/m2-fmm-maxwell-o{6-n32,8-n32,8-sequential}-20261019/`,
+`artifacts/m2-fmm-pmchwt-{o8,near-ilu,o9-near-ilu}-20261019/`
+(case/command/container-state), EXP70–76 w PROGRESS.md. Historyczne SHA helpera
+EXP71–75 są zachowane; kolejne dodane tryby/guards nie zmieniają ich manifestów.

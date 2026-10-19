@@ -16,7 +16,12 @@ class PythonMountTests(unittest.TestCase):
         with patch.object(oracle.dev,'require_host_memory') as host:
             for level,options in [(2,dict(physics='nd2',fmm_order=8)),
                     (1,dict(physics='fmm-control')),(2,dict(physics='fmm-control',fmm_order=10)),
-                    (2,dict(physics='fmm-control',fmm_ncrit=0))]:
+                    (2,dict(physics='fmm-control',fmm_ncrit=0)),
+                    (2,dict(physics='fmm-solve')),
+                    (2,dict(physics='fmm-control',fmm_order=9)),
+                    (2,dict(physics='fmm-control',fmm_preconditioner='near-ilu')),
+                    (2,dict(physics='fmm-solve',fmm_order=8,fmm_ncrit=32,fmm_preconditioner='bad')),
+                    (3,dict(physics='fmm-solve',fmm_order=8,fmm_ncrit=32))]:
                 with self.assertRaises(ValueError):oracle.run(Path('/unused'),level,120,**options)
             host.assert_not_called()
 

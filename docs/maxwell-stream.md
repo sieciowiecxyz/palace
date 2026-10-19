@@ -71,7 +71,7 @@ kosztem operatora. Obecny PMCHWTB5:7680DOF na prąd; cztery denseoperatory oraz
 
 EXP70–73: przypięty ExaFMM addon z cached build działa. Mała kontrola
 MaxwellT/K p8 przechodzi1e-6 po naprawie cyklu życia tablic w RAM tmpfs.
-PMCHWTsolve i większa referencja nadal NOT RUN; szczegóły i ograniczenia:
+PMCHWTsolve EXP74–76 nie przechodzi niezależnego residuum; większa referencja NOT RUN. Szczegóły i ograniczenia:
 [maxwell-fmm.md](maxwell-fmm.md). To CPU oracle, bez promocji CUDA/anteny.
 
 ## Odtworzenie i dowody
