@@ -8,7 +8,16 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M4. [PLAN](PLAN.md), [MILESTONES](
 
 ## Bieżący checkpoint
 
-- M1 COMPLETE: referencja/normy/topologia/bieżącealokacje/krótkiprofil i końcowy normalpathPASS; M2ACTIVE. Goal pozostaje aktywny, bez promocji nowych defaultów.
+- Active M4 / EXP93. M0–M3 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci, bez globalnej promocji czasu/defaultów.
+- EXP91: reuse setupu PASS na tiny i trzech punktach medium coax/obu portach; 3,55GHz, control115,196s vsreuse110,150s, dwie faktoryzacje vsjedna. Pełna antena niezakwalifikowana.
+- EXP92: pełny control obu portów anteny FAIL/OOM podczas P2. P1 zapisany, wholejob nie jest referencją; limit60GiB niezmieniony.
+- EXP93: tiny lifecycle operatorów energii PASS, rzeczywisty drop36,86MB; medium para przygotowana, NOT RUN. Następny krok: medium release-only vsrelease+reuse, potem pełna antena przy tym samym limicie.
+- Pamięć robocza wyłącznie RAM/VRAM, bez swap/offload. Aktualny kod M4 WIP; stabilny wcześniejszy commit840e764 i zachowane native/cache. Tej aktualizacji planu nie traktować jako walidacji kodu M4.
+- Nowe badania M5.5–M5.6 i M6.5 opisane w PLAN/MILESTONES. Zakres wyłącznie wydajność obliczeń na 5070 Ti/96GB; Rust/FieldCraft/GUI/CAD poza pracą. Cel końcowy i W.4/W.5 pozostają.
+
+## Historyczny skrót M1/M2
+
+- M1 COMPLETE: referencja/normy/topologia/bieżącealokacje/krótkiprofil i końcowy normalpathPASS; M2 był wtedy ACTIVE. Goal pozostaje aktywny, bez promocji nowych defaultów.
 - EXP18–19: W.3FP64nativecomplex kwalifikacja35iter/447,462sbezprofilera, raw8,36e−7, maxΔS6,70e−9/E-B9,89e−8 względemtight-r2. To3,50GHz/P2fixturemedium, nie najlepsza geometria produkcyjna. docs/native-complex-coarse.md.
 - EXP21: rzeczywiste DOF zgodne z Palace, AIR-exclusive57,586%ND2. Pełny net-release bilans55,148GBmanaged. docs/topology-memory.md.
 - EXP22: aktualny residentallocaudit49,583GBpeak,99,616%przypisane dościeżek; cuDSS25,008GB, libCEEDduże bufory18,495GB. docs/memory-audit.md. Nieutożsamiać wczesnegopeaku4iter z35iterpełnego solve.
@@ -46,9 +55,9 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. EXP54–58 niezależnyFEM3/fixedprobesPASS; EXP59–69 własnaF3volume/refFAIL. Następny mały MaxwellFMMvsdense/PMCHWT przedwiększą referencją, nie denseB5 ani ponowny solve. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
-3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
+1. Dokończyć EXP93 według ostatniej prerejestracji; brak podnoszenia limitu po OOM, bez ponawiania niezmienionej konfiguracji.
+2. Po bramkach M4 przejść do M5: koszt apply PC i faktorów, następnie ograniczone badania FDTD oraz interfejsu Rust. Nie zaczynać nowych backendów przed zamknięciem bieżącego etapu.
+3. Globalna kwalifikacja częstotliwości/portów i pakiet pozostają w M7; nie oznaczać celu jako ukończonego na podstawie samego planu/researchu.
 
 ## Reguły pracy
 
@@ -1789,3 +1798,162 @@ receipts andstrict profile enumtotals; no gateweakening, no SSDoffload/default
 change. M3completeassessment/M4ACTIVE. Next sourceaudit existingdrivenloop/
 SetOperator/factorizationcounts before writingcache. GlobalgoalNOTcomplete:
 M4–M7/W4/W5/finalreproduciblequalification remain. Localcommitonly/no push.
+
+## EXP91 — one-frequency port setup reuse (preregistered, 2026-10-19)
+M4 sourceaudit: drivensolver.cpp SweepUniform outerexcitation/innerfrequency
+reassembles A2/A/P and calls kspSetOperators perRHS. Nativecomplexcoarse
+SetOperator clearsanalysis/factors everycall. EXP89 2nativecoarsemarkers per
+singlefrequency confirms2factorizations. LumpedPort AddDamping loopsallactive
+ports irrespectiveexcitation; AddExcitation filtersidx onlyRHS. A2/A/P depend
+onfrequency/materials/mesh/boundaries, notexcitationidx. Restrictprototype to
+singlefrequency/fixedmesh/oneMPIrank/multipleLPexcitations/noWave/Floquet.
+Keep same A2/A/P ownership throughlastsolve; no multfreqfactorcache/reordering.
+Runtime --port-setup-reuse opt-in, --setup-audit for control/candidate.
+Audit records driverbuild/reuse, native CSRfnv1a64 structure/values fingerprints
+(notcryptographicproof) and synchronizedanalysis/factor times. Noextra
+workingcopy/cache ofmatrices, no SSD/swap, preserveglobaldefault. Native+manifest
+fallback build/m4-reuse/pre-m4-native. Buildcached onlychangedPalaceTUs.
+First samebuild tinycoax3.55GHz/bothports/fields/TEM/right FP32direct/nativecoarse
+matchedcontrol/reuse,60s. Require raw1e-6,wholefields1%/S1e-3/VSWR.01/power1e-3,
+onebuild+onereuse marker and1nativefactor vs2control, samebaselineCSRhashes.
+Ifpass W2 threefrequencyshards180s each and justifiedbothportsantennaW3
+withunchangedmesh/terminations, notdeclareantennaspeed fromcoaxonly.
+Symbolicreuse decisionseparate fromnumericreuse basedmeasuredanalysiscost.
+
+EXP91 buildPASS15.611s/5steps, no dependencyrebuild. FournewunitguardsPASS
+(37devtests total); typo ininitialunithelpername corrected beforebuild.
+Tinycommon exactargv: `python3 tools/dev.py run coax-tiny <output> --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --setup-audit --coax-l2 --save-fields --memory-marks --release-gmres-basis --release-final-solver --field-reference <ref> --seconds 60`.
+Control artifacts/m4-reuse-tiny-control-20261019/ref artifacts/m3-coax-tiny-fp64-20261019;
+candidate artifacts/m4-reuse-tiny-on-20261019/ref control, adds --port-setup-reuse.
+
+EXP91 terminalPASS/rootfrozenKPASS, samebuild/config39/42iter, raw<=9.601e-7.
+2build/2nativefactors control vs1build/1reuse/1nativefactor candidate. Control's
+twoCSRstructure+valuefingerprints identical. Cross-process candidatevaluehash
+differs; do NOT claimbitwise CSRreproducibility acrossprocesses. Fingerprints
+are diagnostic identity ofbaselineportsetups, notqualitynorm. Frozenquality
+usesactualraw/S/VSWR/power/wholefields; receipt m4-reuse-tiny-root-analysis.
+18.623→17.755s onepair tiny, noantenna/statisticalspeedclaim. Peak629→593MB.
+Proceed W2: currentnative/bothports3pointshards withsameparams; first355control
+then355reuse and330/380reuse vsqualifiedFP64refs. No otheralgorithmchange.
+Exactcommonargv: `python3 tools/dev.py run coax-medium <output> --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --setup-audit --coax-l2 --coax-frequency <f> --save-fields --memory-marks --release-gmres-basis --release-final-solver --field-reference <ref> --seconds 180`.
+Control355 output artifacts/m4-reuse-medium-control-355-20261019/ref artifacts/m3-coax-medium-native-fp64-355-20261019; reuse output artifacts/m4-reuse-medium-on-{355,330,380}-20261019 adds --port-setup-reuse,355ref currentcontrol/others respectiveEXP83FP64.
+
+EXP91 W2 all4runs terminalPASS, rootreceiptpending:45/47iter/raw<8.34e-7,
+fields/TEM/auditPASS. 355control115.196s vsreuse110.150s,2→1factor. Independent
+330/380refsPASS. BaselinecontrolportCSRfingerprintsidentical; not crossprocess
+bitwise claim. Analysis1.1–1.3s/factorhot1.14s inW2, initialJITfactor8.4s.
+
+## EXP92 — bounded both-port antenna study with explicit partial seed
+Historicalcold M1 oneport151iter/1090–1384s; two coldports likelyexceed1800s.
+Use the SAME existingP2 approximate field seed (m1resident) incontrol/candidate;
+P1 remains explicitzero. Thisis initialguessonly, notaccuracyreference. Preserve
+strictfullsnapshotvalidation; new --partial-initial-fields explicitly allows
+verifiedsourceexcitation subsettarget, requiringidenticalotherphysics/mesh/
+dependencies, originalsourceinventory/complete/hash. No fabricatedmergedresults.
+Runner passesverifiedexcitationmask; driver zeros unseededRHS withdistinctmarker,
+neverreusesprecedingportfield accidentally. Missingseedfiles stillfailbeforelaunch.
+No change to strictaccuracyreferencepath. No warmstartspeedclaim/comparison;
+setupreuse controlledbyidenticalstarts. Unitguards thenexistingtinyfilter and
+W3bothportscontrol/reuse,1800s/60GiB/no swap/6GiBguard. K64/pool256/RIGHT,
+FP32direct/nativecoarse, no prefetch. IfcoldP1doesnotfit stopatcap andrecordFAIL,
+notraisebudget/altermesh/tolerance. Both-ports flagchangesonlyRHSrequests,
+preservesallphysicalportimpedances. W4/W5 remainfinalM7.
+
+EXP92 partialseedunitguardsPASS (39devtests). --excitation selectsoneexisting
+physicalLPforseed/shards, neverchanges R/geometry. Beforeheavycase actualtiny
+filter: sourceoneP2 (`--excitation 2 --coax-fields --save-fields`), thenbothports
+control/reuse withverifiedpartialP2seed andtightertol1e-8 soP2 still exercises
+PC. SameK64/nativecoarse/pool256/right, no prefetch;60s each. Rootargv below
+are sentexactly tosameLuna. Newbuildonlydrivensolver weakseedbranch, depscached.
+Tiny source artifacts/m4-partial-seed-tiny-source-20261019; bothcontrols
+artifacts/m4-partial-seed-tiny-{control,on}-20261019, refsqualifiedEXP91tiny
+controlthenfreshcontrol; no accuracyclaimedfromsourceexecutionalone.
+
+EXP92 integratedtinybuild9.535s/sourceP2+bothcontrol/reuse PASS, partialmask
+zerosP1/loadsP2provenactualmarkers. Tightfiltertol1e-8 requiresreliablerestart
+onP1:58/17iters bothvariants, finalchecks<=9.20e-9; failedintermediate
+recurrencecheckretained/corrected. Fields+setupauditsPASS. FulltargetP2seed
+M1residentpasses strictpartialverify againstcurrenttarget+native (rootchecked).
+
+EXP92 W3 commonexactargv: `python3 tools/dev.py run tshaped-medium <output> --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --setup-audit --both-ports --save-fields --memory-marks --release-gmres-basis --release-final-solver --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --partial-initial-fields --seconds 1800`.
+Controloutput artifacts/m4-reuse-antenna-control-20261019. No completebothport
+fieldrefexistsyet; controlraw/S/energy/E+Bsaved, P2crosscheckagainstqualified
+M3fullfield afterwards, P1qualityscopeexplicitno independenttightfullrefyet.
+Candidateoutput artifacts/m4-reuse-antenna-on-20261019, adds --port-setup-reuse
+and --field-reference artifacts/m4-reuse-antenna-control-20261019. Guard60GiB/
+noswap/host6GiB, stopat1800s. No alteredmesh/physics/tolerance.
+
+EXP92 W3 control FAIL/OOM exit137/550.848s, cgroup64378429440B, hostguard
+notcrossed. P1completed44iter/raw7.490e-7 andsavedfields; P2started butnot
+complete. DoNOTuseincompletewholejobasaccuracyref ordeclare2RHSqualified.
+Peakcauseevidence: managedlive48.686GB afterP1solve→65.177GB duringpostproc;
+remainslive, nextPCend64.929GB (peak66.264), thenOOM. No capraise/retryunchanged.
+
+## EXP93 — release domain-energy workspace between solves (preregistered)
+Hypothesis: persistent DomainPostOperator mass/energyworkspace causes betweenRHS
+pressure. Add explicit opt-in release afterallmeasurements/fielddiagnostics/
+AddEstimate, rebuildsameoperators onlyafter nextGMRES. Preservemeasurementcache,
+primaryE/B, CSV/fields andphysicaldefinitions; no visualization writes/AMR for
+thispilot. Neverholdtwoenergyoperators while rebuilding. Same releasepolicy
+inreusecontrol/candidate isolates setupreuse; measuremarker livebytesdrop.
+MinimalPostOperator resetAPI; no newdeps/diskcache/floatingtypechange.
+Tinycontrol+policy pairedagainstlastqualifiedEXP92 samephysicalfields then
+mediumsinglefrequency/bothports,180s; onlythenbothportantenna control+reuse
+at1800s/60GiB/noswap/guard6GiB andsameverifiedpartialseed. Ifmemorydropnot
+observed orqualityfail, keepFAIL andinvestigate, notrelaxgates.
+
+EXP93 initialvalidation40devtestsPASS. Tiny commonexactargv: `python3 tools/dev.py run coax-tiny <output> --basis fp32 --direct-basis --native-complex-coarse --port-setup-reuse --setup-audit --pc-side right --krylov-size 64 --hypre-pool-mib 256 --coax-l2 --save-fields --memory-marks --release-gmres-basis --release-final-solver --field-reference <ref> --seconds 60`.
+Control artifacts/m4-energy-tiny-control-20261019/ref artifacts/m4-reuse-tiny-on-20261019.
+Candidate artifacts/m4-energy-tiny-on-20261019/ref currentcontrol adds
+--release-postprocess-energy. CheckenergyCSVaswellasraw/S/wholefields/TEM;
+markers releaseP1 andrebuiltP2 eachonce, measuredlivebytesdrop. No dualoperator
+copies (resetemptyfirst, replacementconstructedonlybeforelaterpostproc).
+
+EXP93 tinyterminalPASS/rootverifiedsamebuild/config39/42iter/raw<9.601e-7,
+fields/audit/release+rebuildPASS; maxrelativeCSVenergy3.483e-9. Managedlive
+127.942→91.082MB atrelease thenrebuild127.942MB. Actualdrop36.860MB, not
+assumed16GBfullmodel. Build40.273s/12Palacesteps/noexternaldepsrebuild.
+Medium355 nowcontrolreleaseonly vsreuse+release, samephysics/K64/pool256.
+Common exactargv: `python3 tools/dev.py run coax-medium <output> --basis fp32 --direct-basis --native-complex-coarse --setup-audit --release-postprocess-energy --pc-side right --krylov-size 64 --hypre-pool-mib 256 --coax-l2 --coax-frequency 3.55 --save-fields --memory-marks --release-gmres-basis --release-final-solver --field-reference <ref> --seconds 180`.
+Outputs artifacts/m4-energy-medium-{control,on}-20261019; controlref artifacts/m4-reuse-medium-control-355-20261019, onref currentcontrol/add --port-setup-reuse.
+
+### Historyczny research integracji, 2026-10-19 — poza aktywnym zakresem
+Poniższe propozycje Rust/SolidCraft/FieldCraft zostały wycofane przez użytkownika;
+nie stanowią zadań ani warunków ukończenia aktualnego goal.
+Useraskswholegoalstatus, accuracyvspeed, Rust/SolidCraft andalternativeengines.
+LateststateEXP93 tinyPASS, mediumpairpreparedNOTLAUNCHED; no palace-run
+containers live whenchecked. M4stillACTIVE/WIP; M5–M7 notcomplete.
+Primaryresearch: SolidCraftROADMAP Scope(ownerdecision2026-10-07) defers
+Simulation; separate tangency-labs/fieldcraft ispureRustCAE forstructures/heat/
+LBM, notfoundRFMaxwellbackend. FieldCraft docs/adr/0001-libraries.md requires
+permissive/cleanroomdependencies, itsownsolveralgebra; crates/lbm-gpu implements
+wgpu/WGSLFP32flow checkedagainstCPU, notantennaEM/cuDSS. Noauthorendorsement
+ofPalacefound. Proposedfuturecontribution: Rustanalysis/export/resultadapter
+withPalaceasanexternalworker, notimmediatefullrewrite; confirmmaintainerfit.
+URLs: https://github.com/tangency-labs/solidcraft/blob/main/ROADMAP.md
+https://github.com/tangency-labs/fieldcraft/blob/main/README.md
+https://github.com/tangency-labs/fieldcraft/blob/main/docs/adr/0001-libraries.md
+https://github.com/tangency-labs/fieldcraft/blob/main/crates/lbm-gpu/src/lib.rs
+Alternativeresearch: gprMaxdocumentedCUDAFDTD+ports/S/gain; fdtdzCUDAphotonic
+lowlevel, ngsolve.gpu supportsCUDAngscuda (officialcurrentdemoPoisson, notproof
+ourRFpipeline). No sameantenna benchmarkagainstPalaceperformed. Consider
+boundedreferenceantennaFDTDpilotbeforeanyreplacementclaim; finefeed/slots/CFL
+needcostestimate. Sources https://docs.gprmax.com/en/latest/inc_README.html
+https://github.com/spinsphotonics/fdtdz
+https://docu.ngsolve.org/latest/i-tutorials/unit-5.5-cuda/poisson_cuda.html
+RustCUDApossiblevia cudarc(https://github.com/chelsea0x3b/cudarc); language
+rewritealone doesnotchangeworking-set/iterations/kernelmath. Goalunchanged;
+nextauthorizedrun remainsEXP93mediumfilterthenboundedfullantennapair.
+
+### Aktualizacja planu na prośbę użytkownika, 2026-10-19
+Dodano M4.4 lifecycle energii; M5.5 koszt/working-set PC, M5.6 ograniczone
+porównanie FDTD/CUDA (zysk jednego szerokopasmowego przebiegu jako hipoteza),
+oraz M6.5 fuzja/batching bez wymuszania TC.
+Numeracja M0–M7 i ActiveM4 zachowane. Nowe kryteria nie są zaliczone przez
+wcześniejsze runy. Rust/FieldCraft/GUI/CAD są poza zakresem obecnego goal.
+Zmiany tylko MD; żadne nowe symulacje/buildy nie zostały uruchomione.
+
+Korekta zakresu od użytkownika w tym samym turnie: bez researchu/implementacji
+Rust ani FieldCraft. Usunięto proponowane M5.7 przed zatwierdzeniem planu.
+M5.5/M5.6/M6.5 służą wyłącznie maksymalnemu przyspieszeniu wiarygodnych
+symulacji na aktualnej5070Ti/96GBRAM. IntegracjeCAD/GUI nie są zadaniem.

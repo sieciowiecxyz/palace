@@ -21,8 +21,8 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 - [x] M2 — ocena FEM–BEM/MoM zakończona REJECT obecnej integracji; bramki promocji pozostają FAIL/niekompletne. docs/milestones/M2-decision.md.
 - [x] M3 — FP32direct memory gain i ocena prefetchu; W.1/W.2/W.3 PASS, bez globalnej promocji; docs/milestones/M3.md.
 - [ ] M4 — ACTIVE: reuse operatorów, preconditionera i faktorów między portami; docs/milestones/M4.md.
-- [ ] M5 — Preconditioner, cuDSS i kontrolowana mixed precision.
-- [ ] M6 — Tensor Cores/TF32/BF16 na zmierzonym gorącym fragmencie.
+- [ ] M5 — Preconditioner, mixed precision oraz ograniczony research FDTD/CUDA.
+- [ ] M6 — Gorące kernele CUDA: fuzja/batching oraz Tensor Cores/TF32/BF16 tam, gdzie pomagają.
 - [ ] M7 — Kwalifikacja najlepszego wariantu na jednej 5070 Ti i pakiet do użycia.
 
 Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmuje jakość i porównywalne pomiary. Negatywna ocena prototypu może zamknąć hipotezę z dowodami; nie wymuszać integracji wolniejszego solvera. Brak poprawności lub brak wykonania wymaganego testu nie zalicza bramki. Plan i numeracja zastępują wcześniejszą kolejkę z obowiązkowym multi-GPU.
@@ -97,20 +97,27 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 - [ ] Zmierzyć liczbę SetOperators/faktoryzacji i potwierdzić identyczność operatora oraz terminacji między portami.
 - [ ] Prototyp reuse na jednej częstotliwości i obu portach; zachować outputy, wznowienia i postprocessing.
 - [ ] Symbolic reuse między częstotliwościami i warm start/recycling badać osobno, tylko gdy koszt setup uzasadnia próbę.
+- [ ] Zmierzyć czas życia postprocessingu między RHS: zwalnianie/rebuild operatorów energii po pomiarach; oba porty muszą ukończyć run przy obecnym limicie, z niezmienionymi energiami/polami.
 
-### M5 — tańszy preconditioner
+### M5 — tańszy preconditioner i wybór algorytmu
 
 - [ ] Sprawdzić w źródłach/aktualnej dokumentacji zgodność cuDSS hybrid memory, hybrid execute, UVM i MPI; przypiąć wersje.
 - [ ] Porównać dwa wykonalne budżety hybrid z UVM, po odczycie wymaganego minimum.
 - [ ] Zbadać AMS dla właściwego operatora pomocniczego; potwierdzić wykonanie na GPU.
 - [ ] FP32 faktory tylko z nową hipotezą: scaling, korekcja FP64, stagnacja i fallback. Jeśli potrzebny FGMRES, najpierw kompatybilność bazy i rachunek dodatkowych wektorów Z.
 
-### M6 — TF32 bez ukrytych kosztów
+- [ ] Rozdzielić koszt PC na analizę, faktoryzację, apply, migracje i zmianę liczby iteracji; oszacować limit zysku pełnego zadania przed kolejnym prototypem.
+- [ ] M5.6 — research jednego konkurenta FDTD/CUDA (najpierw gprMax): koszt siatki/CFL/zaniku, porty i kilka częstotliwości z jednego przebiegu; mały test tylko po pozytywnej ocenie zasobów.
+
+Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jest ograniczony; negatywna ocena z dowodami kończy hipotezę, nie wymusza migracji backendu.
+
+### M6 — gorące kernele, TF32 i przepustowość pamięci
 
 - [ ] Wybrać rzeczywisty gorący kernel i rozmiary P2 z profilu; oszacować potencjał zysku całego runu.
 - [ ] Research cuBLASLt/libCEED/MFEM; CUTLASS dopiero przy brakującej funkcji. Zapisać link, rewizję, licencję i przydatność.
 - [ ] Prototyp batchowania: FP32 vs TF32, potem ewentualna korekcja; zmierzyć także packing/scatter/workspace.
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
+- [ ] Gdy profil wskazuje koszt ruchu pamięci/launches: ocenić fuzję własnych operatorów, batching real/imag i reuse lokalnych danych, także bez Tensor Cores; policzyć narzut i cały solve.
 
 ### M7 — utrwalić najlepszy zaakceptowany wariant
 
@@ -120,6 +127,6 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 
 ## Oszczędzanie czasu i compute
 
-Jedna hipoteza na eksperyment. Kolejność: analiza źródeł → mały test → coax → jedna pełna antena → kwalifikacja obiecującego wariantu. Brak dowodu poprawy kończy gałąź; trzy próby bez nowych informacji wymagają zmiany hipotezy. Pełne sweepy i powtarzanie pomiarów tylko dla finalistów. Zachować medium i fizykę, cache oraz istniejące API; bez nowego runtime Rust i przebudowy całego stosu bez uzasadnienia.
+Jedna hipoteza na eksperyment. Kolejność: analiza źródeł → mały test → coax → jedna pełna antena → kwalifikacja obiecującego wariantu. Brak dowodu poprawy kończy gałąź; trzy próby bez nowych informacji wymagają zmiany hipotezy. Pełne sweepy i powtarzanie pomiarów tylko dla finalistów. Zachować medium i fizykę, cache oraz istniejące API. Zakres: maksymalna użyteczna wydajność symulacji na obecnej 5070 Ti/96GB RAM. Bez prac nad Rust, FieldCraft, GUI i integracją CAD. Zachować obecny silnik jako referencję; inny backend wyłącznie jako narzędzie do mierzalnego przyspieszenia obliczeń.
 
 Praktyczna pętla pracy: sekundy na test operatora, około 34 s na obecny coax (limit 180 s); pełny case maks. 1800 s po tanim filtrze. Cache zależności/obiektów/ccache jest obowiązkowo zachowany, nie przebudowywać solvera po zmianie samych dokumentów lub runnera.

@@ -27,7 +27,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP86–90, mała korzyść ortogonalizacji, strict selective profiling, aktualne W.2/W.3 PASS; bez globalnej promocji czasu.
 - [M4: reuse setup](milestones/M4.md)
   - Czytaj gdy: wznawiasz aktywny audyt setup i faktoryzacji między portami
-  - Opis: Najpierw istniejący driven loop i liczniki, potem prototyp tylko przy wykazanym powtórzeniu setup.
+  - Opis: EXP91 reuse coax PASS; pełna antena EXP92 OOM, EXP93 lifecycle energii tiny PASS; aktualnie średni filtr przed kolejnym pełnym runem.
+- [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
+  - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
+  - Opis: Ocena kosztu siatki/CFL i wielu częstotliwości przed benchmarkiem; tylko przyspieszanie obliczeń, bez Rust/GUI/CAD.
 - [M3: actual API i walidacja medium](mixed-basis-validation.md)
   - Czytaj gdy: oceniasz aktualny wariant FP32direct lub planujesz politykę migracji
   - Opis: EXP80–85 W.1/W.2/W.3 PASS,−2,87GB cgroup na T-Shaped; bez speedup/defaultpromotion, W.4/W.5 otwarte.

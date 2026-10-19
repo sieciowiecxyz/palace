@@ -68,7 +68,9 @@ Wymaga M3.
 - M4.2: oba porty tej samej częstotliwości spełniają K, poprawne wyjścia/wznowienia; krótszy koszt kompletnego zadania albo udokumentowane odrzucenie.
 - M4.3: symbolic reuse/warm start ocenione oddzielnie, jeśli uzasadnione pomiarem. Numeryczne faktory nie są bez dowodu przenoszone między różnymi A(f).
 
-## M5 - Preconditioner/cuDSS
+- M4.4: zmierzony czas życia buforów pomiarowych między RHS; wariant release/rebuild zachowuje energie, complex S i pola. Brak kompletnego runu obu portów pozostaje FAIL/NOT RUN; nie podnosić limitu, aby ukryć nakładanie pamięci.
+
+## M5 - Preconditioner i research backendów
 
 Wymaga M4.
 
@@ -77,7 +79,10 @@ Wymaga M4.
 - M5.3: powrót do FP32 faktorów wymaga nowego mechanizmu scaling/korekcji/fallback, nie powtórki odrzuconego runu. Zmienny preconditioner wymaga zgodnego solvera i uwzględnienia dodatkowej pamięci.
 - M5.4: W.2/W.3/K, koszt setup + wszystkie iteracje i pamięć kwalifikują promotowany wariant; cuDSS FP64 pozostaje dostępnym fallbackiem. Brak poprawy ma raport odrzucenia.
 
-## M6 - Tensor Cores
+- M5.5: profil i rachunek kosztu rozdzielają analizę/faktoryzację, apply PC, iteracje i migracje; limit Amdahla dotyczy jasno wskazanego okna lub pełnego zadania. Brak sumowania nakładających się transferów/kerneli.
+- M5.6: udokumentowana ocena jednego FDTD/CUDA konkurenta: reprezentacja geometrii/portów, budżet siatki/CFL/zaniku i porównanie kosztu całego zestawu częstotliwości. Jeśli wykonalny, mały benchmark jakości/kosztu; jeśli nie, konkretne oszacowanie lub brak funkcji zamyka ocenę bez wymuszania portu anteny. Reguły w docs/milestones/M5-research.md.
+
+## M6 - Gorące kernele CUDA i Tensor Cores
 
 Wymaga M5.
 
@@ -85,6 +90,8 @@ Wymaga M5.
 - M6.2: dla wykonalnego kandydata prototyp FP32/TF32 vs FP64 obejmuje packing, konwersje, scatter, transfer i workspace; backend biblioteczny oceniony przed własnym CUTLASS.
 - M6.3: deklaracja TC wymaga instrukcji/liczników potwierdzających użycie. TF32 nie jest przedstawiane jako format zmniejszający storage FP32; sprzęt bez TC/TF32 ma fallback.
 - M6.4: promocja wyłącznie po K i W.1–W.3 oraz zysku całego runu z uwzględnieniem iteracji. Negatywny wynik zamyka hipotezę, nie uzasadnia wymuszania TF32/BF16.
+
+- M6.5: gdy uzasadnione profilem, oceniona fuzja/batching/reuse danych we własnych kernelach, również bez TC. Podany ruch pamięci/launches, dodatkowy workspace oraz jakość i czas całego zadania; sama poprawa mikrobenchmarku nie kwalifikuje promocji.
 
 ## M7 - Finalista na jednej 5070 Ti do używania
 
