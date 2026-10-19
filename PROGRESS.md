@@ -1957,3 +1957,10 @@ Korekta zakresu od użytkownika w tym samym turnie: bez researchu/implementacji
 Rust ani FieldCraft. Usunięto proponowane M5.7 przed zatwierdzeniem planu.
 M5.5/M5.6/M6.5 służą wyłącznie maksymalnemu przyspieszeniu wiarygodnych
 symulacji na aktualnej5070Ti/96GBRAM. IntegracjeCAD/GUI nie są zadaniem.
+
+### Doprecyzowanie polityki SSD przez użytkownika, 2026-10-19
+Cache, zwykłe pliki i sporadyczny odczyt SSD dozwolone; niewielkie zapisy
+oceniać po pomiarze bajtów/częstotliwości i czasu. Gorące dane solvera RAM/VRAM.
+Bez swapowania zadania i intensywnego przepisywania workspace na dysk.
+Nie przywrócono disk basis ani nie zmieniono runtime/limitów kontenera.
+Historyczne zakwalifikowanie wyników bez zmian. Aktualizacja wyłącznie MD.

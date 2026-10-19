@@ -55,7 +55,9 @@ niekwalifikowanego backendu; pełna promocja nadal wymaga K i końcowych W.
 
 Mały test60–180s, reprezentatywny pełny run najwyżej1800s po tanim filtrze.
 Zachować obecne limity pamięci/guard; budżet nowego testu zapisać przed startem.
-Pamięć robocza tylkoRAM/VRAM, bez SSD/swap i płatnego compute; nie zamykać aplikacji.
+Gorące dane w RAM/VRAM; cache i sporadyczny odczyt SSD dozwolone, niewielkie
+zapisy mierzone. Bez swap i intensywnego dyskowego workspace; bez płatnego
+compute i zamykania aplikacji. Szczegóły polityki I/O w PLAN.md.
 Agent główny przygotowuje hipotezy/argv, ta sama Luna obsługuje uruchomienia.
 Brak mierzalnego potencjału kończy hipotezę. M6 może uczciwie wybrać fuzję/batching
 zamiast TC, jeśli to lepiej przyspiesza pełne zadanie.

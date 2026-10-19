@@ -3,7 +3,7 @@
 - Zacznij od `docs/INDEX.md`, `ARCHITECTURE.md`, Git status i kodu związanego z zadaniem. Czytaj dokumenty na żądanie; nie nadpisuj cudzej pracy.
 - Cel: wiarygodne medium na jednej 5070 Ti, mniej VRAM/RAM i krótszy czas; FEM–BEM/MoM, mixed precision i CUDA. Plan badań: `docs/speedup.md`; profilowanie nie jest dowodem poprawności fizycznej anteny.
 - Małe, testowalne zmiany, istniejące API i zależności; C++/CUDA dla solvera, Python stdlib dla lokalnych narzędzi. Zachowuj kod/licencje upstream. Bez refaktoryzacji na zapas.
-- Pamięć robocza solvera wyłącznie RAM/VRAM. Zakaz SSD/NVMe scratch, disk basis, out-of-core na dysku i swap jako sposobu dopasowania zadania. UVM może migrować GPU↔RAM. Przy braku pamięci przerwij; optymalizuj reprezentację/algorytm. Cache kompilacji oraz zwykłe wejścia/wyniki są osobną funkcją.
+- Gorące dane solvera w RAM/VRAM; UVM GPU↔RAM. SSD: cache, wejścia/wyniki i sporadyczne odczyty dozwolone; niewielkie zapisy mierzyć (bajty/częstotliwość). Bez swapowania zadania i intensywnego przepisywania bazy/workspace na dysk. Przy braku pamięci przerwij i optymalizuj reprezentację/algorytm. Obecny disk basis pozostaje usunięty; ewentualną nową metodę ocenić po I/O, czasie i dokładności.
 - Medium i fizykę zmieniaj jawnie. Raportuj faktyczne precyzje, normy residuum i zakres kwalifikacji. Build lub timeout nie oznacza poprawnego wyniku RF.
 - Build/testy: `docs/testing.md`; cache i eksporty: `docs/build.md`. Nie usuwaj cache/dependencies przy zwykłym rebuildzie. Nie modyfikuj źródłowego repo anten ani `.toolchain`.
 - Symulacje: agent główny projektuje, ta sama GPT-6 Luna high uruchamia dokładne argv, czeka i odbiera wyniki. Agent główny analizuje. Bez cyklicznego odpytywania agenta.
