@@ -51,3 +51,21 @@ class BemppPairingTests(unittest.TestCase):
         left.dof_transformation=csr_matrix([[1.,0.],[2.,0.],[0.,3.]])
         right.dof_transformation=csr_matrix([[1.],[2.],[3.]])
         np.testing.assert_allclose(pairing.physical_gram(left,right),[[5.],[9.]],atol=1e-15)
+
+    def test_trace_load_and_error_quadrature_against_exact_polynomial(self):
+        from scipy.sparse import eye
+        class Space:
+            grid_dof_count=3
+            local2global=np.array([[0,1,2]])
+            normal_multipliers=np.ones(1)
+            dof_transformation=eye(3,format='csr')
+            grid=types.SimpleNamespace(number_of_elements=1,integration_elements=[1.],
+                vertices=np.array([[0.,1.,0.],[0.,0.,1.],[0.,0.,0.]]),
+                elements=np.array([[0],[1],[2]]),normals=np.array([[0.,0.,1.]]))
+            def evaluate(self,triangle,points):
+                return np.broadcast_to(np.eye(3)[:,:,None],(3,3,points.shape[1]))
+        def field(x):return np.column_stack([x[:,0],np.zeros((len(x),2))])
+        for order in [2,4,6]:
+            np.testing.assert_allclose(pairing.trace_load(Space(),field,order=order),[0.,-1/6,0.],atol=1e-15)
+            error=pairing.projection_error(Space(),np.array([0.,-1/3,0.]),field,order=order)
+            self.assertAlmostEqual(error,np.sqrt(1/3),places=14)

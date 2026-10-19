@@ -40,6 +40,17 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_duality_option_rejected_before_running_an_unrelated_case(self):
+        with patch.object(oracle.dev,'require_host_memory') as check:
+            for physics in ['pec','traces','nd2']:
+                with self.assertRaises(ValueError):
+                    oracle.run(Path('/unused'),1,120,physics=physics,duality='magnetic')
+            with self.assertRaises(ValueError):
+                oracle.run(Path('/unused'),1,120,physics='nd2-coupling',duality='invalid')
+            for physics,level,surface in [('pec',1,2),('nd2-coupling',2,1),('nd2-coupling',1,4)]:
+                with self.assertRaises(ValueError):
+                    oracle.run(Path('/unused'),level,120,physics=physics,surface_level=surface)
+            check.assert_not_called()
     def test_mfem_cache_recipe_tracks_global_source_separately(self):
         bridge = oracle.mfem_bridge
         with tempfile.TemporaryDirectory() as directory:

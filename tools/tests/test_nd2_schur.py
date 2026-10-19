@@ -23,6 +23,23 @@ if AVAILABLE:
 
 @unittest.skipUnless(AVAILABLE,'Optional NumPy/SciPy; pinned oracle includes both')
 class ND2SchurTests(unittest.TestCase):
+    def test_nested_surface_parents_and_rejection_of_crossed_cells(self):
+        def volume(level):
+            vertices,tets,faces=coupling.fem.mesh(level)
+            return types.SimpleNamespace(vertices=vertices,tetrahedra=tets,faces=faces)
+        def surface(level,shift=0.):
+            vertices,_,faces=coupling.fem.mesh(level)
+            return types.SimpleNamespace(vertices=(vertices+shift).T,elements=faces.T,number_of_elements=len(faces))
+        coarse=volume(0)
+        cells,normals,parents=coupling.boundary_parents(coarse,surface(1))
+        self.assertEqual(len(cells),80)
+        np.testing.assert_array_equal(np.bincount(parents),np.full(20,4))
+        np.testing.assert_allclose(np.linalg.norm(normals,axis=1),1.,atol=1e-15)
+        for cell,face in zip(cells,parents):
+            self.assertTrue(set(coarse.faces[face]).issubset(coarse.tetrahedra[cell]))
+        with self.assertRaises(ValueError):coupling.boundary_parents(volume(1),surface(0))
+        with self.assertRaises(ValueError):coupling.boundary_parents(coarse,surface(1,shift=.001))
+
     def problem(self):
         rng=np.random.default_rng(41)
         random=lambda shape:rng.standard_normal(shape)+1j*rng.standard_normal(shape)

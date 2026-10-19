@@ -44,8 +44,8 @@ def physical_gram(test,trial):
     return (test.dof_transformation.T@local@trial.dof_transformation).toarray()
 
 
-def trace_load(test,field):
-    points,weights = quadrature()
+def trace_load(test,field,order=4):
+    points,weights = quadrature(order)
     local = np.zeros(test.grid_dof_count,dtype=np.complex128)
     for triangle in range(test.grid.number_of_elements):
         indices = test.grid.elements[:,triangle]
@@ -58,8 +58,8 @@ def trace_load(test,field):
     return test.dof_transformation.T@local
 
 
-def projection_error(space,coefficients,field):
-    points,weights = quadrature()
+def projection_error(space,coefficients,field,order=4):
+    points,weights = quadrature(order)
     local = space.dof_transformation@coefficients
     numerator=denominator=0.
     for triangle in range(space.grid.number_of_elements):

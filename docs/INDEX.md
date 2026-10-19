@@ -28,6 +28,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M2: sprzężenie ND2 i sparse Schur](maxwell-nd2-coupling.md)
   - Czytaj gdy: diagnozujesz błąd sprzężenia lub planujesz niezależny test powierzchni BEM
   - Opis: Fizyczny BC/RBCmortar, localbasisassembler i sparseSchur PASS; wholefieldFAIL mimo farfield/energii, bez promocji anteny.
+- [M2: dualność i niezależny brzeg](maxwell-trace-duality.md)
+  - Czytaj gdy: wznawiasz transmisję dielektryczną lub oceniasz wynik sprzężonego ND2
+  - Opis: EXP35–37, magnetic-dual i niezależny BEM dają transparentne pola <1%; nie dowodzi to jeszcze zysku anteny ani transmisji przez dielektryk.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

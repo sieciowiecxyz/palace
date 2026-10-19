@@ -20,7 +20,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP32: primalRWG/SNCGramtracirank90/120,330/480; odrzucićinwersjędoprowadzeniaND2projection. DualRWG/RBCfullrank/κscaled≤2,93, physicalpairing/transforms/constanttracePASS. Plane-traceRWG0błąd20,99→10,43→5,16%, nadalnieND2mortar. docs/maxwell-coupling.md.
 - EXP33: actualglobalMFEMND2/faceDOFtransforms/physicalbasis/CSR, Dirichletplane-waveE/H0,1505/0,3317%PASS na8936DOF/1280tet.5,514s/433MB/CSR8,79MB; interpolacjaH1,468%FAIL. BrakcoupledBEM/antenna speedup; docs/maxwell-nd2.md.
 - EXP34: actualND2/BC-RBCmortar/localbasisassembler/sparseSchurPASS, currentwholefieldFAIL17,74/15,22→10,07/5,64% mimo raw/far/energyPASS. NativeT/K≤1,22e−16, tinydenseSchur≤1,94e−14; brakpromocjianteny. docs/maxwell-nd2-coupling.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.71testsPASSwpinnedenv; systemowo63PASS/8SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP35–37: duality/trace diagnostics i niezależny brzeg. Magnetic F2/B3 E/H0,560/0,751% PASS, F3/B3 0,358/0,904% PASS (H gorsze). Root source/SO/state/quality verification PASS; docs/maxwell-trace-duality.md. Dielectric transmission/rezonanse/scalable assembly/koszt pozostają otwarte.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.74testsPASSwpinnedenv; systemowo64PASS/10SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -40,7 +41,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: ND1interface1%fieldFAIL. EXP32GdualRBCmałytestPASS; EXP33globalND2DirichletPASS. EXP34B/Dmortar/localassembler/sparseSchurPASS, coupledfieldsFAIL. Następne tani traceprobe RWGvsBC dla obu electric/magneticduality z upstream, potem niezależna powierzchnia przy stałym zakwalifikowanymFEM — oddzielić traceE, reprezentacjęhBC i błądmortaru. Nieponawiaćślepo matchedrefinement obu siatek. Potem coupledE/H≤1%/energy/farfield, dielectricFEM/stabilizacja/scalableassembly/antena. M2otwarty, bezpaidcompute.
+2. M2: transparent ND2 coupling PASS w EXP35–37. Następne sprzężona transmisja eps=2,94 z niezależnym odniesieniem na tej samej geometrii, kontrola rezonansów i koszt przy zgodnym błędzie. Bez promocji anteny i bez płatnego compute; M2 pozostaje otwarty.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -501,3 +502,85 @@ rozdzieleniesamejgranicyprzyustalonymFEM, najpierwcheaptrace-spaceprobe.
 71testsPASSwpinnedenv,systemowo63PASS/8SKIP; docs-gardenLuna/rootreview/checker/diffcheckPASS.
 Wynikizapisane w lokalnymcommicie, bezpushdo upstream.
 Brakmatched-errorporównania/promocjianteny/M2closure; goalaktywny.
+
+### EXP35 — prerejestracja: trace spaces bez nonlocalBEMsolve
+
+Jednymprocesem1→3surfacehierarchy: RWG/RBC iBC/SNC dualprojection vs bestL2
+massprojection w tychsamychprzestrzeniach. ConstantEx i planeEx/Hyexp(iz).
+NiezakładaćBCconstantreproduction; zmierzyćosobnobestapproxerror i wpływtestduality.
+Gateweakresidual≤1e−12/q4vs6≤1e−6, RWGconstant≤1e−12, massSPD i bestL2
+niegorszeoddual o>1e−9. Błędy powierzchniowenieMaxwell1%gate/nieHdivstability.
+`trace_load/projection_error` otrzymują orderarg default4 (stare wywołaniabez zmian),
+nowypolynomialtest wunit. TylkoCPU6GiB/4CPU/tmpfs/noaddedSwap, limit120s,
+cachedBempp/JIT, bezMFEMCAPI/buildów/GPU/paidcompute. Dokładnyargv
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-trace-space-hierarchy-20261019
+--physics traces --level 3 --seconds 120`. Wynikwybierzenastępnąprzestrzeń/mortar,
+niezmieniaM2gates/medium/productiondefaultów.
+
+EXP35exit0/noOOM/executionPASS18,643s/RSS347MB. Poziomy1/2/3planeE/Htrace:
+RWGdual≈20,99/21,02→10,43/10,41→5,16/5,16%, bestL2≈19,63→10,02→5,06%.
+BCdual≈48,94→31,24→20,87%, bestL2≈46,79→30,14→20,09%. ConstantBCdual46,87→30,35→20,57%,
+bestL245,33→29,44→19,81%, RWGconstant≈1e−15. Weakresidual≤1,97e−16/qdelta≤5,17e−11.
+BCdualitytestniejestgłównympowodemdużegobłęduL2: bestL2pozostajedużo gorszeniżRWG.
+ToniedowódHdivstability/coupledcausality. WEXP34h=BC, więc następnyizolowanykontrafakt:
+
+### EXP36 — prerejestracja: magnetic_dual przy stałymFEMlevel2
+
+Ten sam ND2/FEM1228/160tet i BEM120/80tri coEXP34level2. Zmiana tylko spaces:
+upstreammaxwell.py `magnetic_dual`: t=BC,h=RWG,testSNC (zamiastRWG/BC/RBC).
+G=<SNC,BC>fullrankzEXP32, physicalB=<v,RWG>, D=<SNC,v×n>=−B^T,
+G*R=D. C/T/Green/Schur/eps/mu/k/medium/1%E-H/raw/far/energyprogi bez zmian.
+BCnieodtwarzaconstanttracepunktowo(EXP35), więc raportowaćerrorbezzerowania;
+sprawdzić exactconstantweakloadG*R*u0=<SNC,E0×n>≤1e−12. Dla defaultowegoelectric
+nadalwymagać także exactconstantpointwise≤1e−12. Brakpoluzowaniawholefieldgate.
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-magnetic-dual-level2-20261019
+--physics nd2-coupling --duality magnetic --level 2 --seconds 180`.
+CPU6GiB/4CPU/tmpfs/noaddedSwap/cache, bezbuild/GPU/paid. Wynikiwybierajądalszy
+testpowierzchniprzyustalonymzakwalifikowanymFEM, niepromocjęanteny.
+
+EXP36pairedlevel2exit0/noOOM. MagneticdualE/H1,424/2,884%FAIL vs electriccontrol
+10,072/5,645%FAIL, Dirichletwobydwu0,591/1,054%. Magnetic40,540s/RSS706MB vs
+electric43,659s/RSS718MB. Mortar/constantweak≤6,88e−16, raw3,05e−14,
+far4,586e−4/energy3,606e−7PASS. BCconstantpointwise30,351% jawne, niezerowane.
+T_RWGSNC240²=0,922MB zamiast1440²=33,178MB; K_BCSNCnadal33,178MB. Przestrzeń
+hRWG mocnopomaga przytej samej objętości, lecz wholefield1%nadalnieosiągnięte.
+
+### EXP37 — prerejestracja: tylko powierzchnia przy stałymFEM
+
+MagneticdualFEMlevel2/1228DOF/160tet bez zmian; surface2→3, BEM120→480DOF,
+80→320tri. Nowygeometryparentlookup po centroids i kontrolawszystkich3vertices
+finerBEMface wFEMboundarytriangle. NieintegrujeBEMfaceprzecinającejFEboundaryface:
+wymaga nestedrefinement, przeciwny/coarsersurface odrzucany. Unit4childperface,
+wronggeometry/crossedfacesrejection. CałkiB/Dnadal≤1e−12; niezmienioneprogi/fizyka.
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-magnetic-f2-b3-20261019
+--physics nd2-coupling --duality magnetic --level 2 --surface-level 3 --seconds 180`.
+CPU6GiB/4CPU/tmpfs/noaddedSwap/cache; brakbuild/GPU/paid. To izolujebłądgranicy;
+FEM2DirichletH1,054%samnieprzechodzi1%, więc całościowypromisingrun wymaganastępnie
+kwalifikowanegoFEM3 i takiej samejpowierzchni. Nieobniżać1%gate.
+
+EXP37F2/B3exit0/noOOM/execution+analyticPASS91,437s/RSS1,323GB.
+CoupledE/H0,5603/0,7512%, samFEMDirichlet0,5910/1,0541%, delta0,2906/0,8702%.
+AnalitycznepolaPASSniezależnieodgorszegointerpolowanegoDirichletH; nieodrzucać
+poprawnegorozwiązaniadlatego, żeten comparator ma1,054%. Mortar≤1,50e−15,
+constantweak5,86e−16, raw5,88e−14, qdelta1,72e−13; far6,46e−5/energy3,33e−8PASS.
+LocalE14,746MB, localK530,842MB, Schur3,686MB; nieoszczędnośćpeakRAManteny.
+Następnykontrafakt przyUSTALONEJBEMB3: zmienićwyłącznieFEM2→3,
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-nd2-magnetic-f3-b3-20261019
+--physics nd2-coupling --duality magnetic --level 3 --surface-level 3 --seconds 180`.
+Te sameprogi/eps/mu/k/6GiB/4CPU/tmpfs/noaddedSwap; tokwalifikuje zbieżnośćobjętości,
+nieporty/dielektryk/antennaspeedup. Nieluzować1% i niezamykaćM2na1transparentprobe.
+
+
+EXP37 F3/B3: exit0/noOOM, analytic+execution PASS, 95,902s/RSS1,345GB.
+E/H0,3577/0,9042%; raw2,312e−13, qdelta2,758e−16. E lepsze niż F2/B3,
+H gorsze (0,7512→0,9042%); nie ogłaszać monotonicznej poprawy obu pól.
+Final paired F2/B2 na tym samym aktualnym kodzie: electric10,072/5,645% FAIL
+43,925s/RSS722MB; magnetic1,424/2,884% FAIL40,861s/RSS708MB. Wyniki zgodne
+z kodem sprzed parent lookup (Δpól<1e−12). Wszystkie stany terminalne i SHA
+case/helperów/MFEM SO, mortar/raw/quad/energy i rozdzielenie PASS/FAIL sprawdzone
+przez root w artifacts/m2-trace-duality-root-analysis-20261019.json.
+Pierwszy verifier odrzucił intencjonalne null nd_api_sha256 w traces (brak NDbridge);
+poprawiono sprawdzanie stosowalnych hashy, bez zmiany progów fizycznych.
+Dokumentacja EXP35–37: docs-garden read-only tej samej Luny i root review PASS;
+74testsPASS w pinnedenv, system64PASS/10SKIP, checker/diffcheckPASS.
+Bez rebuilda Palace/deps, zmian medium i promocji; lokalny commit bez push.
