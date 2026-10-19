@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:95testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo79PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:101testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo85PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -107,3 +107,12 @@ Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
 ## Eksperymentalne Q-workspace
 
 Probe dwóch operatorów i późniejszy pełny coax-tiny/TEML2 przeszły; Q-pool nie jest promowany z powodu braku oszczędności na tiny. Pierwszy baseline zakończony OOM/hostguard pozostaje FAIL. Regresje Pythona sprawdzają preflight RAM, sourceSHA, stale/tampered manifest, granice HYPREseed i jednostki/filtrowaniePID w pomiarze GPU. Odtworzenie oraz scope: [Q-pool](ceed-qpool.md), [pula HYPRE](hypre-pool.md). Nowa pełna antena FP64 jest wyłącznie resident execution reference; antena z Q-pool ani kandydat mixed precision pozostają NOT RUN.
+
+### ExaFMM addon / Maxwell control
+
+Instrukcja i frozen actiongate1e-6: [maxwell-fmm.md](maxwell-fmm.md).
+`python3 tools/experiments/exafmm_build.py build` zachowuje cache, `check`
+weryfikuje receipt; numeryczny `--physics fmm-control --fmm-order 8 --fmm-ncrit 32`
+ma120DOF/6GiB/120s i512MiB RAM tmpfs, bez GPU. EXP73 actionPASS nie zastępuje
+PMCHWTsolve/field qualification. Regresje stdlib sprawdzają cache/tampering,
+walidację flag i odrzucenie pełnego tmpfs; nie importują ExaFMM w testach systemowych.

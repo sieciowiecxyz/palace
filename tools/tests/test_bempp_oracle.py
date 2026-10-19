@@ -12,6 +12,14 @@ SPEC.loader.exec_module(oracle)
 
 
 class PythonMountTests(unittest.TestCase):
+    def test_fmm_flags_are_bounded_and_rejected_before_host_allocation(self):
+        with patch.object(oracle.dev,'require_host_memory') as host:
+            for level,options in [(2,dict(physics='nd2',fmm_order=8)),
+                    (1,dict(physics='fmm-control')),(2,dict(physics='fmm-control',fmm_order=10)),
+                    (2,dict(physics='fmm-control',fmm_ncrit=0))]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),level,120,**options)
+            host.assert_not_called()
+
     def test_stream_probe_rejects_unused_or_unbounded_control_flags(self):
         with patch.object(oracle.dev,'require_host_memory') as host:
             for options in [dict(physics='nd2',stream_variant='near6'),

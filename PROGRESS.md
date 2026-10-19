@@ -1201,8 +1201,104 @@ Nie mierzonodeltapeakRAM aniantenna speedup. Nativealreadymatrixfree fact correc
 Docs/INDEX/ARCH/PLAN i nextstep zaktualizowane; nadalM2ACTIVE i nierozwiązane
 field/volume/reference gates. FMMaudytkandydataNOTRUN, bezinstalacjideps.
 
-Walidacja końcowa:95unitPASS pinned/system79PASS16SKIP, checker/diffcheckPASS.
+Walidacja historycznego commitu e57ba76:95unitPASS pinned/system79PASS16SKIP, checker/diffcheckPASS.
 Ta sama Luna: read-only docs-gardenPASS, bez sprzeczności i bez edycji.
 Rootreview: native-no-pointmatrix correction, matchingcost z commonpanelprep,
 frozenFAILgates i FMM/tmpfsNOTRUN sprawdzone. Commit lokalny, bezpush.
 Następne M2FMMsource/małyMaxwelloracle; brak nowej antena/medium/defaultpromotion.
+
+
+### EXP70 — prerejestracja: izolowany cached ExaFMM addon
+
+Poprzedni turn PROGRESS: commite57ba76 fusedpotential i własnaF3volume/refFAIL;
+nextreferenceFMMcandidate. Root przypiął exafmm-t v0.1.1 do commit
+78b7d56f988b3843ba502faf4ac60b0c013aa206; LICENSE BSD3Clause (setup metadataMIT
+nie jest źródłem licencji). Sourcecheckoutclean bez modyfikacji upstream.
+Pybind11headers2.13.6 prywatnytarget .cache/m2-build-deps, bez zmian venv/Bempp.
+
+Read-only dependencyprobes dużego PalacebuilderImage(25,4GB) nie wystartowały
+z cap6GiB: OCIinit 'OOM-killed?' lubparentreset, także z Luny. Nie dowodzi
+hostOOM: MemAvailable~69GiB,parentcgroup memoryevents oom0, runtimeimage /bin/true
+startuje pod tym samymcap. Nie podniesiono limitów ani zamknięto aplikacji.
+Zamiast kolejnych prób nowy mały cached builder frompinnedUbuntu24.04 digest
+68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac,
+tylko g++/ccache/FFTW/OpenBLAS, bez Palace/dependencyrebuild i bez kasowaniacache.
+
+exafmm_build.py: namedimageprovision max180s/6GiB4CPU, cached image byrecipe;
+compile1TU przezccache -c, osobnylink, max120s/6GiB4CPU/tmpfs/noaddedSwap/networknone.
+Headers/PythonbinaryABI/source/builder/runtimeimage/flags i prywatneFFTW/BLAS
+librarySHA wmanifest. Tworzone obrazy/cache są softwarecache, nie solveroffload.
+NumericalsolverNOTRUN; successfulbuild nie kwalifikuje importu/FMM/Maxwell.
+Root przygotował kod; Luna tylkoexactbuildargv i terminalmonitoring, bez decyzji.
+Exactargv:
+`python3 tools/experiments/exafmm_build.py build`.
+Po PASS osobny runtimeimport i małyMaxwellFMMvsdense przedB5. NofullPalacebuild/GPU/paidcompute.
+
+EXP70 buildPASS21,455s, imageprovision/compile terminalexit0/noOOM.
+BinarySHA7bb42c3049da13405d4c2a604352af6b89b14ed54466c4c51243b56b660c6e48.
+Rootrecipe/artifactfingerprintverified; no runtime/numericalpass yet. Imagesmall
+Ubuntu+FFTW/BLAS+g++ solves provisioning path without changing Palacebuildercache.
+
+### EXP71 — prerejestracja: cached rebuild + runtime MaxwellFMMvsdense
+
+First repeat samebuildargv: expectverifiedno-op/noC++compile, preservesbinarySHA.
+Then runtimeimportprivateCPython3.12module+libs on originaloracleruntime, no newvenvdeps.
+SurfaceB2RWG120, k=1/sqrt(2,94), quadregular/singular4, FMMorder6/ncrit32.
+Three deterministic complexvectors eachT/K; weightedgeometry same asdense,
+relativeactiongate1e-6, dtypecomplex128, nohiddenGLOBALdensefallback. Require
+nontrivialtree depth>=2 andallFMMtmp under /scratchtmpfs512MiB; privatelibsfromreceipt.
+No transmission solve/Mie/antenna or scalabilityqualification on operatorpass.
+99systemtests:83PASS16SKIP. Numericalrun120s/6GiB4CPU/noaddedSwap/noGPU/paidcompute.
+Exactargvs sequential:
+`python3 tools/experiments/exafmm_build.py build`.
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-maxwell-o6-n32-20261019 --physics fmm-control --level 2 --fmm-order 6 --fmm-ncrit 32 --seconds 120`.
+OnlyaftercachedbuildterminalPASS; no retries or limit changes.
+
+EXP71 terminal exit0/noOOM, executionPASS but operator_controlFAIL. Root checked
+case/command/container-state: p6/ncrit32, complex128,120DOF,480sources/targets,
+two73node depth2trees. T relative action error2.15e-6/2.24e-6; K1.95e-5/1.66e-5
+at k1/sqrt2.94, exceeding frozen1e-6. Elapsed26.331s/sharedRSS497680384B.
+Build repeat cache no-op0.105s. No numerical qualification or speedup promotion.
+
+### EXP72 — prerejestracja: MaxwellFMM order8, unchanged action gate
+
+Previous goal response was an explanation/plan (no progress); EXP71 is terminal,
+so next safe action is p6→p8 only. Same geometry/B2, ncrit32, quad4, k/vectors,
+complex128 and1e-6gate. Added report-only actual FMM tempfile bytes and tmpfs
+occupancy/capacity; cwd remains512MiB RAM tmpfs,6GiB/4CPU/noaddedSwap/networknone.
+No source/Palace rebuild, no paidcompute/GPU, max120s. A pass qualifies small
+operator actions only; then actual PMCHWTsolution control before higher reference.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-maxwell-o8-n32-20261019 --physics fmm-control --level 2 --fmm-order 8 --fmm-ncrit 32 --seconds 120`.
+
+EXP72 terminalexit0/noOOM28.036s/RSS708407296B, operatorFAIL. k1T/K4.14e-8/
+5.55e-7 meetgate, ksqrt2.94 T/K.27650/.83602 invalid. Root found scratch_used
+536870912==capacity; firstfile302215176B, second234651648B truncated atcap.
+Pinned ExaFMM fmm.h precompute closes ofstream without checking errors, and
+evaluate rereads its tables. Runtimeexit0 is not numericalvalidity. This is
+tmpfs/RAM exhaustion, NOT SSD scratch or proof highorder mathematicalfailure.
+
+### EXP73 — prerejestracja: sequential-wave cache lifetime, same512MiBcap
+
+Independent k1/kdielectric controls don't need coexistence. Snapshot receipts,
+release each tree via upstream clear_fmm_cache, delete only its runtime tmpfiles
+via upstream cleanup_fmm_tmp; preserve source/JIT/build caches. New failfast check
+before numericalaction rejects exhausted tmpfs. Same p8/ncrit32/q4/vectors/gate,
+120s/6GiB4CPU, no capincrease, no SSD fallback. Not yet PMCHWT simultaneous2k.
+Exactargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-fmm-maxwell-o8-sequential-20261019 --physics fmm-control --level 2 --fmm-order 8 --fmm-ncrit 32 --seconds 120`.
+
+EXP73 terminalexit0/noOOM, execution/operatorPASS, analyticFalse. Root inspected
+case/state:28.331s/RSS624742400B, Terrors4.14e-8/4.67e-8, K5.55e-7/4.71e-7.
+Both tables302215176B individually, peakRAMtmpfs302219264B/end0/cap536870912B.
+This removes spurious corruption by sequential independent-wave lifetime, not
+a solution for simultaneousPMCHWT or proof antenna memory/speed improvement.
+Next: budget true PMCHWT2k storage and solve-vs-dense, no change to frozen gates.
+Docs maxwell-fmm/stream, PLAN/M2/INDEX/ARCH/testing updated; M2 remainsACTIVE.
+
+EXP73 finalvalidation:101testsPASS pinned; system85PASS/16SKIP. SameLuna
+read-only docs-garden reviewed code/untracked/report: no numerical/scope
+contradictions; stale current-suite95 corrected to101 (historical e57ba76 count
+retained with explicitlabel). Checker/diffcheckPASS. Root verified currentcaseSHA
+match EXP73command and terminalstate exit0/noOOM. No antenna/promotion/M3 claim.
+Local commit only, no push to public upstream.

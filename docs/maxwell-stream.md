@@ -67,24 +67,12 @@ Dalsza referencja wymaga lepszej dyskretyzacji powierzchni, ze sprawdzonym
 kosztem operatora. Obecny PMCHWTB5:7680DOF na prąd; cztery denseoperatory oraz
 15360²complex128system to≥7,550GB przedLU, ponad6GiBcap. Nie uruchamiać denseB5.
 
-## Kandydat następnego eksperymentu: FMM — NOT RUN
+## Następny backend: FMM
 
-Oficjalny [Bempp handbook](https://bempp.com/handbook/api/boundary_operators.html)
-obsługuje MaxwellT/K z `assembler='fmm'`; backendem jest
-[ExaFMM](https://bempp.com/handbook/core/assembling_operators.html).
-Potwierdzono to w lokalnym pinned0.4.2 `api/fmm/fmm_assembler.py`.
-Pinned Dockerfile wskazuje exafmm-t0.1.1; lokalne środowisko go nie ma.
-Nie zainstalowano ani nie przetestowano kompatybilności/Python3.12/licencji rewizji.
-
-Następny krok: audyt/przypięcie źródła i cached build tylko dodatku, potem
-mały MaxwellT/K FMMvsdense i rozwiązaniePMCHWTvsdense. Dopiero po kontroli
-błędu, residuum, czasu i pamięci rozważyć B5reference oraz streamapply
-na zachowanych F3targets. FMM_CPU jako oracle nie jest obietnicą CUDA/TensorCore.
-Nie dodawać do Palace ani zakładać powodzenia przed pomiarem.
-
-ExafmmInterface tworzy cwd/.exafmm/*.tmp. Ewentualny runtime musi pozostać
-w istniejącym `/scratch`tmpfs512MiB/bezswap pod6GiBcap, bez plików roboczych
-na SSD i bez fallbacku na dysk. Niewystarczająca pamięć oznacza przerwanie.
+EXP70–73: przypięty ExaFMM addon z cached build działa. Mała kontrola
+MaxwellT/K p8 przechodzi1e-6 po naprawie cyklu życia tablic w RAM tmpfs.
+PMCHWTsolve i większa referencja nadal NOT RUN; szczegóły i ograniczenia:
+[maxwell-fmm.md](maxwell-fmm.md). To CPU oracle, bez promocji CUDA/anteny.
 
 ## Odtworzenie i dowody
 

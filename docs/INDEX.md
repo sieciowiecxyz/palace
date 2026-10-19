@@ -42,7 +42,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP54–58, analityczny epsilon2,94/FEMrefinement, actual coupled i porównanie640punktów; brak pełnej normy/antenna promotion.
 - [M2: fused potential i własna F3volume](maxwell-stream.md)
   - Czytaj gdy: liczysz potencjały zachowanych prądów lub planujesz skalowalną referencję FMM
-  - Opis: EXP59–69, matched CPUapply i pełne F3degree2/5; reference/volume FAIL, FMM dopiero kandydat.
+  - Opis: EXP59–69, matched CPUapply i pełne F3degree2/5; reference/volume FAIL; kolejna kontrola FMM opisana osobno.
+- [M2: Maxwell FMM i cached addon](maxwell-fmm.md)
+  - Czytaj gdy: przygotowujesz PMCHWT bez dense B5 lub kontrolujesz RAM tmpfs ExaFMM
+  - Opis: EXP70–73, cached build i mały operator PASS; tmpfs exhaustion wykryty, solve/pola/antena NOT RUN.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.
