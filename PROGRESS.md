@@ -23,7 +23,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP35–37: duality/trace diagnostics i niezależny brzeg. Magnetic F2/B3 E/H0,560/0,751% PASS, F3/B3 0,358/0,904% PASS (H gorsze). Root source/SO/state/quality verification PASS; docs/maxwell-trace-duality.md. Dielectric transmission/rezonanse/scalable assembly/koszt pozostają otwarte.
 - EXP38–41: dielectric eps2,94 wykonany, centroidscreening FAIL E/H1,092/1,320% względem PMCHWTB4/q12. RefEchange0,408%>0,3%; potentialB4q8/q12<1e−6. Raw/far/energy małe nie kwalifikują pola. Zachowane NPZ do dalszej analizy bez solve; docs/maxwell-transmission.md.
 - EXP42–43: saved-solution volume replay640/2240pts. Degree5 E/H2,888/1,612%, refchange1,945/1,158%, potentialqdelta~7,4e−4 FAIL. Root SHA/state/complexintegral verificationPASS; H_FEM własnanorma q2/q5 zgadza się2,11e−15. Następna hipoteza adaptive near-panel correction; niepromować i nie skalować ślepo referencji.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.80testsPASSwpinnedenv; systemowo67PASS/13SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP44–47: RWGpanel/native i niezależny static-normalcontrolPASS, ratio2 czterokrotnie mniejliści. FullfineB4nearcorrection117,617s/217MB adaptive/cutoffPASS, E/H2,888/1,611% nadal FAIL. Root allpoint/weights/input/sourceSHA/complexnorm/subsetregression PASS. Następne coarseB3 i degree2/5, docs/maxwell-near-panels.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.85testsPASSwpinnedenv; systemowo71PASS/14SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -43,7 +44,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: volume replay EXP42–43 FAIL, near potential quadrature niezbieżna. Następny mały panel-control na tej samej kwadraturze/DOFmap co pinned Bempp, potem adaptacyjna korekcja tylko near panels. Reużywać saved solutions; nie globalq/B5. Dalej pełne pola/dielektryk/rezonanse/koszt; M2 otwarty bez promocji/cloud.
+2. M2: EXP44–47 fineB4nearpotential opanowany (native/solid-angle/adaptive/cutoffPASS); pola2,888/1,611% nadal FAIL. Następne coarseB3correction i volume-degree2/5agreement z zachowanych danych, potem niezależny FEM przy zgodnej referencji. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -746,3 +747,115 @@ degree2/5agreement od potentialq12/q16. Root poprawił dokument i dodał osobny
 preregistered1e-6volume-degreegate FAIL do rootanalysis; casequalityflag nie
 obejmuje pary reguł i opis teraz mówi to jawnie. Pozostałe source/artifacts PASS.
 80unitPASS pinned, system67PASS/13SKIP; checker/diffcheckPASS. Lokalnycommit bezpush.
+
+
+### EXP44 — prerejestracja: fizyczny panelkernel i adaptacja przy bliskich punktach
+
+Poprzedni goalturn PROGRESS: commit e5a85ce, volume replaydegree2/5FAIL zachowany.
+Nowy maxwell_near.py rekonstruuje affineRWG J oraz div_Gamma z rzeczywistego
+space.evaluate/DOFtransform i physicalJacobian. T=ik intGJ-intgradGdiv/(ik),
+K=intgradGcrossJ; bez modyfikacji installedBempp. Porównać każdy zTt/Kt/Th/Kh
+na identycznej triangle_gauss.rule(8) przeciw pinnedpotentialkernel, relative<1e-12.
+Kontrola openonepanel(include_boundary_dofs) i closed20trianglepolyhedron,
+syntheticcomplexcurrents, k=sqrt2.94. To operatorcheck, nie fizyczne rozwiązanie.
+
+Adaptive test: singlepanel,6targets wtym distance0,002/0,02/0,2 z obu stron.
+DuffyGauss6 vs8 na tej samej distance-subdivisiontree (ratio4,maxdepth12),
+każdy point/operatorrelative<1e-6, brakdepth_hits. Raport regularvsadaptive
+bez przypisywania exacterror samemu porównaniu. Gdy regular nativecheckFAIL,
+nie uruchamiać dalszych poprawekvolume; zdiagnozować normalizację/div/orientację.
+Unit84PASS: rigidrotation/translation,area childmap, exhaustion/errorguards i
+preallocationflaglimits. Brak BEM/FEM solve/build/GPU/cloud.6GiB4CPU/tmpfs/noSwap.
+
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-panel-control-20261019 --physics near-control --level 1 --seconds 120`.
+Niepromowaćanteny, niezaliczaćM2 z operatorcontrol. Następne ewentualnie korekcja
+savedvolume (subtract regularnear + addadaptive), tylko po tym filtrze i pomiarzekosztu.
+
+
+EXP44 execution/operatorcontrolPASS15,028s/RSS272MB/noOOM. Regularphysical T/K
+vs native peroperator≤1,97e-15, adaptiveq6/q8worst1,96e-15,10140leaves/order,
+maxdepth12 alezeroexhaustion. Regularq8 vs adaptive1,627relative na nearpoints;
+to nie świadczy samo o złej adaptive ani o jej exactaccuracy. Potrzebny niezależny
+kontroler, nie tylko dwa warianty tej samej adaptacji.
+
+### EXP45 — prerejestracja: niezależny solid-angle oracle + koszt ratio
+
+KonwencjaLaplace: normalcomponent intgrad(1/(4piR)) = orientedOmega/(4pi).
+Reference z istniejącej SciPy1.15.3 calculate_solid_angles (VanOosterom/Strackee,
+DOI10.1109/TBME.1983.325207, bibliografiaCrossref/PubMedzweryfikowana; kodpinnedSciPy
+odczytanylokalnie). Nie kopiowaćkernelnear jako oracle. Nowy helper diagnostyczny
+nie jest używany przezintegrate/adaptive. Unit octantOmega=pi/2/orientation/scalePASS.
+ConstantJx/Jy,div0,k=1e-5 daje normalgrad z (K[Jx]_y-K[Jy]_x)/2. Różnica
+Helmholtz–Laplace ograniczona≤(1+maxkr)k²Area/(8pi)≈2e-12, gateabsolute1e-8,
+bezdepthhits. To niezależny staticnormalcontrol, nie pełnyphysicalFEMsolve.
+
+ZachowajnativeT/Kgate1e-12 iadaptiveq6/q8worstpointoperator1e-6. Porównaj
+ratio2vs4 na tych samych6targets/currents/rules, mierząc czas/leaves/hits.
+Fasterratio2dopuszczalne dopiero po obukontrolach.85unitPASS. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-solid-angle-control-20261019 --physics near-control --level 1 --seconds 120`.
+6GiB4CPU/noadditionalSwap/tmpfs/noGPU/cloud/build. Nie powtarzaćfullvolume,
+niepromowaćanteny. Przyfailnajpierwdiagnoza, bez automatycznejzmianyprogu.
+
+
+EXP45 operatorcontrolPASS15,781s/RSS279MB/noOOM. Native T/Kmax1,97e-15;
+ratio2worstq6/q8pointoperator1,97e-11,2550leaves,0,196/0,210s vs ratio4
+10140leaves,0,783/0,865s. Independentconstant-normalstaticerror1,929e-12 ≤
+Helmholtz–Laplacebound1,989e-12 ≪1e-8gate,zeroexhaustion. Root actualstate/
+currentcase+nearSHA/peroperator and ratioNPZrecompute/regressionvsEXP44 in
+artifacts/m2-near-control-root-analysis-20261019.json. Nie twierdzić że to
+fullMaxwell/volumequality. Ratio2wybrany do małej następnej korekcji, nieanteny.
+
+### EXP46 — prerejestracja: korekcja32savedpoints bez assembly/solve
+
+bempp_near_correction.py: finePMCHWTB4 currents, cachedvolume degree5.
+16worst q12/q16targets +16spanningpoints (wybórtendencyjny, NIE fullL2).
+Odtwórzregularq12przezwłasnepanele na3punktach vs cacheE/H<1e-12; potem
+odejmijregularnear i dodajadaptive6/8 (distance ratio2, maxdepth12).
+Osobno selectionradius2vs4 przyadaptive8/ratio2 bada niekorygowane dalsze panele.
+Gates adaptive6/8relative<1e-6 i cutoff2/4relative<1e-6,zeroexhaustion,
+bezpromocji/analytic_target=false. Zmierzczas/leaves/RSS przed pełnymreplay.
+
+Runner wiąże volume-output/currents/meta/state/material/referencelevel/SO,
+reference.py i helperSHA; inputsread-only. Ref sourceSHA i volumegeometryhelper
+wymagają zgodności. Unit85PASS, actualinputcheckPASS. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-subset-20261019 --physics near-correction --level 2 --volume-inputs artifacts/m2-transmission-volume-degree5-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+6GiB4CPU/noadditionalSwap/tmpfs/noGPU/cloud/build/solves. Jeśli regularcache
+niezgodny, stopdiagnose. Nie utożsamiać subsetcontrol z volumeconvergence.
+
+
+EXP46 correctioncontrolPASS8,555s/RSS217MB/noOOM,32biasedpoints. Nativecachedq12
+vs reconstructed E/H6,58e-15/4,47e-15. Adaptive6/8E/H1,01e-12/1,18e-12;
+selectionradius2/4E/H1,76e-14/1,84e-14. Oldq16vs corrected0,1115/0,1189%.
+q6r2 .600s/6897leaves, q8r2 .631s/6897, q8r4 1,118s/10200;zeroexhaustion.
+Root source/input/state/npzcomplexnorm verification in artifacts/m2-near-correction-root-analysis-20261019.json.
+Subset niejest globalL2 ani convergedphysicalreference. Reconstructedcurrents
+zachowane; nic nie zmieniło fizycznego rozwiązania.
+
+### EXP47 — prerejestracja: pełnyfine-reference replay ze wszystkimi kontrolami
+
+Zmienić tylko count32→all2240savedpoints, reuse tych samychFEMcurrents/basis/refs.
+Korekcje q6/q8radius2 i q8radius4; gateeachglobalE/Hdelta<1e-6, brakdepthhits;
+nativeq12 vs3savedpoints<1e-12. Raport correctedvolumeestimate vs savedFEM,
+nie qualifiedL2: nadal otwarty coarse-reference i degree2/5convergence.
+Prognoza<180s (pilot2,35s/32dla3passes; celowanysubset jest kosztowniejszy niż
+przeciętnepunkty). Bezprzedłużania deadline. Limit6GiB4CPU/noaddedSwap/tmpfs.
+85unitPASS, bezGPU/cloud/build/assembly/solve. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-volume-b4-20261019 --physics near-correction --level 2 --near-count 0 --volume-inputs artifacts/m2-transmission-volume-degree5-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180`.
+Jeśli timeout, zachowaćstage; nie uruchamiaćponownie bez diagnozy. Nie podwyższać
+medium ani progu błędów. To korekcjareferencjipostprocessingu, nie optymalizacja
+productionPalace ani measuredantenna speedup.
+
+
+EXP47 exit0/noOOM117,617s/RSS217MB, all2240positiveweights/4pi3. FineB4correction
+adaptiveq6/q8E/H8,17e-13/8,34e-13, cutoff2/4 1,88e-14/1,86e-14,zerohits.
+Correctedvolumeestimate E/H2,88847/1,61091%FAIL1%; oldq16vs corrected0,0311/0,0316%.
+q6r2 279180leaves/25,068s,q8r2 279180/26,719s,q8r4 502040/59,561s.
+Root independentlyrecomputedallcomplexnorms,input/source/helper/SHA andstates,
+fullindices/weights,subset32regression<1e-13 in artifacts/m2-near-full-root-analysis-20261019.json.
+Korekcja finepotential nie usuwa głównej rozbieżności pola. Nie rozstrzyga jeszcze
+coarse-reference mesherror vs FEM/coupling; degreeagreement nadalotwarty.
+Bez assembly/solve/build/GPU/cloud/swap/offload, zwykłe NPZinput/results wRAM.
+85unitPASS pinned, system71PASS/14SKIP. Docs-garden read-only tej samej Luny
+i rootreview PASS; root doprecyzował brak assembly operatorów FEM/BEM oraz
+usunął dodatkowy nieaktualny licznik71unit z docs/testing. Checker/diffcheckPASS.
+Lokalny commit bezpush; M2 ACTIVE, zero productionpromotion.

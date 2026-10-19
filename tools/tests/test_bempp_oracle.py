@@ -40,6 +40,16 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_near_control_stays_small_and_rejects_unused_input_flags(self):
+        with patch.object(oracle.dev,'require_host_memory') as check:
+            for level,options in [(2,{}),(1,dict(volume_inputs=['a','b'])),
+                    (1,dict(volume_degree=5)),(1,dict(surface_level=2)),(1,dict(epsilon_r=2.94)),(1,dict(near_count=0))]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),level,120,physics='near-control',**options)
+            check.assert_not_called()
+            for options in [dict(),dict(volume_degree=5)]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),2,120,physics='near-correction',**options)
+            check.assert_not_called()
+
     def test_volume_flags_are_rejected_before_host_allocation(self):
         with patch.object(oracle.dev,'require_host_memory') as check:
             for options in [dict(physics='volume'),dict(physics='volume',volume_degree=3),
@@ -55,7 +65,7 @@ class NativeManifestTests(unittest.TestCase):
                 path.mkdir()
                 case=dict(execution_passed=True,epsilon_r=2.94,level=2,surface_level=4)
                 command=dict(physics='transmission',reference_only=role=='reference',mfem_bridge=dict(binary_sha256='h'),
-                             **{key:'h' for key in ['fem_api_sha256','nd_api_sha256','pairing_api_sha256','coupling_api_sha256']})
+                             **{key:'h' for key in ['fem_api_sha256','nd_api_sha256','pairing_api_sha256','coupling_api_sha256','reference_sha256','case_sha256']})
                 for name,value in [('case.json',case),('command.json',command),
                         ('result.json',dict(complete=True,exit_code=0)),
                         ('container-state.json',dict(Running=False,OOMKilled=False,ExitCode=0))]:
@@ -77,6 +87,17 @@ class NativeManifestTests(unittest.TestCase):
                 oracle.dev.write(paths[0]/'command.json',cmd)
                 with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
                 cmd['nd_api_sha256']='h';oracle.dev.write(paths[0]/'command.json',cmd)
+                cmd['physics']='volume';cmd['transmission_api_sha256']='h'
+                oracle.dev.write(paths[0]/'command.json',cmd)
+                saved=oracle.dev.read(paths[0]/'case.json');saved['reference_surface_level']=4
+                oracle.dev.write(paths[0]/'case.json',saved)
+                (paths[0]/'volume-fields.npz').touch()
+                checked=oracle.checked_volume_inputs(paths,2,candidate_physics='volume')
+                self.assertIn('volume-fields.npz',checked['candidate']['sha256'])
+                saved['reference_surface_level']=3;oracle.dev.write(paths[0]/'case.json',saved)
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2,candidate_physics='volume')
+                saved['reference_surface_level']=4;oracle.dev.write(paths[0]/'case.json',saved)
+                cmd['physics']='transmission';oracle.dev.write(paths[0]/'command.json',cmd)
                 (paths[1]/'pmchwt-level4.npz').unlink()
                 with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
 

@@ -80,8 +80,8 @@ Zapisy `coupled-solution.npz`, `pmchwt-level*.npz`, `fields-level*-q*.npz`
 i `probes.npz` to małe zwykłe wyniki do ponownego postprocessingu.
 Nie są basis/scratch/offloadem solvera. EXP41 nie powtarzał coupled solve.
 
-Kontrolę objętościową wykonano w EXP42–43 poniżej. Najbliższy krok: opanować
-całkowanie potencjału blisko powierzchni przed niezależną zmianą FEM. Nie zwiększać
+Kontrolę objętościową wykonano w EXP42–43 poniżej. Całkowanie fine-reference blisko powierzchni opanowano w EXP44–47, ale nie usunęło
+rozbieżności pól. Następne coarse-reference i zbieżność reguł przed zmianą FEM. Nie zwiększać
 w ciemno referencji do B5 i nie uruchamiać sweepu anteny. M2.2/M2.3 pozostają
 otwarte; późniejsza decyzja integrate/reject wymaga również oceny rezonansów
 i kosztu przy zgodnym błędzie. Bez promocji solvera ani nowych defaultów.
@@ -151,9 +151,9 @@ python3 tools/experiments/bempp_oracle.py run artifacts/new-volume --physics vol
 
 Degree5 zmienia wyłącznie `--volume-degree 5` i katalog wyniku. Oba runy zachowane.
 
-### Następna hipoteza: adaptacyjne całkowanie tylko bliskich paneli
+### Hipoteza bliskich paneli — dalszy wynik EXP44–47
 
-To analiza źródeł, **prototyp jeszcze NOT RUN**. Pinned Bempp
+Audyt źródeł prowadził do [prototypu EXP44–47](maxwell-near-panels.md). Pinned Bempp
 `core/numba_kernels.py::maxwell_efield_potential/maxwell_mfield_potential`
 używa zwykłej reguły z `triangle_gauss.rule(parameters.quadrature.regular)`.
 Brak w tych funkcjach adaptacji zależnej od odległości punktu od panelu.
@@ -164,7 +164,6 @@ Konwencja do niezależnej kontroli, G=exp(ikr)/(4πr):
 T[J]=ik∫GJ−1/(ik)∫grad_x(G)div_Γ(J), K[J]=∫grad_x(G)×J.
 Funkcje RWG są afiniczne na panelu, ich div_Γ jest stała; wartości/orientacje
 muszą pochodzić z rzeczywistych space.evaluate i DOF transforms.
-Najpierw mały test własnego pojedynczego panelu przeciw pinned kernelowi
-na identycznej regule; potem odejmowanie zwykłej i dodawanie adaptacyjnej
-całki wyłącznie paneli bliskich. Sprawdzić dwie dokładności i koszt przed
-nowym pełnym odtworzeniem. Nie podnosić globalnie q ani siatki bez pomiaru.
+Native regular-kernel i niezależny solid-angle kontroler zostały wykonane;
+fineB4adaptive/cutoff kontroler PASS na całej reguledegree5. E/H nadal2,888/1,611%
+FAIL1%. Nie podnosić globalnie q ani siatki; pozostały coarseB3 i degree2/5control.

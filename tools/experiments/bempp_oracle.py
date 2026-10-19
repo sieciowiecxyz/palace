@@ -28,6 +28,9 @@ ND_COUPLING_CASE = dev.ROOT/'tools/experiments/bempp_nd2_coupling.py'
 TRACE_CASE = dev.ROOT/'tools/experiments/bempp_trace_spaces.py'
 TRANSMISSION_CASE = dev.ROOT/'tools/experiments/bempp_transmission.py'
 VOLUME_CASE = dev.ROOT/'tools/experiments/bempp_volume.py'
+NEAR_CASE = dev.ROOT/'tools/experiments/bempp_near_control.py'
+NEAR_API = dev.ROOT/'tools/experiments/maxwell_near.py'
+NEAR_CORRECTION_CASE = dev.ROOT/'tools/experiments/bempp_near_correction.py'
 ND_API = dev.ROOT/'tools/experiments/maxwell_nd.py'
 FEM_API = dev.ROOT/'tools/experiments/maxwell_fem.py'
 REFERENCE = dev.ROOT/'tools/maxwell_reference.py'
@@ -157,7 +160,7 @@ def python_mounts(env, base):
     return [arg for source,target in mounts for arg in ['-v',f'{source}:{target}:ro']]
 
 
-def checked_volume_inputs(paths,level):
+def checked_volume_inputs(paths,level,candidate_physics='transmission'):
     """Bind terminal saved solutions to unchanged geometry/basis and native ABI."""
     if len(paths)!=2:raise ValueError('Volume replay needs candidate and reference directories')
     result={}
@@ -168,20 +171,26 @@ def checked_volume_inputs(paths,level):
         case,command,status,state=[dev.read(path/name) for name in names]
         if not status.get('complete') or status.get('exit_code')!=0 or state.get('Running') is not False or state.get('OOMKilled') is not False or state.get('ExitCode')!=0 or not case.get('execution_passed'):
             raise ValueError('Volume replay input is not a completed no-OOM solve')
-        if command.get('physics')!='transmission' or bool(command.get('reference_only'))!=(role=='reference'):
+        expected_physics=candidate_physics if role=='candidate' else 'transmission'
+        if command.get('physics')!=expected_physics or bool(command.get('reference_only'))!=(role=='reference'):
             raise ValueError('Wrong candidate/reference case role')
         for key,source in [('fem_api_sha256',FEM_API),('nd_api_sha256',ND_API),
-                           ('pairing_api_sha256',PAIRING_CASE),('coupling_api_sha256',ND_COUPLING_CASE)]:
+                           ('pairing_api_sha256',PAIRING_CASE),('coupling_api_sha256',ND_COUPLING_CASE),('reference_sha256',REFERENCE)]:
             if command.get(key)!=dev.sha(source):raise ValueError('Saved geometry/basis helper changed')
         if (command.get('mfem_bridge') or {}).get('binary_sha256')!=dev.sha(mfem_bridge.LIBRARY):
             raise ValueError('Saved solution uses another MFEM bridge binary')
         if role=='candidate':
             if case.get('level')!=level:raise ValueError('Replay level differs from saved FEM level')
-            names+=['coupled-solution.npz']
+            names+=['volume-fields.npz' if candidate_physics=='volume' else 'coupled-solution.npz']
             epsilon=case.get('epsilon_r')
+            candidate_surface=case.get('reference_surface_level') if candidate_physics=='volume' else None
+            if candidate_physics=='volume' and command.get('transmission_api_sha256')!=dev.sha(TRANSMISSION_CASE):
+                raise ValueError('Saved volume geometry helper changed')
         else:
             fine=case.get('surface_level')
             if fine not in [3,4] or case.get('epsilon_r')!=epsilon:raise ValueError('Reference geometry/material mismatch')
+            if candidate_surface is not None and candidate_surface!=fine:raise ValueError('Saved volume and reference surface levels differ')
+            if command.get('case_sha256')!=dev.sha(TRANSMISSION_CASE):raise ValueError('Saved reference geometry helper changed')
             names+=[f'pmchwt-level{n}.npz' for n in [fine-1,fine]]
         if not all((path/name).is_file() for name in names):raise ValueError('Saved coefficients are missing')
         result[role]=dict(path=str(path),sha256={name:dev.sha(path/name) for name in names})
@@ -190,11 +199,11 @@ def checked_volume_inputs(paths,level):
     return result
 
 
-def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
-    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume'] or (physics!='pec' and (compression or native)):
+    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction'] or (physics!='pec' and (compression or native)):
         raise ValueError('Only PEC supports the optional CUDA compression probe')
     if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
     if duality not in ['electric','magnetic'] or (duality!='electric' and physics!='nd2-coupling'):
@@ -208,17 +217,27 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
         raise ValueError('Transmission requires BEM level2 or3 for a reference hierarchy')
     if reference_only and (physics!='transmission' or epsilon_r not in [1.,2.94]):
         raise ValueError('Reference-only calibration requires explicit transmission epsilon1/2.94')
-    if volume_degree not in [2,5] or (physics!='volume' and (volume_inputs is not None or volume_degree!=2)):
+    if volume_degree not in [2,5] or (physics not in ['volume','near-correction'] and (volume_inputs is not None or volume_degree!=2)):
         raise ValueError('Volume input/degree options apply only to volume replay')
-    if physics=='volume' and volume_inputs is None:raise ValueError('Volume replay requires saved inputs')
-    saved=checked_volume_inputs(volume_inputs,level) if physics=='volume' else None
+    if physics in ['volume','near-correction'] and volume_inputs is None:raise ValueError('Replay requires saved inputs')
+    if physics=='near-correction' and volume_degree!=2:raise ValueError('Near correction reuses the saved volume rule; do not override it')
+    if physics=='near-control' and level!=1:raise ValueError('Near-panel control is bounded at level1')
+    if near_count not in [0,32] or (physics!='near-correction' and near_count!=32):
+        raise ValueError('Near count0/all or32 applies only to near correction')
+    saved=checked_volume_inputs(volume_inputs,level,'volume' if physics=='near-correction' else 'transmission') if physics in ['volume','near-correction'] else None
     source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,
-              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE}[physics]
+              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE}[physics]
+    transmission_helper=physics in ['volume','near-control','near-correction']
+    nd_coupling_helper=transmission_helper or physics=='transmission'
+    pairing_helper=nd_coupling_helper or physics in ['nd2-coupling','traces']
+    nd_helper=nd_coupling_helper or physics in ['nd2','nd2-coupling']
+    fem_helper=nd_helper or physics in ['coupling','pairing','traces']
+    near_helper=physics in ['near-control','near-correction']
     dev.require_host_memory()
     manifest = verified()
     if native and not compression: raise ValueError('--native-apply requires --compression')
     cuda = verified_cuda() if native else None
-    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling','transmission','volume'] else None
+    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling','transmission','volume','near-correction'] else None
     output = Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     (BASE/'jit-cache').mkdir(exist_ok=True)
@@ -239,11 +258,12 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--device','nvidia.com/gpu=all'] if compression else []),
             *(['-v',f'{CUDA_LIBRARY}:/native/libmaxwell_apply.so:ro'] if native else []),
             *(['-v',f'{mfem_bridge.LIBRARY}:/native/libmfem_bridge.so:ro'] if bridge else []),
-            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if physics in ['coupling','pairing','nd2','nd2-coupling','traces','transmission','volume'] else []),
-            *(['-v',f'{ND_API}:/scripts/maxwell_nd.py:ro'] if physics in ['nd2','nd2-coupling','transmission','volume'] else []),
-            *(['-v',f'{PAIRING_CASE}:/scripts/bempp_pairing.py:ro'] if physics in ['nd2-coupling','traces','transmission','volume'] else []),
-            *(['-v',f'{ND_COUPLING_CASE}:/scripts/bempp_nd2_coupling.py:ro'] if physics in ['transmission','volume'] else []),
-            *(['-v',f'{TRANSMISSION_CASE}:/scripts/bempp_transmission.py:ro'] if physics=='volume' else []),
+            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if fem_helper else []),
+            *(['-v',f'{ND_API}:/scripts/maxwell_nd.py:ro'] if nd_helper else []),
+            *(['-v',f'{PAIRING_CASE}:/scripts/bempp_pairing.py:ro'] if pairing_helper else []),
+            *(['-v',f'{ND_COUPLING_CASE}:/scripts/bempp_nd2_coupling.py:ro'] if nd_coupling_helper else []),
+            *(['-v',f'{TRANSMISSION_CASE}:/scripts/bempp_transmission.py:ro'] if transmission_helper else []),
+            *(['-v',f'{NEAR_API}:/scripts/maxwell_near.py:ro'] if near_helper else []),
             *([arg for role in ['candidate','reference'] for arg in ['-v',f'{saved[role]["path"]}:/{role}:ro']] if saved else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
             '-u','/scripts/case.py','--level',str(level),'--output','/work',
@@ -253,22 +273,26 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--surface-level',str(surface_level)] if surface_level is not None else []),
             *(['--epsilon-r',str(2.94 if epsilon_r is None else epsilon_r)] if physics=='transmission' else []),
             *(['--reference-only'] if reference_only else []),
-            *(['--candidate','/candidate','--reference','/reference','--volume-degree',str(volume_degree)] if saved else []),
+            *(['--candidate','/candidate','--reference','/reference'] if saved else []),
+            *(['--volume-degree',str(volume_degree)] if physics=='volume' else []),
+            *(['--near-count',str(near_count)] if physics=='near-correction' else []),
             *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
                                       physics=physics,duality=duality if physics=='nd2-coupling' else None,
                                       surface_level=(level if surface_level is None else surface_level) if physics in ['nd2-coupling','transmission'] else None,
                                       epsilon_r=(2.94 if epsilon_r is None else epsilon_r) if physics=='transmission' else None,
                                       reference_only=reference_only,
-                                      coupling_api_sha256=dev.sha(ND_COUPLING_CASE) if physics in ['transmission','volume'] else None,
-                                      transmission_api_sha256=dev.sha(TRANSMISSION_CASE) if physics=='volume' else None,
-                                      volume_inputs=saved,volume_degree=volume_degree if saved else None,
+                                      coupling_api_sha256=dev.sha(ND_COUPLING_CASE) if nd_coupling_helper else None,
+                                      transmission_api_sha256=dev.sha(TRANSMISSION_CASE) if transmission_helper else None,
+                                      near_api_sha256=dev.sha(NEAR_API) if near_helper else None,
+                                      volume_inputs=saved,volume_degree=volume_degree if physics=='volume' else None,
+                                      near_count=near_count if physics=='near-correction' else None,
                                       case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
                                       native_cuda=cuda,
-                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if physics in ['coupling','pairing','nd2','nd2-coupling','traces','transmission','volume'] else None,
-                                      nd_api_sha256=dev.sha(ND_API) if physics in ['nd2','nd2-coupling','transmission','volume'] else None,
-                                      pairing_api_sha256=dev.sha(PAIRING_CASE) if physics in ['nd2-coupling','traces','transmission','volume'] else None,
+                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if fem_helper else None,
+                                      nd_api_sha256=dev.sha(ND_API) if nd_helper else None,
+                                      pairing_api_sha256=dev.sha(PAIRING_CASE) if pairing_helper else None,
                                       scope='CPU Maxwell oracle, optional CUDA compressed apply; no antenna promotion'))
     started = time.monotonic()
     result = dict(complete=False,analytic_target_passed=False,level=level)
@@ -302,7 +326,7 @@ if __name__=='__main__':
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
     parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
     parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
-    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume'],default='pec')
+    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission','volume','near-control','near-correction'],default='pec')
     parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     parser.add_argument('--duality',choices=['electric','magnetic'],default='electric')
     parser.add_argument('--surface-level',type=int,choices=[1,2,3,4])
@@ -310,9 +334,10 @@ if __name__=='__main__':
     parser.add_argument('--reference-only',action='store_true')
     parser.add_argument('--volume-inputs',type=Path,nargs=2,metavar=('CANDIDATE','REFERENCE'))
     parser.add_argument('--volume-degree',type=int,choices=[2,5],default=2)
+    parser.add_argument('--near-count',type=int,choices=[0,32],default=32)
     args = parser.parse_args()
     if args.action=='setup': setup()
     elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count)
