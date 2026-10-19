@@ -32,8 +32,8 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Czytaj gdy: wznawiasz transmisję dielektryczną lub oceniasz wynik sprzężonego ND2
   - Opis: EXP35–37, magnetic-dual i niezależny BEM dają transparentne pola <1%; nie dowodzi to jeszcze zysku anteny ani transmisji przez dielektryk.
 - [M2: transmisja i kalibracja referencji](maxwell-transmission.md)
-  - Czytaj gdy: wznawiasz eps2,94, analizę zapisanych pól lub decyzję o dalszym FEM–BEM
-  - Opis: EXP38–41, niezależny PMCHWT tej samej geometrii; screening nadal FAIL, rozdzielony błąd siatki/kwadratury i zapisane rozwiązania bez powtarzania solve.
+  - Czytaj gdy: wznawiasz eps2,94, volume replay lub badanie całkowania bliskich paneli
+  - Opis: EXP38–43, niezależny PMCHWT i replay całej objętości; centroidy zaniżały błąd, degree5/potentialquadrature FAIL. Następna hipoteza: korekcja tylko bliskich paneli.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

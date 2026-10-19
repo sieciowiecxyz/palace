@@ -24,10 +24,29 @@ if AVAILABLE:
     transmission=importlib.util.module_from_spec(transmission_spec)
     with patch.dict(sys.modules,{'bempp_cl':package,'bempp_cl.api':api,'bempp_nd2_coupling':coupling}):
         transmission_spec.loader.exec_module(transmission)
+    volume_spec=importlib.util.spec_from_file_location('bempp_volume',
+        Path(__file__).resolve().parents[1]/'experiments/bempp_volume.py')
+    volume=importlib.util.module_from_spec(volume_spec)
+    with patch.dict(sys.modules,{'bempp_transmission':transmission}):
+        volume_spec.loader.exec_module(volume)
 
 
 @unittest.skipUnless(AVAILABLE,'Optional NumPy/SciPy; pinned oracle includes both')
 class ND2SchurTests(unittest.TestCase):
+    def test_positive_volume_rules_integrate_all_barycentric_monomials(self):
+        from math import factorial
+        from itertools import product
+        for degree,count in [(2,4),(5,14)]:
+            points,weights=volume.tetra_rule(degree)
+            self.assertEqual(points.shape,(count,4))
+            self.assertTrue(np.all(points>0) and np.all(weights>0))
+            np.testing.assert_allclose(points.sum(axis=1),1.,atol=1e-15)
+            for powers in product(range(degree+1),repeat=4):
+                if sum(powers)>degree:continue
+                exact=np.prod([factorial(p) for p in powers])/factorial(sum(powers)+3)
+                self.assertAlmostEqual(float(weights@np.prod(points**np.array(powers),axis=1)),exact,places=14)
+        with self.assertRaises(ValueError):volume.tetra_rule(3)
+
     def test_reference_surface_refinement_preserves_planes_volume_and_orientation(self):
         from collections import Counter
         vertices,faces=transmission.surface_mesh(4)

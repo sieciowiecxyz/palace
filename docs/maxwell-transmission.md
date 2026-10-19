@@ -1,6 +1,6 @@
 # M2 — transmisja przez dielektryk: screening i kalibracja referencji
 
-EXP38–41, 2026-10-19. **Wykonane, próg jakości niezaliczony.** M2 ACTIVE.
+EXP38–43, 2026-10-19. **Wykonane, próg jakości niezaliczony.** M2 ACTIVE.
 To lokalne testy CPU/RAM na wielościanie, nie promocja anteny ani pomiar
 przyspieszenia na RTX. Nie zmieniono Palace/MFEM/medium i nie było rebuilda.
 
@@ -80,8 +80,8 @@ Zapisy `coupled-solution.npz`, `pmchwt-level*.npz`, `fields-level*-q*.npz`
 i `probes.npz` to małe zwykłe wyniki do ponownego postprocessingu.
 Nie są basis/scratch/offloadem solvera. EXP41 nie powtarzał coupled solve.
 
-Najbliższy krok: wykorzystać te rozwiązania do kontroli pola na wspólnej
-kwadraturze objętościowej oraz ocenić niezależnie zmianę FEM. Nie zwiększać
+Kontrolę objętościową wykonano w EXP42–43 poniżej. Najbliższy krok: opanować
+całkowanie potencjału blisko powierzchni przed niezależną zmianą FEM. Nie zwiększać
 w ciemno referencji do B5 i nie uruchamiać sweepu anteny. M2.2/M2.3 pozostają
 otwarte; późniejsza decyzja integrate/reject wymaga również oceny rezonansów
 i kosztu przy zgodnym błędzie. Bez promocji solvera ani nowych defaultów.
@@ -103,3 +103,68 @@ Dowody: `artifacts/m2-transmission-root-analysis-20261019.json` oraz
 stany terminalne/noOOM, applicable helper/SO/case SHA i niezależnie przeliczył
 zespolone błędy z NPZ. Historyczne EXP38/39 pochodzą ze wcześniejszych wersji
 skryptu; manifesty zachowują ich SHA, nie przypisujemy im aktualnego hasha.
+
+## EXP42–43 — odtworzenie na kwadraturze całej objętości
+
+`bempp_volume.py`, oracle `--physics volume`, odczytuje małe zapisane rozwiązania
+EXP40 i prądy EXP41. Bez nowego BEM assembly/faktoryzacji. Obecny MFEM handle
+tworząc przestrzeń montuje małe serial mass/curl, ale nie eksportujemy tych
+macierzy ani nie rozwiązujemy układu. Nie twierdzić, że nie ma żadnego assembly.
+Przed runem: terminal state/noOOM, role, materiał, helpery geometrii/bazy i MFEM
+SO muszą się zgadzać; wszystkie wejścia mają SHA i mount read-only w manifeście.
+
+Pozytywne symetryczne reguły MFEM stopnia2/5:4/14 punktów na tetraedr,
+640/2240 punktów dla tego samego FEM2. Wszystkie elementy objęte całkowaniem,
+wagi dodatnie i suma4π/3. Reguły2/5 są różne, nienested. Unit niezależnie
+sprawdza wszystkie barycentryczne jednomiany do deklarowanego stopnia.
+Dane: [MFEMv4.9 intrules.cpp](https://github.com/mfem/mfem/blob/v4.9/fem/intrules.cpp),
+TetrahedronIntegrationRule cases2/5; pobrano źródło przez urllib, SHA256
+`41db1714a12c35ae1c319744a78e16c48e003873501df3c0c75ce675185d3ce1`.
+
+| Reguła objętościowa | E/H względem B4 q16, % | B3→B4 q12, % | B4 q12→q16, względnie | Czas | RSS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| degree2,640 punktów | 2,152 / 0,863 | 1,075 / 0,437 | 7,37e−7 / 7,67e−7 | 52,526s | 493MB |
+| degree5,2240 punktów | 2,888 / 1,612 | 1,945 / 1,158 | 7,38e−4 / 7,47e−4 | 159,317s | 494MB |
+
+**Oba screening FAIL.** Degree2/5 zmiana oszacowania błędu E/H to0,737/0,749
+punktu procentowego. Osobna prerejestrowana kontrola zgodności reguł objętościowych
+(delta błędu względnego≤1e−6, sprawdzana przez root po obu runach) jest FAIL.
+To inny test niż potential q12/q16: ten przechodzi dla degree2 i jest FAIL
+dla degree5. Pojedynczy `quality_screening_passed` w case nie obejmuje jeszcze
+porównania dwóch reguł objętościowych; root raportuje je osobno.
+Wcześniejszych centroidów ani degree2 nie można uznać za dokładny pełny błąd L2.
+Są to przybliżenia całek obejmujących całą objętość, nie zakwalifikowana całka.
+
+Sąsiednie pola bliskie wymagają dokładniejszego całkowania niż centroidy.
+FEM H ma stopień1 wewnątrz elementu; jego własna norma kwadratowa zgadza się
+między regułami do2,11e−15 względnie (obie całkują stopień2). Rozwiązanie i baza
+nie zmieniły się. Root przeliczył wszystkie zespolone normy z NPZ, zweryfikował
+źródła/SO/wejścia/stany w `artifacts/m2-volume-replay-root-analysis-20261019.json`.
+
+Potencjał liczymy porcjami128 punktów, bez pełnej gęstej mapy objętość×brzeg.
+Zachowano6GiB/4CPU,180s, brak dodatkowego swap/GPU/cloud/build. Czasy dotyczą
+odtworzenia i pola, nie nowej symulacji anteny. Nie dowodzą jej speedupu.
+
+```sh
+python3 tools/experiments/bempp_oracle.py run artifacts/new-volume --physics volume --level 2 --volume-degree 2 --volume-inputs artifacts/m2-transmission-eps294-f2-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180
+```
+
+Degree5 zmienia wyłącznie `--volume-degree 5` i katalog wyniku. Oba runy zachowane.
+
+### Następna hipoteza: adaptacyjne całkowanie tylko bliskich paneli
+
+To analiza źródeł, **prototyp jeszcze NOT RUN**. Pinned Bempp
+`core/numba_kernels.py::maxwell_efield_potential/maxwell_mfield_potential`
+używa zwykłej reguły z `triangle_gauss.rule(parameters.quadrature.regular)`.
+Brak w tych funkcjach adaptacji zależnej od odległości punktu od panelu.
+To wyjaśnia mechanizm możliwej utraty dokładności blisko powierzchni; nie dowodzi
+jeszcze zysku konkretnej korekcji ani tego, że cały błąd referencji jest kwadraturą.
+
+Konwencja do niezależnej kontroli, G=exp(ikr)/(4πr):
+T[J]=ik∫GJ−1/(ik)∫grad_x(G)div_Γ(J), K[J]=∫grad_x(G)×J.
+Funkcje RWG są afiniczne na panelu, ich div_Γ jest stała; wartości/orientacje
+muszą pochodzić z rzeczywistych space.evaluate i DOF transforms.
+Najpierw mały test własnego pojedynczego panelu przeciw pinned kernelowi
+na identycznej regule; potem odejmowanie zwykłej i dodawanie adaptacyjnej
+całki wyłącznie paneli bliskich. Sprawdzić dwie dokładności i koszt przed
+nowym pełnym odtworzeniem. Nie podnosić globalnie q ani siatki bez pomiaru.

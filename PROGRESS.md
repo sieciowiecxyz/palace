@@ -22,7 +22,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP34: actualND2/BC-RBCmortar/localbasisassembler/sparseSchurPASS, currentwholefieldFAIL17,74/15,22→10,07/5,64% mimo raw/far/energyPASS. NativeT/K≤1,22e−16, tinydenseSchur≤1,94e−14; brakpromocjianteny. docs/maxwell-nd2-coupling.md.
 - EXP35–37: duality/trace diagnostics i niezależny brzeg. Magnetic F2/B3 E/H0,560/0,751% PASS, F3/B3 0,358/0,904% PASS (H gorsze). Root source/SO/state/quality verification PASS; docs/maxwell-trace-duality.md. Dielectric transmission/rezonanse/scalable assembly/koszt pozostają otwarte.
 - EXP38–41: dielectric eps2,94 wykonany, centroidscreening FAIL E/H1,092/1,320% względem PMCHWTB4/q12. RefEchange0,408%>0,3%; potentialB4q8/q12<1e−6. Raw/far/energy małe nie kwalifikują pola. Zachowane NPZ do dalszej analizy bez solve; docs/maxwell-transmission.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.77testsPASSwpinnedenv; systemowo65PASS/12SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP42–43: saved-solution volume replay640/2240pts. Degree5 E/H2,888/1,612%, refchange1,945/1,158%, potentialqdelta~7,4e−4 FAIL. Root SHA/state/complexintegral verificationPASS; H_FEM własnanorma q2/q5 zgadza się2,11e−15. Następna hipoteza adaptive near-panel correction; niepromować i nie skalować ślepo referencji.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.80testsPASSwpinnedenv; systemowo67PASS/13SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -42,7 +43,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: eps2,94 screening wykonany i FAIL w EXP38–41. Następne wspólna kontrola objętościowa z zachowanych rozwiązań oraz niezależna perturbacja FEM; bez powtarzania assembly dla postprocessingu i bez ślepego B5. Nadal potrzebne kwalifikacja transmisji/rezonanse/koszt. M2 otwarty, bez promocji i paidcompute.
+2. M2: volume replay EXP42–43 FAIL, near potential quadrature niezbieżna. Następny mały panel-control na tej samej kwadraturze/DOFmap co pinned Bempp, potem adaptacyjna korekcja tylko near panels. Reużywać saved solutions; nie globalq/B5. Dalej pełne pola/dielektryk/rezonanse/koszt; M2 otwarty bez promocji/cloud.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -682,3 +683,66 @@ To centroiddiagnostic, nie globalL2 i nie measuredantenna memory/speedgain.
 77unitPASS w pinnedenv, system65PASS/12SKIP. Docs-garden read-only tej samej
 Luny, root review, checker i diffcheck PASS. Lokalny commit bez push.
 Bez rebuilda/deps/paidcompute/GPU. M2 ACTIVE, bez promocji solvera.
+
+
+### EXP42 — prerejestracja: volume replay bez nowego solve
+
+Poprzedni goalturn był PROGRESS: zapisano EXP38–41 i commit c240a7c. Teraz
+bempp_volume.py odtwarza savedF2/B3 i PMCHWT B3/B4 bez nowego BEMassembly/LU.
+Obecny MFEMhandle przytworzeniu montuje małe serialmass/curl; nie eksportujemy
+ich ani nie faktoryzujemy. Nie twierdzić, że cały postprocessing nie ma assembly.
+Reguły dodatnie degree2(4pts/tet) i degree5(14pts/tet), dane z MFEMv4.9
+fem/intrules.cpp; primarysource pobrano urllib do istniejącego sourcecache
+(webfetch niedostępny). Unit sprawdza wszystkie barycentricmonomials do stopnia.
+Pierwszy tani filtr degree2:160tet*4=640points, weights sum4pi/3. Te same punkty
+obejmują całą domenę. Reference B3q12, B4q12 i B4q16: osobno meshchange i
+potentialquad. Chunk128points ogranicza pamięć, nic nie migruje do SSD/swap.
+
+Zamrożone screening1%volumeE/H,0,3%referencechange,1e-6potentialquad, a następnie
+osobno degree2/5agreement1e-6. analytic_target_passed=false; volume quadrature
+nie jest jeszcze zbieżną całką, brakpromocji. Runner wiąże wszystkieinputSHA,
+state/noOOM/role/material/unchangedFEMhelpers/SO przed uruchomieniem.
+80unitPASS. Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-volume-degree2-20261019 --physics volume --level 2 --volume-degree 2 --volume-inputs artifacts/m2-transmission-eps294-f2-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180`.
+6GiB4CPU/noaddedSwap/tmpfs, bezGPU/cloud/rebuild. Jeśli timeout, zachowaćdiag,
+nie ponawiać bezdiagnozy. Degree5 tylko po informacji o koszcie/kompletności.
+
+
+EXP42 exit0/noOOM52,526s/RSS493MB,640positivevolumepts/4pi3. Root independently
+recomputed volume E/H2,1518/0,8630% from npz. RefB3→B4 E/H1,0746/0,4374%
+FAIL0,3%. Potentialq12/q16 E/H7,37e-7/7,67e-7 PASS1e-6 at these points.
+ScreeningFAIL: centroid1,09%E underestimated volumequadratureE; don't promote.
+Phases: MFEMfields0,062s,B3q12 13,219s(includesinitialJIT),B4q12 14,876s,
+B4q16 23,233s. Retained caches, no BEMassembly/solve.
+
+### EXP43 — prerejestracja: oddzielna kontrola degree5
+
+Te same zapisane wektory/material/geometry, zmienić tylko volume_degree2→5.
+2240points(14/tet), symetrycznepositiveMFEMruledegree5; sourceURL
+https://raw.githubusercontent.com/mfem/mfem/v4.9/fem/intrules.cpp i lokalnycache.
+Prognoza~150–180s (steadyPotentialcost*3,5 + initialJIT), limit nadal180s,
+6GiB4CPU/noadditionalSwap/tmpfs. Nie zwiększać deadline automatycznie.
+Porównać normy/errors względemEXP42 i potential/referencegates bezluzowania.
+Nie jest to zmiana medium ani nowy solve. Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-volume-degree5-20261019 --physics volume --level 2 --volume-degree 5 --volume-inputs artifacts/m2-transmission-eps294-f2-b3-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180`.
+Jeśli timeout, zachować dokładnystage, następny run dopiero z diagnozą/pracy
+podziałem; nie wyciągać fullfieldwniosku z niedokończonej całki.
+
+
+EXP43 exit0/noOOM159,317s/RSS494MB,2240positivevolumepts. Degree5 E/H
+2,8884/1,6116%; refB3/B4 1,9455/1,1580%; potentialq12/q16 7,38e-4/7,47e-4
+FAIL1e-6. Degree2/5error zmiana0,7367/0,7486punktuproc. Nie ogłaszać dokładnego
+fullL2; oba oszacowania niespójne. H_FEMsquarednormdelta2,11e-15: te same
+wektory i prawidłowe regułycałkujące jego stopień2. Root wszystkiecomplexnormy,
+actualsource/helper/SO/inputSHA/noOOM/stany w artifacts/m2-volume-replay-root-analysis-20261019.json.
+80unitPASS; bez BEMassembly/LU/rebuild/cloud/GPU/swap, małe MFEMforms nadal
+montowane z handle. Docs EXP42–43 i sourceaudit pinned potentialkernels zapisane.
+Następna hipoteza: fixed regulartrianglequadrature nie adaptuje się do point-panel
+separation. Kontrola własnego panelintegral przeciw pinned kernel na tej samej
+regule, potem near correction (subtract regular + add adaptive), bez powtarzania
+solve. Jeszcze NOTRUN; bez twierdzenia że usunie cały błąd referencji.
+Docs-garden read-only tej samej Luny: jeden wordingissue — rozróżnić standalone
+degree2/5agreement od potentialq12/q16. Root poprawił dokument i dodał osobny
+preregistered1e-6volume-degreegate FAIL do rootanalysis; casequalityflag nie
+obejmuje pary reguł i opis teraz mówi to jawnie. Pozostałe source/artifacts PASS.
+80unitPASS pinned, system67PASS/13SKIP; checker/diffcheckPASS. Lokalnycommit bezpush.

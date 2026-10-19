@@ -40,6 +40,46 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_volume_flags_are_rejected_before_host_allocation(self):
+        with patch.object(oracle.dev,'require_host_memory') as check:
+            for options in [dict(physics='volume'),dict(physics='volume',volume_degree=3),
+                    dict(physics='pec',volume_inputs=['a','b']),dict(physics='pec',volume_degree=5)]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),2,120,**options)
+            check.assert_not_called()
+
+    def test_volume_input_roles_completion_basis_and_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            paths=[root/'candidate',root/'reference']
+            for role,path in zip(['candidate','reference'],paths):
+                path.mkdir()
+                case=dict(execution_passed=True,epsilon_r=2.94,level=2,surface_level=4)
+                command=dict(physics='transmission',reference_only=role=='reference',mfem_bridge=dict(binary_sha256='h'),
+                             **{key:'h' for key in ['fem_api_sha256','nd_api_sha256','pairing_api_sha256','coupling_api_sha256']})
+                for name,value in [('case.json',case),('command.json',command),
+                        ('result.json',dict(complete=True,exit_code=0)),
+                        ('container-state.json',dict(Running=False,OOMKilled=False,ExitCode=0))]:
+                    oracle.dev.write(path/name,value)
+                for name in (['coupled-solution.npz'] if role=='candidate' else ['pmchwt-level3.npz','pmchwt-level4.npz']):
+                    (path/name).touch()
+            with patch.object(oracle.dev,'sha',return_value='h'):
+                checked=oracle.checked_volume_inputs(paths,2)
+                self.assertEqual(checked['epsilon_r'],2.94)
+                self.assertIn('coupled-solution.npz',checked['candidate']['sha256'])
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,3)
+                state=paths[1]/'container-state.json'
+                oracle.dev.write(state,dict(Running=True,OOMKilled=False,ExitCode=0))
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
+                oracle.dev.write(state,dict(Running=False,OOMKilled=True,ExitCode=0))
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
+                oracle.dev.write(state,dict(Running=False,OOMKilled=False,ExitCode=0))
+                cmd=oracle.dev.read(paths[0]/'command.json');cmd['nd_api_sha256']='changed'
+                oracle.dev.write(paths[0]/'command.json',cmd)
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
+                cmd['nd_api_sha256']='h';oracle.dev.write(paths[0]/'command.json',cmd)
+                (paths[1]/'pmchwt-level4.npz').unlink()
+                with self.assertRaises(ValueError):oracle.checked_volume_inputs(paths,2)
+
     def test_transmission_options_rejected_before_host_allocation(self):
         with patch.object(oracle.dev,'require_host_memory') as check:
             for physics,level,surface,epsilon in [('pec',2,None,2.94),
