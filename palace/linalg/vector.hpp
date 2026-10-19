@@ -362,6 +362,12 @@ public:
   void Unpack(Vector &full) const;
   void Pack(const ComplexVector &full);
   void Unpack(ComplexVector &full) const;
+  // Dot(full,basis), matching Palace's conjugation convention. Shared scratch.
+  double Dot(MPI_Comm comm, const Vector &full, Vector &partial) const;
+  std::complex<double> Dot(MPI_Comm comm, const ComplexVector &full,
+                           ComplexVector &partial) const;
+  void AddTo(double alpha, Vector &full) const;
+  void AddTo(std::complex<double> alpha, ComplexVector &full) const;
 };
 
 }  // namespace palace

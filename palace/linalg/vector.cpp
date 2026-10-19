@@ -3,10 +3,12 @@
 
 #include "vector.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <random>
 #include <mfem/general/forall.hpp>
 #include "linalg/hypre.hpp"
+#include "linalg/mixedbasis.hpp"
 #include "utils/omp.hpp"
 
 namespace palace
@@ -61,6 +63,76 @@ void StoredBasisVector::Pack(const ComplexVector &full)
 void StoredBasisVector::Unpack(ComplexVector &full) const
 {
   UnpackBasisPart(xr, full.Real()); UnpackBasisPart(xi, full.Imag());
+}
+
+double StoredBasisVector::Dot(MPI_Comm comm, const Vector &full, Vector &partial) const
+{
+  const int n = full.Size(), parts = std::min(n, 65536);
+  MFEM_VERIFY(xr.Capacity() == n, "Compressed basis dimension mismatch!");
+  double result = 0.0;
+  if (n)
+  {
+    const bool dev = full.UseDevice();
+    partial.SetSize(parts); partial.UseDevice(dev);
+    const auto *basis = xr.Read(dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST, n);
+    const auto *values = full.Read(dev); auto *scratch = partial.Write(dev);
+    mfem::forall_switch(dev, parts, [=] MFEM_HOST_DEVICE(int i) {
+      scratch[i] = mixed_basis::DotRealPart(i, parts, n, basis, values);
+    });
+    result = linalg::LocalSum(partial);
+  }
+  Mpi::GlobalSum(1, &result, comm);
+  return result;
+}
+
+std::complex<double> StoredBasisVector::Dot(MPI_Comm comm, const ComplexVector &full,
+                                           ComplexVector &partial) const
+{
+  const int n = full.Size(), parts = std::min(n, 65536);
+  MFEM_VERIFY(xr.Capacity() == n && xi.Capacity() == n, "Compressed basis dimension mismatch!");
+  std::complex<double> result = 0.0;
+  if (n)
+  {
+    const bool dev = full.UseDevice();
+    partial.SetSize(parts); partial.UseDevice(dev);
+    const auto mc = dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST;
+    const auto *br = xr.Read(mc, n), *bi = xi.Read(mc, n);
+    const auto *wr = full.Real().Read(dev), *wi = full.Imag().Read(dev);
+    auto *pr = partial.Real().Write(dev), *pi = partial.Imag().Write(dev);
+    mfem::forall_switch(dev, parts, [=] MFEM_HOST_DEVICE(int i) {
+      const auto value = mixed_basis::DotPart(i, parts, n, br, bi, wr, wi);
+      pr[i] = value.real; pi[i] = value.imag;
+    });
+    result = {linalg::LocalSum(partial.Real()), linalg::LocalSum(partial.Imag())};
+  }
+  Mpi::GlobalSum(1, &result, comm);
+  return result;
+}
+
+void StoredBasisVector::AddTo(double alpha, Vector &full) const
+{
+  const int n = full.Size(); const bool dev = full.UseDevice();
+  MFEM_VERIFY(xr.Capacity() == n, "Compressed basis dimension mismatch!");
+  if (!n) return;
+  const auto *basis = xr.Read(dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST, n);
+  auto *values = full.ReadWrite(dev);
+  mfem::forall_switch(dev, n, [=] MFEM_HOST_DEVICE(int i) {
+    values[i] += alpha * static_cast<double>(basis[i]);
+  });
+}
+
+void StoredBasisVector::AddTo(std::complex<double> alpha, ComplexVector &full) const
+{
+  const int n = full.Size(); const bool dev = full.UseDevice();
+  MFEM_VERIFY(xr.Capacity() == n && xi.Capacity() == n, "Compressed basis dimension mismatch!");
+  if (!n) return;
+  const auto mc = dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST;
+  const auto *br = xr.Read(mc, n), *bi = xi.Read(mc, n);
+  auto *wr = full.Real().ReadWrite(dev), *wi = full.Imag().ReadWrite(dev);
+  const double ar = alpha.real(), ai = alpha.imag();
+  mfem::forall_switch(dev, n, [=] MFEM_HOST_DEVICE(int i) {
+    mixed_basis::AddEntry(i, br, bi, ar, ai, wr, wi);
+  });
 }
 
 ComplexVector::ComplexVector(int size) : xr(size), xi(size) {}

@@ -83,6 +83,10 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 
 ### M3 — największy podejrzany koszt pamięci
 
+- [x] EXP77–79: sharedFP32/FP64CUDAprobe, opt-in directDot/AddTo, actualcomplexcoax-tinyPASS. Bez promocji/speedupclaim; docs/mixed-basis.md.
+- [ ] Jawna kontrola MGSorthogonality/realpath/faultdetector, potem większycoax i W.3.
+
+
 - [ ] Zbadać bezpośredni odczyt bazy FP32 w dot/AXPY z akumulacją FP64; usunąć pełne rozpakowania do FP64.
 - [ ] Prototyp małego kernela, następnie integracja z MGS GMRES i test ortogonalności/stagnacji.
 - [ ] Osobno porównać UVM oraz ograniczone porcjowanie/prefetch bazy; policzyć transfery i bytes/iteration.

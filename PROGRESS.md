@@ -1381,3 +1381,96 @@ Final EXP74–76 validation:102unitPASS pinned; system86PASS/16SKIP. SameLuna
 read-only docs-gardenPASS: M2negativeassessment vs failednumericalgates explicit,
 M3ACTIVE, tmpfs/RSS/p10limits agree withsource/artifacts. Checker/diffcheckPASS.
 Rootreview complete; localcommit only/no push. No fullantenna/speedup promotion.
+
+### EXP77 — prerejestracja M3: shared FP32-storage/FP64 arithmetic CUDA probe
+
+Previous turn progress f58d028: M2assessmentCLOSED/productionREJECT, M3ACTIVE.
+Root audited compressed MGS: iterative.cpp unpacks basis insideeachk and before
+ApplyBA. LocalDot(w,b)=sum(w*conj(b)), linear firstargument. New pure header
+mixedbasis.hpp defines partialdot/complexaxpy with floatloads castdouble BEFORE
+products/accumulation. Not wired into GMRES yet. Header shared with isolated
+CUDA probe; no ABIcasts, fastmath, FP32accum or TensorCoreclaim.
+
+Compile only oneCUDA TU sm120 via existingbuilder/ccache, separatelink,120s;
+no Palace/dependencies rebuild. Subsequent identicalbuild expects cache no-op.
+Numerics same pinnedPython/NumPy environment andruntime;6GiB4CPU/noSwap,
+RAMtmpfs512MiBeach/networknone, localGPUfree>=768MiB,60sdeadline. Largest
+vector2^20, explicitdevicealloc~77MB plusCUDAcontext (not fullprocesspeak).
+Reference longdouble math on SAME quantizedfloatstorage; gate normalizeddot/
+axpy1e-12, separate FP32quantization norm-product-scaled gate2e-7.
+Casesn1(nontrivialcomplexsign),1009,131071(dynamicrange1e-30..1e30),1048576;
+rejectn0 beforeallocation. Two-stage FP64reduction, partialcount<=65536.
+Compare direct dot+axpy vs unpack→sameFP64kernels, identicalworkvectorreset.
+Alternate executionorder acrosspairedtrials; eventtimers excludealloc/H2D/JIT,
+includecommonDtoDresets. NOT HYPRE/GMRES/fullantenna benchmark or UVMprofile.
+105systemtests89PASS16SKIP. Rootdesign; sameLunaexactargv/babysitting only.
+Exactargvs sequential, later only afterprior terminalPASS:
+`python3 tools/experiments/mixed_basis_probe.py build`.
+`python3 tools/experiments/mixed_basis_probe.py build` (cache repeat).
+`python3 tools/experiments/mixed_basis_probe.py run artifacts/m3-mixed-basis-cuda-20261019 --seconds 60`.
+
+EXP77 allterminalPASS/rootverifiedsource/header/worker receipts andstateexit0/noOOM.
+First build1.503s(manifest), repeatno-op; noMFEM/Palace rebuild. Sharedheader
+complexarithPASS atall4sizes; maxnormalizeddot4.43e-18,axpy4.40e-17,
+FP32quantizationnorm-scaled8.87e-10. LargestN1048576 median.109695msdirect vs
+.119766msunpack(~8.4%lowerprobeeventtime, NOTGMRES/HYPRE/antenna gain).
+Explicitdevicealloc76546064B includesbothpaths, reductionworkspace1048592B,
+baselineunpack16777216B; no peakVRAMdelta measured. Probeelapsed.501s/RSS476MB.
+
+### EXP78 — prerejestracja: opt-in Palace direct basis and cached incremental build
+
+Root wired StoredBasisVector::Dot/AddTo with shared1MiBmaxpartials perGMRES,
+floatloads→FP64products/accumulation, MFEMforall+HYPREFP64sums/MPIcomplexreduce.
+Real path added separately (not yetGPUqualified); complexconventionmatches
+LocalDot(w,b). PALACE_GMRES_FP32_DIRECT requires FP32storage and existingMGS;
+defaultFP64 and FP32unpack path preserved. OneUnpack beforeApplyBA remains
+because operator expectsFP64; innerMGS/update avoidrepeatedfullvectorconversion.
+Reliable residual/restarts unchanged. No newFMM/no model/mesh/Order changes.
+
+Before incrementalbuild root copied verified11MiBpre-M3nativebinaries+manifest
+to build/m3-basis/pre-m3-native (cache/fallback, not solverdata). Firstcoreheader
+APIchange may invalidate Palace TUs, but installeddependencies untouched; jobs2,
+existingccache/CMakeobjects retained. Tinycodeprobe recompiles afternewrealhelper,
+worker adds relative-to-dot control besidesnormproductgate. Numericgates unchanged.
+Next afterterminalbuild: separateFP64 /FP32unpack /FP32direct coax-tiny W.1 with
+samebuild/reference/RIGHTpc, wholefields/residual/TEM checks before largercase.
+Exactargv sequential:
+`python3 tools/experiments/mixed_basis_probe.py build`.
+`python3 tools/experiments/mixed_basis_probe.py run artifacts/m3-mixed-basis-cuda-v2-20261019 --seconds 60`.
+`python3 tools/dev.py build --jobs 2` (onlyifprobeexecution/arithmeticPASS).
+
+EXP78 allterminalPASS. Probe refreshedrecipe afterrealhelper and extra relative
+dotcheck, complexdata allPASS; nativePalacebuild227.712s, installeddependencies
+unchanged. Corevectorheader change invalidatedsolverTUs: ccache9hits/329misses,
+83buildsteps. NofullMFEM/hypre rebuild. Subsequentimplementation.cpp-only edits
+should use retainedobjects; don't deletecaches. Native libpalaceSHA3893de4b66aa9543
+6f98958a9057df3f5a61b27c2dd5efdc292c8cee9be12b41. BuildsuccessNOTnumericalPASS.
+
+### EXP79 — prerejestracja: actual Palace coax-tiny three storage paths
+
+Samecurrentnativebuild/mesh/physics, RIGHTpc, defaultFP64operators/factors,
+onecoaxdiagnostic3.55GHz, explicitTEMvolumeL2 andsavedfullfields. BaselineFP64,
+existingFP32unpack, thennewFP32direct; bothcandidatesreferenceidenticalFP64fields.
+No nativecomplexcoarse combination yet (existingrunnerguardFP64onlypreserved).
+SamefrozenK field/raw/TEM/S gates; compare actualmarkers/directflag plus residual
+and wholefields, not justexecution. Threecheap<=60sruns, localGPU/noappsclose,
+existingRAM/VRAMonlyrunnercaps. These are W.2tinyfilters; W.1orthogonality/realpath
+and largerW.2/W.3 stillpending, no speedup/promotion fromtiny alone.
+Exactargvs sequential (next onlyafterprevious terminalexecutionPASS):
+`python3 tools/dev.py run coax-tiny artifacts/m3-coax-tiny-fp64-20261019 --basis fp64 --pc-side right --coax-l2 --save-fields --memory-marks --phase-trace --seconds 60`.
+`python3 tools/dev.py run coax-tiny artifacts/m3-coax-tiny-fp32-unpack-20261019 --basis fp32 --pc-side right --coax-l2 --save-fields --field-reference artifacts/m3-coax-tiny-fp64-20261019 --memory-marks --phase-trace --seconds 60`.
+`python3 tools/dev.py run coax-tiny artifacts/m3-coax-tiny-fp32-direct-20261019 --basis fp32 --direct-basis --pc-side right --coax-l2 --save-fields --field-reference artifacts/m3-coax-tiny-fp64-20261019 --memory-marks --phase-trace --seconds 60`.
+
+EXP79 three terminalexit0/noOOM, rootverifiedsamecurrentnativeSHA/config/fields
+and rawmarkers. FP64/unpack/direct62/64iter, maxraw9.026e-7/9.045e-7/9.042e-7.
+DirectfieldE/B7.528e-7/1.004e-8,ΔS3.412e-9,ΔVSWR6.751e-9,Δportpower6.823e-9.
+TEMq4/6PASS~.4953%E/.4558%B. Times18.714/18.723/18.709s, no speedupclaim.
+Cgroup610.3/589.8/595.1MB; GPUprocess4.658/4.658/4.687GB, no GPUpeakreduction.
+Rootanalysis artifacts/m3-coax-tiny-root-analysis-20261019.json.
+Docs mixed-basis/ARCH/INDEX/PLAN/M3/testing updated. M3stillACTIVE; W.1actual
+orthogonality/realpath/faultdetector and largerW.2/W.3pending. No promotion.
+
+Finalvalidation EXP77–79:106unitPASS pinned/system90PASS16SKIP. SameLuna
+read-only docs-gardenPASS, no scope/source/metric contradictions. Checker and
+diffcheckPASS. Rootreview numerical receipts/rootanalysis/currentnative match.
+M3ACTIVE; commitlocalonly, no publicpush/defaultpromotion/goalcompletion.

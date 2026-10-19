@@ -12,6 +12,12 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_direct_basis_rejects_fp64_before_allocation(self):
+        with patch.object(dev,'require_host_memory') as host:
+            with self.assertRaisesRegex(ValueError,'requires FP32'):
+                dev.run('coax-tiny',Path('/unused'),60,basis='fp64',direct_basis=True)
+            host.assert_not_called()
+
     def test_native_complex_coarse_is_explicit_and_requires_gpu_cudss(self):
         _, info, config = dev.fixture('coax-tiny')
         old = json.loads(json.dumps(config))

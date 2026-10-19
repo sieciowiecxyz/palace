@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:102testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo86PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:106testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo90PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -122,3 +122,12 @@ PMCHWT `--physics fmm-solve` pilot B2/p8..9/ncrit32; opcjonalny
 ale solveFAIL independentraw1e-9; nie kwalifikować na podstawie samego residualu
 FMM lub Δcoeff. Dwa512MiB RAM tmpfs bez capincrease, exact filesize/preflight
 guards; p10NOTRUN ponadcap. [Decyzja M2](milestones/M2-decision.md).
+
+### M3 direct FP32 basis
+
+[EXP77–79](mixed-basis.md): cached shared-header CUDA probe + samebuild
+coax-tiny FP64/FP32unpack/FP32direct, actualraw/fields/TEM/S PASS.
+`--direct-basis` wymaga FP32 i jest czyszczony z odziedziczonego środowiska;
+default/fallback zachowane. MGSorthogonality/realpath/largercoax/W.3NOTRUN,
+nie promować na podstawie samego builda/probe. Cache and binarytamper/deadline
+regresje w test_mixed_basis_probe.py, guard FP64/direct w test_dev.py.

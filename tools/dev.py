@@ -542,7 +542,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
-        nsys_window=None):
+        nsys_window=None, direct_basis=False):
+    if direct_basis and basis != 'fp32':
+        raise ValueError('Direct basis requires FP32 storage')
     profiler = profile = None
     if nsys_window is not None:
         if basis != 'fp64' or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
@@ -615,6 +617,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_RELEASE_FINAL_SOLVER'] = '1'
     if basis == 'fp32':
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
+    if direct_basis:
+        flags['PALACE_GMRES_FP32_DIRECT'] = '1'
     if allocation_trace:
         flags['PALACE_CUDA_ALLOC_TRACE'] = '1'
     if coax_l2:
@@ -634,6 +638,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
+            '--unsetenv', 'PALACE_GMRES_FP32_DIRECT',
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
@@ -840,6 +845,7 @@ def main():
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
+    r.add_argument('--direct-basis', action='store_true', help='Experimental direct FP32 basis dot/axpy with FP64 arithmetic; requires --basis fp32')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
     r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
@@ -896,7 +902,7 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

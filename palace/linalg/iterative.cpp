@@ -614,16 +614,19 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   r.UseDevice(true);
   Initialize();
   const bool compressed_basis = UseStoredBasis();
+  const bool direct_basis = std::getenv("PALACE_GMRES_FP32_DIRECT") != nullptr;
+  MFEM_VERIFY(!direct_basis || compressed_basis, "Direct basis requires PALACE_GMRES_FP32_BASIS!");
   MFEM_VERIFY(!compressed_basis || gs_orthog == Orthogonalization::MGS,
               "FP32 basis pilot currently supports MGS GMRES only!");
   std::vector<StoredBasisVector> packed_basis(compressed_basis ? max_dim + 1 : 0);
   VecType basis_read;
+  VecType basis_partial;
   if (compressed_basis)
   {
     basis_read.SetSize(A->Height());
     basis_read.UseDevice(true);
-    Mpi::Print(comm, "PALACE_STORED_BASIS: storage=FP32 RAM/VRAM, FP64 arithmetic; K={:d}\n",
-               max_dim);
+    Mpi::Print(comm, "PALACE_STORED_BASIS: storage=FP32 RAM/VRAM, FP64 arithmetic; K={:d}, direct={}\n",
+               max_dim, direct_basis);
   }
 
   const auto report_residual = [&](RealType checked_beta)
@@ -750,9 +753,17 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       {
         for (int k = 0; k <= j; k++)
         {
-          packed_basis[k].Unpack(basis_read);
-          Hj[k] = linalg::Dot(comm, w, basis_read);
-          w.Add(-Hj[k], basis_read);
+          if (direct_basis)
+          {
+            Hj[k] = packed_basis[k].Dot(comm, w, basis_partial);
+            packed_basis[k].AddTo(-Hj[k], w);
+          }
+          else
+          {
+            packed_basis[k].Unpack(basis_read);
+            Hj[k] = linalg::Dot(comm, w, basis_read);
+            w.Add(-Hj[k], basis_read);
+          }
         }
       }
       else linalg::OrthogonalizeColumn(gs_orthog, comm, V, w, Hj, j + 1);
@@ -800,8 +811,12 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       {
         if (compressed_basis)
         {
-          packed_basis[k].Unpack(basis_read);
-          x.Add(s[k], basis_read);
+          if (direct_basis) packed_basis[k].AddTo(s[k], x);
+          else
+          {
+            packed_basis[k].Unpack(basis_read);
+            x.Add(s[k], basis_read);
+          }
         }
         else x.Add(s[k], V[k]);
       }
@@ -813,8 +828,12 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       {
         if (compressed_basis)
         {
-          packed_basis[k].Unpack(basis_read);
-          r.Add(s[k], basis_read);
+          if (direct_basis) packed_basis[k].AddTo(s[k], r);
+          else
+          {
+            packed_basis[k].Unpack(basis_read);
+            r.Add(s[k], basis_read);
+          }
         }
         else r.Add(s[k], V[k]);
       }

@@ -19,6 +19,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M3: GMRES i pamięć](milestones/M3.md)
   - Czytaj gdy: rozpoczynasz aktywną optymalizację bazy GMRES
   - Opis: Bezpośrednie FP32 storage/FP64 arithmetic, mały CUDA probe, późniejsze K/W.1–W.3.
+- [M3: bezpośrednia baza FP32](mixed-basis.md)
+  - Czytaj gdy: uruchamiasz opt-in direct basis albo oceniasz pierwszy filtr
+  - Opis: EXP77–79 shared CUDA arithmetic i complex coax-tiny PASS; brak wykazanego zysku anteny, większe kontrole otwarte.
 - [M2: Maxwell oracle i kompresja](maxwell-oracle.md)
   - Czytaj gdy: uruchamiasz PEC/Mie lub oceniasz pierwszy H-matrix CUDA apply
   - Opis: Przypięte źródła/cache, historyczne EXP23–24 PEC PASS i wolny per-block apply; dalsze wyniki w EXP25–29.
