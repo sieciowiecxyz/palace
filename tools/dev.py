@@ -548,21 +548,28 @@ def native_complex_coarse_applied(log, solves):
     return len(markers) == solves and all(int(n) > 0 and int(nnz) > 0 for n, nnz in markers)
 
 
+def basis_prefetch_applied(log, solves):
+    markers = re.findall(r'PALACE_BASIS_PREFETCH: managed=true stream=0 calls=(\d+) requested_bytes=(\d+)', log)
+    return solves > 0 and len(markers) == solves and all(int(c) > 0 and int(b) >= 4*int(c) for c, b in markers)
+
+
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
-        nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None):
+        nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False):
     if direct_basis and basis != 'fp32':
         raise ValueError('Direct basis requires FP32 storage')
+    if basis_prefetch and (basis != 'fp32' or not direct_basis or cpu_reference):
+        raise ValueError('Basis prefetch requires direct FP32 CUDA')
     if coax_sweep and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2)):
         raise ValueError('Coax sweep requires coax fields/L2 on a coax fixture')
     if coax_frequency is not None and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2) or coax_sweep):
         raise ValueError('Coax frequency requires coax fields/L2 and no simultaneous sweep')
     profiler = profile = None
     if nsys_window is not None:
-        if basis != 'fp64' or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
-            raise ValueError('Profiling requires FP64 CUDA and no output/reference field qualification')
+        if (basis != 'fp64' and not (basis == 'fp32' and direct_basis)) or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
+            raise ValueError('Profiling requires FP64 or direct FP32 CUDA and no output/reference field qualification')
         import nsight_window as profiler
         profiler.parse_window(nsys_window)
         profiler.verified_tool()
@@ -633,6 +640,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_GMRES_FP32_BASIS'] = '1'
     if direct_basis:
         flags['PALACE_GMRES_FP32_DIRECT'] = '1'
+    if basis_prefetch:
+        flags['PALACE_GMRES_BASIS_PREFETCH'] = '1'
     if allocation_trace:
         flags['PALACE_CUDA_ALLOC_TRACE'] = '1'
     if coax_l2:
@@ -647,12 +656,14 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     if profiler:
         profile = profiler.prepare(nsys_window, output)
         flags['PALACE_KRYLOV_PROFILE'] = nsys_window
+        flags['PALACE_PROFILE_CAPTURE_RANGE'] = '1'
     args = ['podman', 'create', '--name', container, '--network=none', '--timeout', str(seconds),
             '--ulimit', 'core=0:0',
             '--stop-timeout', '3', '--memory', '60g', '--memory-swap', '60g',
             '--cpus', '8', '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable',
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '--unsetenv', 'PALACE_GMRES_FP32_DIRECT',
+            '--unsetenv', 'PALACE_GMRES_BASIS_PREFETCH',
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
@@ -662,6 +673,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_KRYLOV_PROFILE',
+            '--unsetenv', 'PALACE_PROFILE_CAPTURE_RANGE',
             '--unsetenv', 'PALACE_COAX_TEM_DIAGNOSTIC',
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
@@ -769,6 +781,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
                 (output/'palace.log').read_text(), status['expected_solves'])
             status['complete'] = status['complete'] and status['native_complex_coarse_applied']
+        if basis_prefetch and not profile:
+            status['basis_prefetch_applied'] = basis_prefetch_applied(
+                (output/'palace.log').read_text(), status['expected_solves'])
+            status['complete'] = status['complete'] and status['basis_prefetch_applied']
         if cpu_reference:
             status['cpu_reference_applied'] = cpu_reference_applied((output/'palace.log').read_text())
             status['complete'] = status['complete'] and status['cpu_reference_applied']
@@ -860,6 +876,7 @@ def main():
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
     r.add_argument('--direct-basis', action='store_true', help='Experimental direct FP32 basis dot/axpy with FP64 arithmetic; requires --basis fp32')
+    r.add_argument('--basis-prefetch', action='store_true', help='Experimental managed basis prefetch before Dot on CUDA stream 0; requires --direct-basis')
     r.add_argument('--coax-sweep', action='store_true', help='Keep fixture frequencies with coax fields/L2 diagnostics instead of selecting 3.55 GHz only')
     r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
@@ -918,7 +935,7 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

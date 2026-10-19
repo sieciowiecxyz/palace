@@ -1,6 +1,6 @@
 # M3 — actual API, większy coax i T-Shaped medium
 
-Status: **W.1/W.2/W.3 PASS dla wskazanego wariantu**, M3 nadal ACTIVE.
+Status: **W.1/W.2/W.3 PASS dla wskazanego wariantu**, ocena M3 zakończona w EXP86–90; aktywny M4.
 Zmierzona korzyść: około2,87GB mniej szczytowej pamięci hosta/cgroup w W.3.
 Brak wykazanego statystycznie przyspieszenia; brak kwalifikacji W.4/W.5.
 Prototyp i implementacja: [mixed-basis](mixed-basis.md).
@@ -92,8 +92,7 @@ Prerejestracje/exact argv EXP80–85 w PROGRESS. Root-verified analizy:
 `m3-antenna-root-analysis-20261019.json`. Każdy run ma source/native/config/mesh,
 command, terminal state, raw i pola. Poprzednie binaria/cache zachowane.
 
-Następne M3: osobna ocena polityki migracji/prefetch dla bazy, bez zmiany
-reprezentacji/restartu. Oczekiwany wpływ na czas może być mały: faktor25GB nadal
-przekracza16GBVRAM. Restart≥35 nie zmniejsza faktycznie dotkniętej bazy tego
-runu; mniejszy restart wymaga osobnego eksperymentu i może zwiększyć koszt PC.
-Nie promować globalnego defaultu przed dalszą kwalifikacją M7/W.4/W.5.
+Ocena polityki migracji/prefetch zakończona w [EXP86–90](basis-prefetch.md).
+FP32direct zachowuje zmierzoną korzyść pamięci, prefetch daje małą lokalną
+poprawę ortogonalizacji; brak statystycznej promocji czasu/globalnego defaultu.
+M3 zamknięty, aktualny etap M4. W.4/W.5 pozostają wymagane w M7.

@@ -11,7 +11,7 @@ python3 tools/dev.py run tshaped-medium artifacts/new-short-profile --seconds 60
 ```
 
 Nowy katalog wyniku, gotowy manifest/native oraz wolny RAM są wymagane.
-`--nsys-window FIRST:COUNT`: FIRST0..32, COUNT2..8, jeden rank CUDA/FP64.
+`--nsys-window FIRST:COUNT`: FIRST0..32, COUNT2..8, jeden rank CUDA/FP64 albo jawny FP32direct.
 Native zatrzymuje się po wybranych iteracjach kontrolowanym wyjątkiem;
 `complete=false` dla RF jest obowiązkowe, osobne `profile_complete` opisuje ślad.
 Bez flagi żaden hook synchronizacji/profilowania nie działa.
@@ -20,7 +20,11 @@ CLI Nsight2026.5.1.161 jest przypięty SHA w `tools/nsight_window.py` i zachowuj
 cache w build/. Nie zmieniono systemowego CUDA/drivera. Aktualny trace to
 `cuda-sw` bez NVTX, `--cuda-trace-all-apis=true`, `--kill=none --wait=all`.
 Bezpośredni native target dostaje LD_PRELOAD przez `--env-var`, nie przez env wrapper.
-Zbieramy cały ograniczony proces; okno wybieramy offline.
+Historyczny EXP18–19 zbierał cały ograniczony proces. Aktualnie zbieranie
+startuje przez cudaProfilerApi przy początku okna, trwa do naturalnego exit
+(`--capture-range-end=none`); właściwe okno nadal wybieramy offline.
+EXP87 późny full-process OOM i EXP88 capture-end-stop warning pozostają FAIL;
+strict selective tiny/late W.3 PASS. [Ocena i wyniki](basis-prefetch.md).
 
 `tools/host_phases.py` łączy fazy BlockTimer i dodatkowe zakresy ortogonalizacji
 z CPU launch zapisanym przez CUPTI. Na początku i po każdej wybranej iteracji

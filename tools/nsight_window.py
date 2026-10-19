@@ -80,7 +80,7 @@ def prepare(value, output):
     metadata = verified_tool()
     ram = Path(tempfile.mkdtemp(prefix='palace-nsys-', dir='/dev/shm'))
     (ram/'tmp').mkdir()
-    info = dict(first=first, count=count, ram_directory=str(ram), tool=metadata,
+    info = dict(first=first, count=count, ram_directory=str(ram), tool=metadata, capture='cudaProfilerApi',
                 scope='Intentional partial profiling window; never an RF/accuracy run')
     (output/'profile-input.json').write_text(json.dumps(info, indent=2)+'\n')
     return info
@@ -90,6 +90,7 @@ def arguments(profile):
     return ['profile', '--trace=cuda-sw', '--sample=none', '--cpuctxsw=none',
             '--cuda-trace-all-apis=true',
             '--cuda-um-cpu-page-faults=false', '--cuda-um-gpu-page-faults=false',
+            '--capture-range=cudaProfilerApi', '--capture-range-end=none',
             '--kill=none', '--wait=all',
             '--export=sqlite', '--output=/profile/window', '--force-overwrite=false']
 
@@ -206,6 +207,7 @@ def collect(profile, output):
         first,count = profile['first'],profile['count']
         report['window_markers_passed'] = all(text.count(f'PALACE_PROFILE_WINDOW: {event} first={first} count={count}')==1 for event in ['begin','end'])
         report['clean_stop_passed'] = text.count('PALACE_PROFILE_STOP: clean diagnostic stop; no RF qualification') == 1
+        report['capture_range_passed'] = all(text.count(f'PALACE_PROFILE_CAPTURE: {event}\n')==1 for event in ['begin','end'])
         loss = re.compile(r'data.{0,20}lost|dropped.{0,15}events|not all.{0,20}events.{0,30}collected|incompatibility.{0,30}driver|older version.{0,20}cupti|unsupported cuda|does not support cuda', re.I)
         report['collector_warnings'] = [line for line in text.splitlines() if loss.search(line)]
         report['files'] = {p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in ram.glob('window.*') if p.is_file()}
@@ -223,7 +225,7 @@ def collect(profile, output):
         calls = {r['name']:r['calls'] for r in report.get('summary',{}).get('phase_ranges',[])}
         report['iteration_coverage_passed'] = (report.get('summary',{}).get('window_count')==1 and calls.get('Preconditioner')==count and calls.get('Krylov orthogonalization')==count)
         report['clock_calibration_passed'] = report.get('summary',{}).get('host_clock',{}).get('clock_calibration_passed',False)
-        report['complete'] = bool(report['window_markers_passed'] and report['clean_stop_passed'] and report['clock_calibration_passed'] and not report['collector_warnings']
+        report['complete'] = bool(report['window_markers_passed'] and report['clean_stop_passed'] and report['capture_range_passed'] and report['clock_calibration_passed'] and not report['collector_warnings']
                                   and report['iteration_coverage_passed'] and 'summary' in report)
         return report
     finally:

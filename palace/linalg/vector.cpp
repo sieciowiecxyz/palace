@@ -5,8 +5,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <random>
 #include <mfem/general/forall.hpp>
+#if defined(MFEM_USE_CUDA)
+#include <cuda_runtime_api.h>
+#endif
+#include "linalg/basisprefetch.hpp"
 #include "linalg/hypre.hpp"
 #include "linalg/mixedbasis.hpp"
 #include "utils/omp.hpp"
@@ -16,6 +21,34 @@ namespace palace
 
 namespace
 {
+thread_local BasisPrefetchStats prefetch_stats;
+
+void PrefetchBasisPart(const float *data, int n, bool dev)
+{
+  if (!std::getenv("PALACE_GMRES_BASIS_PREFETCH")) return;
+  MFEM_VERIFY(dev && mfem::Device::Allows(mfem::Backend::CUDA_MASK),
+              "Basis prefetch requires CUDA device execution!");
+#if defined(MFEM_USE_CUDA)
+  const auto check = [](cudaError_t error) {
+    MFEM_VERIFY(error == cudaSuccess, "Basis prefetch CUDA failure: " << cudaGetErrorString(error));
+  };
+  int device, concurrent;
+  check(cudaGetDevice(&device));
+  check(cudaDeviceGetAttribute(&concurrent, cudaDevAttrConcurrentManagedAccess, device));
+  MFEM_VERIFY(concurrent, "Basis prefetch requires concurrent managed access!");
+  cudaPointerAttributes attr{};
+  check(cudaPointerGetAttributes(&attr, data));
+  MFEM_VERIFY(attr.type == cudaMemoryTypeManaged, "Basis prefetch requires managed storage!");
+  const std::size_t bytes = static_cast<std::size_t>(n) * sizeof(float);
+  // MFEM forall CUDA kernels use stream 0. No added synchronization or persistent advice.
+  check(cudaMemPrefetchAsync(data, bytes, device, 0));
+  ++prefetch_stats.calls;
+  prefetch_stats.bytes += bytes;
+#else
+  MFEM_ABORT("Basis prefetch requires a CUDA build!");
+#endif
+}
+
 void PackBasisPart(const Vector &full, mfem::Memory<float> &packed)
 {
   const int n = full.Size();
@@ -43,6 +76,10 @@ void UnpackBasisPart(const mfem::Memory<float> &packed, Vector &full)
     dst[i] = static_cast<double>(src[i]);
   });
 }
+}
+BasisPrefetchStats GetBasisPrefetchStats()
+{
+  return prefetch_stats;
 }
 StoredBasisVector::~StoredBasisVector()
 {
@@ -75,6 +112,7 @@ double StoredBasisVector::Dot(MPI_Comm comm, const Vector &full, Vector &partial
     const bool dev = full.UseDevice();
     partial.SetSize(parts); partial.UseDevice(dev);
     const auto *basis = xr.Read(dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST, n);
+    PrefetchBasisPart(basis, n, dev);
     const auto *values = full.Read(dev); auto *scratch = partial.Write(dev);
     mfem::forall_switch(dev, parts, [=] MFEM_HOST_DEVICE(int i) {
       scratch[i] = mixed_basis::DotRealPart(i, parts, n, basis, values);
@@ -97,6 +135,7 @@ std::complex<double> StoredBasisVector::Dot(MPI_Comm comm, const ComplexVector &
     partial.SetSize(parts); partial.UseDevice(dev);
     const auto mc = dev ? mfem::Device::GetDeviceMemoryClass() : mfem::MemoryClass::HOST;
     const auto *br = xr.Read(mc, n), *bi = xi.Read(mc, n);
+    PrefetchBasisPart(br, n, dev); PrefetchBasisPart(bi, n, dev);
     const auto *wr = full.Real().Read(dev), *wi = full.Imag().Read(dev);
     auto *pr = partial.Real().Write(dev), *pi = partial.Imag().Write(dev);
     mfem::forall_switch(dev, parts, [=] MFEM_HOST_DEVICE(int i) {

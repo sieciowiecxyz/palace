@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-19. Mode: goal, Active: M4. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -1633,3 +1633,159 @@ read-only docs-gardenPASS, source/metric/scope reviewed incl actualprobe receipt
 EXP82FAIL retained, W2shards andsamebuildwarmW3, no falseVRAM/speed/defaultclaim.
 Checker/diffcheckPASS; rootanalysis matches currentnative andterminalstates.
 M3ACTIVE/policyexperiment next; M4–M7pending. Localcommit only/no push.
+
+## EXP86 — opt-in managed basis prefetch (preregistered, 2026-10-19)
+M3 active. Hypothesis: prefetch only FP32direct Dot sources before MFEM
+stream0 kernels may reduce demand faults; may also evict PC pages and lose.
+No CPU preferred/readmostly advice, no extra sync, no physics/restart change.
+Strict managed-pointer/concurrentManagedAccess checks; CUDA errors fail.
+Log request counts/bytes, never call them measured transfers/residency.
+Primary source CUDA12.9 Runtime API memory cudaMemPrefetchAsync, accessed
+2026-10-19: https://docs.nvidia.com/cuda/archive/12.9.0/cuda-runtime-api/group__CUDART__MEMORY.html
+Installed MFEM forall.hpp:598 default kernel stream, cuda.hpp:28 stream0 sync.
+Current qualified native+manifest preserved build/m3-basis/pre-prefetch-native.
+Incremental build only; no dependency rebuild. First filter samebuild coax-tiny
+FP32direct RIGHT,3.55GHz/bothports/TEM/fields,60s. Compare raw<=1e-6, fields1%,
+S1e-3/VSWR.01/power1e-3 and positive prefetch markers per solve.
+If pass, matched W.3 no-prefetch/prefetch warmstart K64/nativecoarse/pool256,
+1800s/60GiB/no swap/hostguard6GiB; root analyzes total time/memory/quality.
+Do not promote speedup from requested bytes or a single small run.
+
+EXP86 tiny terminalPASS/rootverified: samebuild/config,62/64iter,raw<=9.045e-7.
+MaxΔS9.132e-10/ΔVSWR9.707e-10; fields within1%; exact rootmetrics in
+artifacts/m3-prefetch-tiny-root-analysis-20261019.json. Prefetch requests
+3906+4160 (1.392+1.482GB requested, not migrated). 19.661/18.699s onepair
+smallcase not speedup evidence. Build13.846s/5steps only Palace, cache counts
+cumulative; dependencies untouched. Proceed matched W.3 per preregistration.
+Exact tiny argv: common `python3 tools/dev.py run coax-tiny <output> --basis fp32 --direct-basis --pc-side right --coax-l2 --save-fields --field-reference <ref> --memory-marks --phase-trace --seconds 60`; control output=m3-prefetch-tiny-control-20261019/reference=m3-coax-tiny-fp64-20261019; candidate output=m3-prefetch-tiny-on-20261019/reference=control plus --basis-prefetch (all artifacts/).
+
+EXP86 W.3 control terminalPASS/rootverified:408.622s/35iter/raw8.35621e-7,
+all7fieldregionsPASS vs qualified FP32direct, E7.238e-9/B5.086e-10. Cgroup
+56025440256B. No prefetch marker. Samebuild candidate now uses this reference.
+Control exactargv: `python3 tools/dev.py run tshaped-medium artifacts/m3-prefetch-antenna-control-20261019 --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver --save-fields --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --field-reference artifacts/m3-antenna-native-direct-20261019 --seconds 1800`.
+Candidate changes output=m3-prefetch-antenna-on-20261019/reference=control
+and adds --basis-prefetch; all other args identical.
+
+EXP86 W3 candidate terminalPASS/rootverified, samebuild/config,35iter,
+raw8.35655e-7, maxfieldE7.489e-9/B4.233e-10. Native coarse/prefetch applied.
+Cgroup56025440256→56021962752B (effectivelysame), managedsame52276667194B,
+cuDSSsame25008217684B. Marker1260requests/56542368960requestedB consistent
+with35*36complexpartreads*11218724*4; NOT measured migrations. Whole run
+408.622→396.526s (~3% onepair), NOT statistically established speedup.
+Full frozenKmetrics: artifacts/m3-prefetch-antenna-root-analysis-20261019.json.
+
+## EXP87 — measured late GMRES UVM movement (preregistered, 2026-10-19)
+Extend existing diagnostic-only Nsight runner to explicit FP32direct (including
+prefetch); no RF qualification in partial profile. No C++/native change.
+Samebuild W3/control+prefetch, window30:2 (latebasis), samewarmstart/K64/
+nativecomplexcoarse/pool256. Count actual Nsight copy enums/bytes periteration,
+phase times inclusive, no sum of overlappingcopy/kernel times. Capture excludes
+RF fields and stopscleanly afterwindow; timeout1800/60GiB/no swap/guard6GiB.
+Temporary profiler output RAM /dev/shm; saved bounded report is diagnostic output,
+not solver disk scratch. Retain profilerwarnings/clockcoverage failure as failure.
+Exact commonargv: `python3 tools/dev.py run tshaped-medium <output> --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --nsys-window 30:2 --seconds 1800`. Outputs artifacts/m3-prefetch-profile-{control,on}-20261019; on adds --basis-prefetch.
+
+EXP87 FAIL: full-process late-window collector exceeded60GiB cgroup, exit137/
+OOMKilled true,456.588s, peak64424509440B. Profilecompletefalse/clockfalse/
+CUDAeventlosswarning; no transfer or phase metrics accepted. No retry/capraise.
+NormalEXP86 W3 passed; this failure is diagnostic collector memory pressure.
+
+## EXP88 — bounded selected-window collection (preregistered, 2026-10-19)
+Fix diagnostic collection instead of raising memory limit: cudaProfilerStart/
+Stop around existing selectediterations, nsys --capture-range=cudaProfilerApi
+--capture-range-end=stop; process still exits via clean diagnostic exception.
+Start after draining earlier kernels, then retain all3clock syncanchors for2iter.
+CUDA profiler API only in adapter/weak hook, opt-in PALACE_PROFILE_CAPTURE_RANGE.
+No ordinary run math/precision/allocationpolicy change; fallback native+manifest
+build/m3-basis/pre-selective-profile-native. CUDA12.9 profiler and Nsight
+2026.5.1 pinned primary guidance, accessed2026-10-19:
+https://docs.nvidia.com/nsight-systems/UserGuide/index.html
+First smoke coax-tiny window0:2 <=60s, both diagnostic control andprefetch if
+needed. Require cleanstop/clock/coverage/no collectorwarnings, not RFpass.
+Then rerun late30:2 W3 diagnostic pair at same1800s/60GiB/no swap cap (new
+artifacts m3-selective-profile-{control,on}-20261019, exactEXP87argv).
+Add captureflag onlyprofiling runner/unsetforordinary, counters marker begin/end.
+
+EXP88 firsttiny FAIL as completeprofile:10.422s/exit0/1.832GBcgroup, all
+clock/window/cleanstop/coveragePASS but DIAGNOSTIC_EVENT severity2 'Not all
+CUDA events might have been collected.' No totals accepted. Primary NVIDIA
+engineer explains same2026.5.1 forcedflush-warning case (not proof forours):
+https://forums.developer.nvidia.com/t/nsight-systems-2026-5-1-produced-112-collected-100-warning-despite-complete-coverage-of-32-kernels/384749
+Nexttiny diagnostic changes only --capture-range-end=none: capture starts at
+selectedwindow but collection ends at natural cleanprocess exit, so capture
+includes boundedcleanup; window remains offlinefiltered. Keep warninggate
+unchanged, no largecase untilwarningfree. No native rebuild for CLI-onlychange.
+
+EXP88 tinyv2 PASS/rootverified: profilecomplete true, capture/window/clock/
+coverage/cleanstop true, zero collectorwarnings. Naturalexitaftercapture-start
+fixeswarningwithoutgateweakening. 8.423s/1.397GBcgroup. Partial diagnostic
+resultcompletefalse deliberate, not RFpass. Proceedlate W3 pair withsame
+newnative andsameparams asEXP87, only boundedcapture policy changed.
+
+EXP88 latecontrol terminalPASS/profileonly rootverified:383.343s/57.623GB
+cgroup, profilecomplete true/zerowarnings/allclockcoveragePASS. Twoiter late
+window15.192s,PC13.567s inclusive/coarse4.869s included,orthog.706s.
+Measured UVM HtoD10.900GBfault+126.512GBspeculative/DToH137.320GBeviction;
+actualenum mapping retainedinreport, not requestedbytes. Candidate sameargv
+except artifacts/m3-selective-profile-on-20261019 and --basis-prefetch.
+
+EXP88 latecandidate terminalPASS/profileonly rootverified:381.014s/57.571GB
+cgroup, samebuild/config, profilecomplete/clockcoverage/cleanstopPASS,
+zerowarnings. Selected2iter14.761s vs15.192; orthog.330 vs.706s,PC13.505
+vs13.567s (coarse4.879 vs4.869included). ActualUVM total272.984 vs274.732GB,
+−0.6363%, periter136.492 vs137.366GB; no claimalltransfersareblocking.
+Explicit HtoDprefetch5.654GB, fault9.982GB/speculative121.123GB/DToHeviction
+136.224GB; numericenumlabels retained in artifacts/m3-prefetch-profile-root-analysis-20261019.json.
+Decision: useful localorthogimprovement, not cure forPC residency; prefetch
+remainsopt-in, no whole-solve speeduppromotion fromonepair. FP32directmemory
+gainEXP85 remains primaryqualifiedbenefit. Restart120vs240 notrun:35iter<K64,
+so neither reduces materializedbasis; below35 changes convergence/cost for
+limitedsaving; no evidence tospendrun onthat now. M3.2 policy assessmentdone.
+
+## EXP89 — final M3 W.2 prefetch quality regression (preregistered, 2026-10-19)
+Newnative EXP88 no ordinaryphysicschange. Threeexistingmediumcoaxfrequency
+shards3.3/3.55/3.8GHz,bothports,180s each, nativecomplexcoarseFP64/RIGHT;
+FP32direct+prefetch vs independentqualifiedEXP83 FP64 fields (samefrozenmesh).
+No new speedclaim fromdifferentbuildreference. Need raw<=1e-6/wholefields1%,
+ΔS1e-3/VSWR.01/power1e-3, allTEMq4/q6,positiveprefetch/native markers.
+Exact commonargv: `python3 tools/dev.py run coax-medium <output> --basis fp32 --direct-basis --basis-prefetch --native-complex-coarse --pc-side right --coax-l2 --coax-frequency <f> --save-fields --field-reference <ref> --memory-marks --phase-trace --seconds 180`.
+Outputs artifacts/m3-prefetch-medium-{330,355,380}-20261019; references
+artifacts/m3-coax-medium-native-fp64-{330,355,380}-20261019. Standardnoswap
+60GiB/6GiBhostguard, no dependencybuild/paidcompute. StoponfirstFAIL.
+
+EXP89 terminalPASS all3shards/bothports/45,47iter/raw<=8.334e-7,wholefields
+E<=7.555e-7/B<=9.423e-9. Allq4/q6TEM records E<.495%/B<.457%. Native
+andprefetchmarkersapplied; rootRFdeltas qualification pending analysisreceipt.
+115unitPASS pinned/system99PASS16SKIP.
+
+## EXP90 — integrated W.3 quality after diagnostic hook change (preregistered)
+EXP86 W3 used immediateprecedingnative; EXP88 onlyadds inactive diagnostic
+hook toordinarypath. Still rerun fullW3 oncurrentnative toprove integrated
+quality; no needrepeatbuild. Samephysics/warmstart/K64/pool256/nativecoarse.
+Exactargv: `python3 tools/dev.py run tshaped-medium artifacts/m3-prefetch-antenna-final-20261019 --basis fp32 --direct-basis --basis-prefetch --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver --save-fields --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --field-reference artifacts/m3-prefetch-antenna-control-20261019 --seconds 1800`.
+Same60GiB/noswap/6GiBhostguard; field/raw/S/VSWR/power frozenK, memory
+expected same compressedbasis; speed statisticalqualification deferredtoM7.
+
+EXP90 terminalPASS/rootverifiedcurrentnative:35iter/399.446s/raw8.35668e-7,
+wholeE/B6.684e-9/4.860e-10,ΔS2.946e-10/ΔVSWR2.865e-10/power3.076e-11.
+Currentnative matches allEXP89shards andEXP90, no activeprofileflags inW3.
+EXP89 RFmaxΔS5.666e-9/ΔVSWR4.794e-9/totalportpower1.077e-8, allTEMPASS.
+Rootreceipt artifacts/m3-prefetch-final-root-analysis-20261019.json. NoW4/W5
+claim. Nextrelink existingactualAPIprobe againstcurrentnative CPU/CUDA,
+6GiB/4CPU/noswap/RAMtmpfs512MiBeach/60s perrun, using existingtool.
+
+EXP90 actualAPI relink currentnative CPU/CUDA PASS/all10rows+realcomplexMGS,
+ownership/conjugationdetectorsPASS, FP64accum/quantization gates unchanged.
+No managedprefetch flag inAPIprobe; actualprefetch qualifies viaEXP86/89/90.
+M3.1–M3.3 assessment complete: usefulmemorygain, policybytes measured;
+optionalprefetchkept/no globaldefaults/speedpromotion; restartconditionalnotrun
+justified. W4/W5 and allM4–M7 remain. ActiveM4 sourceaudit setupreuse next.
+New report docs/basis-prefetch.md and M4 checkpoint; finaldocsreview pending.
+
+FinalEXP86–90 validation:115pinnedPASS/system99PASS16SKIP;8shellPASS,
+docschecker/diffcheckPASS. SameLuna read-onlydocs-garden foundstaleM3ACTIVE
+line in mixed-basis-validation; rootcorrected. Rootreviewedcode+currentnative
+receipts andstrict profile enumtotals; no gateweakening, no SSDoffload/default
+change. M3completeassessment/M4ACTIVE. Next sourceaudit existingdrivenloop/
+SetOperator/factorizationcounts before writingcache. GlobalgoalNOTcomplete:
+M4–M7/W4/W5/finalreproduciblequalification remain. Localcommitonly/no push.

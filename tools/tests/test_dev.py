@@ -12,6 +12,38 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_prefetch_requires_direct_cuda_before_resource_allocation(self):
+        with patch.object(dev, 'require_host_memory') as host:
+            for flags in [dict(), dict(basis='fp64'), dict(direct_basis=True,cpu_reference=True)]:
+                with self.assertRaises(ValueError):
+                    dev.run('coax-tiny','/unused',60,basis_prefetch=True,**flags)
+            host.assert_not_called()
+        with patch.object(dev,'require_host_memory',side_effect=RuntimeError('resource gate')):
+            with self.assertRaisesRegex(RuntimeError,'resource gate'):
+                dev.run('coax-tiny','/unused',60,direct_basis=True,basis_prefetch=True)
+
+    def test_direct_prefetch_profile_is_explicit_diagnostic_not_field_qualification(self):
+        from types import SimpleNamespace
+        profiler=SimpleNamespace(parse_window=lambda value: (30,2), verified_tool=lambda: {})
+        import sys
+        with patch.dict(sys.modules, {'nsight_window':profiler}), patch.object(
+                dev,'require_host_memory',side_effect=RuntimeError('resource gate')):
+            with self.assertRaisesRegex(RuntimeError,'resource gate'):
+                dev.run('tshaped-medium','/unused',1800,direct_basis=True,basis_prefetch=True,nsys_window='30:2')
+            for flags in [dict(),dict(direct_basis=True,save_fields=True),dict(direct_basis=True,coax_l2=True)]:
+                with self.assertRaises(ValueError):
+                    dev.run('coax-tiny','/unused',60,nsys_window='30:2',**flags)
+
+    def test_prefetch_requires_positive_actual_markers_per_solve(self):
+        marker='PALACE_BASIS_PREFETCH: managed=true stream=0 calls=10 requested_bytes=80\n'
+        self.assertTrue(dev.basis_prefetch_applied(marker*2,2))
+        for log,count in [(marker,2),(marker*3,2),('',0),
+                          (marker.replace('calls=10','calls=0'),1),
+                          (marker.replace('requested_bytes=80','requested_bytes=0'),1),
+                          (marker.replace('managed=true','managed=false'),1),
+                          (marker.replace('stream=0','stream=1'),1)]:
+            self.assertFalse(dev.basis_prefetch_applied(log,count))
+
     def test_one_coax_frequency_is_from_frozen_sweep_and_keeps_both_ports(self):
         _,_,config=dev.fixture('coax-medium')
         for frequency in [3.3,3.55,3.8]:

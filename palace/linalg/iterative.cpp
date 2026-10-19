@@ -13,10 +13,13 @@
 #include <string>
 #include <string_view>
 #include "linalg/orthog.hpp"
+#include "linalg/basisprefetch.hpp"
 #include "utils/communication.hpp"
 #include "utils/timer.hpp"
 #include "utils/memorymark.hpp"
 #include "utils/profilewindow.hpp"
+
+extern "C" void PalaceProfileCapture(int begin) __attribute__((weak));
 
 namespace palace
 {
@@ -61,6 +64,11 @@ public:
     if (!done && iteration == first)
     {
       MFEM_VERIFY(PalaceProfileSynchronize, "Profile window requires the CUDA adapter sync hook!");
+      if (std::getenv("PALACE_PROFILE_CAPTURE_RANGE"))
+      {
+        MFEM_VERIFY(PalaceProfileCapture, "Selective profile requires the CUDA capture hook!");
+        PalaceProfileCapture(1);
+      }
       PalaceProfileSynchronize();
       Mpi::Print("PALACE_PROFILE_WINDOW: begin first={} count={}\n", first, count);
       nvtxEventAttributes_t event{};
@@ -82,6 +90,7 @@ public:
       ProfileHostRange("end", "Krylov sample");
       Mpi::Print("PALACE_PROFILE_WINDOW: end first={} count={}\n", first, count);
       nvtxDomainRangePop(domain);
+      if (std::getenv("PALACE_PROFILE_CAPTURE_RANGE")) PalaceProfileCapture(0);
       active = false;
       done = true;
       throw KrylovProfileComplete{};
@@ -615,6 +624,9 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   Initialize();
   const bool compressed_basis = UseStoredBasis();
   const bool direct_basis = std::getenv("PALACE_GMRES_FP32_DIRECT") != nullptr;
+  const bool prefetch_basis = std::getenv("PALACE_GMRES_BASIS_PREFETCH") != nullptr;
+  MFEM_VERIFY(!prefetch_basis || direct_basis, "Basis prefetch requires direct FP32 basis!");
+  const auto prefetch_begin = GetBasisPrefetchStats();
   MFEM_VERIFY(!direct_basis || compressed_basis, "Direct basis requires PALACE_GMRES_FP32_BASIS!");
   MFEM_VERIFY(!compressed_basis || gs_orthog == Orthogonalization::MGS,
               "FP32 basis pilot currently supports MGS GMRES only!");
@@ -888,6 +900,12 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
   }
   final_res = beta;
   final_it = it;
+  if (prefetch_basis)
+  {
+    const auto stats = GetBasisPrefetchStats();
+    Mpi::Print(comm, "PALACE_BASIS_PREFETCH: managed=true stream=0 calls={:d} requested_bytes={:d}\n",
+               stats.calls - prefetch_begin.calls, stats.bytes - prefetch_begin.bytes);
+  }
   if (std::getenv("PALACE_RELEASE_GMRES_BASIS"))
   {
     MemoryMark("gmres.basis_release.begin");

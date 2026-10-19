@@ -17,11 +17,12 @@ class NsightTests(unittest.TestCase):
         self.assertEqual(nsight.launch_phase(11000,3,scopes,10000),'phase boundary uncertainty')
         self.assertEqual(nsight.launch_phase(50000,4,scopes,10000),'other thread inside selected window')
 
-    def test_whole_process_cuda_capture_waits_for_native_cleanup(self):
+    def test_selected_cuda_capture_waits_for_native_cleanup(self):
         args = nsight.arguments({})
         self.assertIn('--wait=all', args)
         self.assertIn('--kill=none', args)
-        self.assertFalse(any(arg.startswith('--capture-range') for arg in args))
+        self.assertIn('--capture-range=cudaProfilerApi',args)
+        self.assertIn('--capture-range-end=none',args)
         self.assertIn('--trace=cuda-sw',args)
 
     def test_window_rejects_oversized_and_ambiguous_values(self):
@@ -86,13 +87,14 @@ class NsightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'schema'): nsight.sqlite_summary(path)
 
     def test_collection_requires_clean_stop_and_rejects_sql_loss_warning(self):
-        for clean, warning in [(True, False), (False, False), (True, 'loss'), (True, 'error')]:
-            with self.subTest(clean=clean, warning=warning), tempfile.TemporaryDirectory(dir='/dev/shm') as temporary:
+        for clean, warning, capture in [(True, False, True), (False, False, True), (True, 'loss', True), (True, 'error', True), (True, False, False)]:
+            with self.subTest(clean=clean, warning=warning, capture=capture), tempfile.TemporaryDirectory(dir='/dev/shm') as temporary:
                 root = Path(temporary)
                 ram, output = root/'ram', root/'output'
                 ram.mkdir(); output.mkdir()
                 (ram/'window.sqlite').touch()
                 log = 'PALACE_PROFILE_WINDOW: begin first=1 count=2\nPALACE_PROFILE_WINDOW: end first=1 count=2\n'
+                if capture: log += 'PALACE_PROFILE_CAPTURE: begin\nPALACE_PROFILE_CAPTURE: end\n'
                 if clean: log += 'PALACE_PROFILE_STOP: clean diagnostic stop; no RF qualification\n'
                 (output/'palace.log').write_text(log)
                 summary = dict(window_count=1,host_clock=dict(clock_calibration_passed=True),phase_ranges=[dict(name=name, calls=2) for name in
@@ -102,6 +104,6 @@ class NsightTests(unittest.TestCase):
                 profile = dict(first=1, count=2, ram_directory=str(ram), scope='test partial')
                 with patch.object(nsight, 'sqlite_summary', return_value=summary):
                     result = nsight.collect(profile, output)
-                self.assertEqual(result['complete'], clean and not warning)
+                self.assertEqual(result['complete'], clean and not warning and capture)
                 self.assertFalse(ram.exists())
                 self.assertTrue((output/'profile-summary.json').exists())

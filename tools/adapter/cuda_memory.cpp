@@ -1,6 +1,7 @@
 // CUDA UVM allocation experiment and cuDSS allocator accounting; host-only translation unit.
 #include <cudss.h>
 #include <cuda_runtime.h>
+#include <cuda_profiler_api.h>
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <cstdio>
@@ -12,6 +13,16 @@
 #include <atomic>
 #include <mutex>
 #include <chrono>
+
+extern "C" void PalaceProfileCapture(int begin) {
+  if(begin) {
+    const auto error=cudaDeviceSynchronize();
+    if(error!=cudaSuccess){std::fprintf(stderr,"Profile drain failed: %s\n",cudaGetErrorString(error));std::abort();}
+  }
+  const auto error=begin?cudaProfilerStart():cudaProfilerStop();
+  if(error!=cudaSuccess){std::fprintf(stderr,"Profile capture failed: %s\n",cudaGetErrorString(error));std::abort();}
+  std::fprintf(stderr,"PALACE_PROFILE_CAPTURE: %s\n",begin?"begin":"end");
+}
 
 extern "C" void PalaceProfileSynchronize() {
   int version;

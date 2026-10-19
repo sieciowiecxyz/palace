@@ -17,11 +17,17 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Czytaj gdy: wznawiasz pracę i sprawdzasz powód przejścia do M3
   - Opis: REJECT obecnej integracji; niezaliczone pola/residual i brak kwalifikowanego speedupu.
 - [M3: GMRES i pamięć](milestones/M3.md)
-  - Czytaj gdy: rozpoczynasz aktywną optymalizację bazy GMRES
-  - Opis: Bezpośrednie FP32 storage/FP64 arithmetic, mały CUDA probe, późniejsze K/W.1–W.3.
+  - Czytaj gdy: sprawdzasz zamknięcie oceny GMRES i pamięci
+  - Opis: FP32 storage/FP64 arithmetic, W.1–W.3 i ocena prefetchu; globalne defaulty bez zmian.
 - [M3: bezpośrednia baza FP32](mixed-basis.md)
   - Czytaj gdy: uruchamiasz opt-in direct basis albo oceniasz pierwszy filtr
   - Opis: EXP77–79 implementacja/probe; aktualna walidacja i korzyść pamięci w raporcie EXP80–85.
+- [M3: prefetch i measured UVM](basis-prefetch.md)
+  - Czytaj gdy: oceniasz prefetch, pomiar transferów albo zakończenie M3
+  - Opis: EXP86–90, mała korzyść ortogonalizacji, strict selective profiling, aktualne W.2/W.3 PASS; bez globalnej promocji czasu.
+- [M4: reuse setup](milestones/M4.md)
+  - Czytaj gdy: wznawiasz aktywny audyt setup i faktoryzacji między portami
+  - Opis: Najpierw istniejący driven loop i liczniki, potem prototyp tylko przy wykazanym powtórzeniu setup.
 - [M3: actual API i walidacja medium](mixed-basis-validation.md)
   - Czytaj gdy: oceniasz aktualny wariant FP32direct lub planujesz politykę migracji
   - Opis: EXP80–85 W.1/W.2/W.3 PASS,−2,87GB cgroup na T-Shaped; bez speedup/defaultpromotion, W.4/W.5 otwarte.

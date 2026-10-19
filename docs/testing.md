@@ -140,3 +140,12 @@ trzyfreq/oba porty PASS, W.3 pojedynczy3,50GHz/P2 PASS/peakcgroup−2,87GB.
 kontrolują częstotliwości/mutualexclusion/boundaries oraz jawną kombinację
 nativeFP64coarse+directFP32. Realny driverCDI również dla CPUAPIprobe (GPU-built
 libceed); buildstub nigdy na runtimeRPATH. Nie kwalifikuje to M7/W.4/W.5.
+
+## M3 — prefetch i selektywny profil, EXP86–90
+
+Aktualny suite115PASS w pinned oracle env; system99PASS/16SKIP. Regresje
+obejmują wymaganie direct/CUDA, dodatnie markery per solve i profiler jako
+niekwalifikujący RF, capture markers, brak utraty zdarzeń i naturalny cleanup.
+ActualAPI CPU/CUDA relink currentnative PASS; prefetch jakościowo sprawdzony
+w tiny,3mediumcoaxshards/bothports i aktualnym W.3. [Wyniki/argv](basis-prefetch.md),
+[M4](milestones/M4.md) aktywny; upstreamfullsuite i W.4/W.5 nadal NOT RUN.

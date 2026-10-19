@@ -2,9 +2,9 @@
 
 Twarde wymaganie użytkownika (2026-10-18): wszystkie dane robocze solvera w RAM/VRAM. Zakaz przenoszenia bazy, macierzy i workspace na SSD/NVMe oraz używania swap do zmieszczenia zadania. UVM wyłącznie GPU↔RAM. Cache builda i zwykłe wejścia/wyjścia pozostają; historyczne eksperymenty z bazą dyskową są odrzucone i nie są dopuszczalnym baseline wydajności.
 Mode: goal
-Active: M3
+Active: M4
 
-Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, aktywny M3: GMRES/pamięć. Compute lokalny; bez najmu chmury.
+Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, M3 zamknięty po ocenie pamięci i prefetchu; aktywny M4: reuse setup. Compute lokalny; bez najmu chmury.
 
 ## Cel
 
@@ -19,8 +19,8 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 - [x] M0 — Research i samodzielny fork z cache; zakres dowodów w docs/migration.md.
 - [x] M1 — Referencja, niezależna jakość, profil i koszt powietrza w FEM; docs/milestones/M1.md.
 - [x] M2 — ocena FEM–BEM/MoM zakończona REJECT obecnej integracji; bramki promocji pozostają FAIL/niekompletne. docs/milestones/M2-decision.md.
-- [ ] M3 — ACTIVE: GMRES, kompresja bazy i ograniczenie migracji RAM↔GPU; docs/milestones/M3.md.
-- [ ] M4 — Reuse operatorów, preconditionera i faktorów między portami.
+- [x] M3 — FP32direct memory gain i ocena prefetchu; W.1/W.2/W.3 PASS, bez globalnej promocji; docs/milestones/M3.md.
+- [ ] M4 — ACTIVE: reuse operatorów, preconditionera i faktorów między portami; docs/milestones/M4.md.
 - [ ] M5 — Preconditioner, cuDSS i kontrolowana mixed precision.
 - [ ] M6 — Tensor Cores/TF32/BF16 na zmierzonym gorącym fragmencie.
 - [ ] M7 — Kwalifikacja najlepszego wariantu na jednej 5070 Ti i pakiet do użycia.
@@ -89,8 +89,8 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 
 - [x] Direct FP32 dot/AXPY z FP64, usunięte rozpakowania z MGS/update (jedno przed ApplyBA nadal potrzebne); EXP77–85.
 - [x] Kernel/actualAPI/MGS/realcomplex/zero/faultdetector i W.2/W.3/reliable stopping PASS; bez uniwersalnej gwarancji stagnacji.
-- [ ] Osobno porównać UVM oraz ograniczone porcjowanie/prefetch bazy; policzyć transfery i bytes/iteration.
-- [ ] Restart 120 vs 240 tylko jeśli profil uzasadnia próbę; sprawdzić liczbę iteracji i koszt całego solve.
+- [x] EXP86–90: prefetch vs demand UVM, actual bytes/iteration i peak/czas; mała poprawa ortogonalizacji, bez statystycznego speedupclaim; docs/basis-prefetch.md.
+- [x] Ocena restartu: 35iter<K64, porównanie120/240 nie ograniczy dotkniętej bazy. NOT RUN z uzasadnieniem; mniejszy restart nieuzasadniony kosztem PC.
 
 ### M4 — setup raz, kilka RHS
 
