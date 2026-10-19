@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:106testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo90PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:112testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo96PASS/16SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -128,6 +128,15 @@ guards; p10NOTRUN ponadcap. [Decyzja M2](milestones/M2-decision.md).
 [EXP77–79](mixed-basis.md): cached shared-header CUDA probe + samebuild
 coax-tiny FP64/FP32unpack/FP32direct, actualraw/fields/TEM/S PASS.
 `--direct-basis` wymaga FP32 i jest czyszczony z odziedziczonego środowiska;
-default/fallback zachowane. MGSorthogonality/realpath/largercoax/W.3NOTRUN,
-nie promować na podstawie samego builda/probe. Cache and binarytamper/deadline
+default/fallback zachowane. Na etapie EXP79 MGSorthogonality/realpath/largercoax/W.3 były NOT RUN;
+aktualizacja EXP80–85 poniżej. Nie promować na podstawie samego builda/probe. Cache and binarytamper/deadline
 regresje w test_mixed_basis_probe.py, guard FP64/direct w test_dev.py.
+
+EXP80–85 aktualizacja M3: actual libpalace API CPU/CUDA/MGS/faultdetector i W.2
+trzyfreq/oba porty PASS, W.3 pojedynczy3,50GHz/P2 PASS/peakcgroup−2,87GB.
+[Dowody i scope](mixed-basis-validation.md). W.2 pełnyTEMsweep przekracza180s;
+`--coax-frequency` dzieli istniejące punkty bez pomijania portów/kwadratury.
+`--coax-sweep` jawnie zachowuje wszystkiefreq z diagnostyką. Testy test_dev.py
+kontrolują częstotliwości/mutualexclusion/boundaries oraz jawną kombinację
+nativeFP64coarse+directFP32. Realny driverCDI również dla CPUAPIprobe (GPU-built
+libceed); buildstub nigdy na runtimeRPATH. Nie kwalifikuje to M7/W.4/W.5.

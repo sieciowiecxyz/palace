@@ -1474,3 +1474,162 @@ Finalvalidation EXP77–79:106unitPASS pinned/system90PASS16SKIP. SameLuna
 read-only docs-gardenPASS, no scope/source/metric contradictions. Checker and
 diffcheckPASS. Rootreview numerical receipts/rootanalysis/currentnative match.
 M3ACTIVE; commitlocalonly, no publicpush/defaultpromotion/goalcompletion.
+
+### EXP80 — prerejestracja: actual exported Palace vector API / MGS CPU + CUDA
+
+Previous turn progress cb40b75: complexcoax-tiny/raw/TEM/S/fieldPASS; W.1real/
+orthogonality/faultdetector pending. New oneTU probe links verified libpalace.so
+StoredBasisVector methods (not copiedCUDAkernels); native/sourceSHA pinned.
+No Palace/dependency rebuild, cachedmpicxx/link max120s, repeat expectsno-op.
+CPU andCUDA separate one-rankprocesses, vectors n0/1/1009/65537/131071, floatdata
+owned independently: originalsource overwritten afterPack while savedUnpack
+reference retained. Compare directDot/AddTo vs legacyFP64Dot/Add on samequantized
+data; scaled+relative dot/axpy gates1e-12. Complexn1: expected31-i, deliberately
+wrong31+i must exceed gate. Real/complexMGS16vectors4097DOF, storedGram/normalized
+orthog<2e-7, directvslegacy normalizedvector<1e-12. No near-dependentbasis or
+multi-rank guarantee. SameFP32storage/FP64arithmetic/reduction, noTCclaim.
+Runtime6GiB4CPU/noSwap/RAMtmpfs512MiBeach/networknone,60s each; CUDA initial
+HYPREUmpirepool256MiB via existingpublicAPI; no appsclose/paidcompute. No solver
+performancepromotion from APIprobe. 109systemtests93PASS16SKIP.
+Exactargvs sequential, nextonlyafterprior terminalPASS:
+`python3 tools/experiments/stored_basis_probe.py build`.
+`python3 tools/experiments/stored_basis_probe.py build` (cache).
+`python3 tools/experiments/stored_basis_probe.py run artifacts/m3-stored-api-cpu-20261019 --device cpu --seconds 60`.
+`python3 tools/experiments/stored_basis_probe.py run artifacts/m3-stored-api-cuda-20261019 --device cuda --seconds 60`.
+
+EXP80 stopped atbuildlinkexit1 after7.385s, no numericalrun. CPPcompile passed;
+GPU-built libceed requires libcuda.so.1 missing in driverlessbuilder. Unresolved
+cu* fromlibceed; not arithmeticfailure. No retries/limits/dependencychanges.
+
+### EXP81 — prerejestracja: link-time driver stub, real runtime driver
+
+Onlylink/provisionfix: explicitCUDAtoolkit driverstub -lcuda atbuildtime,
+--no-as-needed; NEVER stubrpath. Runtime CDI realNVIDIAdriver injected forboth
+CPU andCUDA processes, like existingPalaceCPUreference runner. CPU still uses
+mfem::Device(cpu)/HYPREhostarithmetic, not GPUtiming. CUDA256MiBpoolunchanged.
+Same oneTU/cache, exactEXP80inputs/gates/caps/deadlines, noPalacerebuild.
+Exactargvs same four asEXP80, samefreshartifactpaths (no numericalrun existed).
+Nextonlyafterprior terminalPASS; no autosourcefix/retry delegated.
+
+EXP81 allterminalPASS/rootverifiedsource/native/binary/state. ActualprobeSHA
+3fae204af9c819e6a5da3b1b35860d752469418e836e772b421bf5c51dc6d5d9; Luna first
+message accidentallyquoted earlierstandaloneCUDAreceipt, rootusesactualmanifest.
+Build1.494s/cacherepeatno-op, noPalace/depsrebuild. CPU/CUDA10/10realcomplex
+casesPASS, includingzero,sourceoverwrite,complex31-i vswrong31+i detector.
+Maxreldot CPU1.09e-13/CUDA2.17e-14, axpy0 vslegacy. MGSGram max2.724e-9,
+orth max6.309e-11, normalizedvectorΔCPU<=2.475e-16/CUDA<=9.015e-17. AllgatesPASS.
+CPU .191s/RSS308809728B;CUDA .595s/RSS511172608B/pool256MiB. One-rankwell-
+conditionedMGSonly, no near-dependent/distributed claim. Rootanalysis stored
+artifacts/m3-stored-api-root-analysis-20261019.json. W.1currenttargetscopePASS.
+
+### EXP82 — prerejestracja: coax-medium native coarse + direct FP32, full sweep
+
+NextW.2samefrozenmediummesh/Order/physics, 3.3/3.55/3.8GHz bothports, RIGHTpc,
+tol1e-6/restart240. Newexplicit --coax-sweep preservesexistingfixturefrequencies
+while enablingTEMq4/q6/probes instead of silentlysingle3.55GHz. DefaultoldCLI
+unchanged. Nativecomplexcoarse uses sameFP64factor/operator forbothvariants;
+newcombinednativecoarse+FP32allowed ONLYexplicitdirectflag (oldunpackstillguarded),
+pendingthisqualification. No factorprecisionchange/shiftedmatrix; modelunchanged.
+FP64reference vsFP32direct: samecurrentnative, fullfields/S/raw/TEM withfrozenK.
+180s each, localRAM/VRAMonly/no paidcompute/appsclose, caches/fallbackpreserved.
+No nativeCPU/Qpoolcombination; nsys remainsFP64only. No promotion onexecution.
+111systemtests95PASS16SKIP. Exactargvs sequential nextafterterminalPASS:
+`python3 tools/dev.py run coax-medium artifacts/m3-coax-medium-native-fp64-20261019 --basis fp64 --native-complex-coarse --pc-side right --coax-l2 --coax-sweep --save-fields --memory-marks --phase-trace --seconds 180`.
+`python3 tools/dev.py run coax-medium artifacts/m3-coax-medium-native-fp32-direct-20261019 --basis fp32 --direct-basis --native-complex-coarse --pc-side right --coax-l2 --coax-sweep --save-fields --field-reference artifacts/m3-coax-medium-native-fp64-20261019 --memory-marks --phase-trace --seconds 180`.
+
+EXP82 referenceTIMEOUT authoritative terminalRunningFalse/ExitCode-1/noOOM,
+runnerexit255/181.026s;4/6solves, no candidate. Nativecoarse WASapplied (four
+dimension155934/nnz2466144 complexFP64markers); resultboolFalse meansnotall6
+requiredmarkers, not ignoredflag. Incompletepostprocessing/memorymarks expected,
+no promotion. TEMq4~13.7s +q6~23.2s PERsolve: sixchecks alone~222s>180limit,
+so unchangedretry cannotfinish. Fourrawchecks<1e-6 not fullqualification.
+
+### EXP83 — prerejestracja: bounded frequency shards, same full W.2 quality
+
+Keep180s/run; split existing3.3/3.55/3.8GHz into onefrequency/twoportjobs.
+New --coax-frequency selects ONLYexistingfrozenfixturepoint, preservesmesh/
+boundaries/ports/physics/tol/restart and allTEMq4/q6/wholefields/Schecks. Mutually
+exclusivewith --coax-sweep; no weakerquadrature or omittedport. Same nativeFP64
+coarse forFP64ref andexplicitFP32direct. Reference/candidate grouped perfrequency,
+allthreepairsmustPASS before W.2 fullsweepqualification. No Palacerebuild.
+Rootfirstreviews3.3pair beforequeueingremaining. 112systemtests96PASS16SKIP.
+For each pair F in [3.3,3.55,3.8], tag in [330,355,380], exactcommands:
+`python3 tools/dev.py run coax-medium artifacts/m3-coax-medium-native-fp64-F-20261019 --basis fp64 --native-complex-coarse --pc-side right --coax-l2 --coax-frequency F --save-fields --memory-marks --phase-trace --seconds 180`.
+`python3 tools/dev.py run coax-medium artifacts/m3-coax-medium-native-direct-F-20261019 --basis fp32 --direct-basis --native-complex-coarse --pc-side right --coax-l2 --coax-frequency F --save-fields --field-reference artifacts/m3-coax-medium-native-fp64-F-20261019 --memory-marks --phase-trace --seconds 180`.
+Paths replace F by tag (argvfrequency numericF). No autosourcechanges/retries;
+nextonlyafterprior authoritative terminalexecutionPASS, root ownsanalysis.
+
+EXP83 firstpair3.3GHzterminalPASS, samecurrentnative/coaxmesh/config,45/47iter
+each, reference114.311s/candidate115.312s. Candidate maxraw8.335e-7, E/BΔ
+7.554e-7/8.503e-9, TEMq4/6~.4937%E/.4558%B PASS. Nativecoarsemarkers2each,
+candidateDIRECTtrue. RootverifiedS/native/state andmemoryphase intervals;
+rootanalysis artifacts/m3-coax-medium-330-root-analysis-20261019.json.
+Allocationmetricmanagedpeak4.7996→4.2176GB(~12.1%lower); GMRESphase4.429/3.297s
+vs4.390/3.316s. This is NOTphysicalRAM/VRAM reduction: cgroup2.758→2.924GB,
+GPUprocess4.660→4.689GB. No speedupclaim, other2frequenciesstillpending.
+Next exactremainingEXP83pairs355/380, sameflags/caps/gates; rootreviewedfirstpair.
+
+EXP83 all6shards terminalPASS, full W.2 threefreq/bothports/raw/TEMq4q6/fields/S
+covered. All45/47iter; candidateEΔ<=7.554e-7/B<=8.503e-9, raw<=8.335e-7.
+Rootanalysis artifacts/m3-coax-medium-sweep-root-analysis-20261019.json includes
+allstates/fields/complexS/VSWR/portpower andallocationmetrics. Allocationpeak
+same12.126%lower allfreq; physicalcgroup/GPUpeaksNOTimproved. Runs114.3sFP64,
+115.3/116.4/115.3sFP32direct: no speedup. Geometry/Order/restart240 preserved;
+full3freqsinglejobEXP82 remainsTIMEOUT, not rewritten asPASS.
+
+### EXP84 — prerejestracja W.3: fresh samebuild FP64 reference, one medium antenna
+
+W.1actualAPI/MGS andW.2fullsweep PASS justify bounded W.3. Same frozen3.50GHz/P2,
+Order2/PA, mesh/ec56c9a7..., nativecomplexFP64coarse, RIGHTpc, explicitK64 to
+match qualifiedM1profile, tol1e-6, hyprepool256MiB, releasebasis/finalsolver.
+Both futurevariants must use SAME savedinitialapproximation fromcompleted
+m1-antenna-resident-fp64-20261018 (startingguess only, not accuracyreference).
+FreshFP64 checked against independentlytighter nativecoarse r2raw7.28e-10;
+root preflight verifiedinput/reference/source/geometry hashes beforelaunch.
+Candidate later referencesfreshFP64 plusfrozenK. No profilers/phase-trace,
+no input/mesh/highquality changes. Existingfullrun1800s/60GiB/noswap/hostguard6GiB,
+no paidcompute/appsclose, source/build/inputcache retained. Not a coldstart
+benchmark; samewarmguess asM1profile, disclosure retained in commandmanifest.
+Currentnative unchanged fromEXP78; no rebuild needed. Firstreference only:
+`python3 tools/dev.py run tshaped-medium artifacts/m3-antenna-native-fp64-20261019 --basis fp64 --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver --save-fields --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --field-reference artifacts/m1-native-complex-coarse-antenna-tight-r2-20261018 --seconds 1800`.
+Rootreviewterminalquality before preparingcandidateexactargv; no auto retry.
+
+EXP84 terminalPASS/rootverifiedstate/currentnative/freshfieldreferencebytes.
+35iter, rawRHS8.35543e-7, E/Bvsindependenttight6.9955e-8/9.8852e-8, sevenentries.
+Elapsed414.164s; cgroup58889510912B, managedpeak55147611962B, cuDSS25008217684B.
+GPUprocesscounter2147483648B (doesnotmeasureallUVMresidency); minhostavailable
+17846087680B>6GiBguard. Initialguess/nativecoarse/release/memoryflags confirmed.
+No claim speedupfrom414vsolder447; background/cache/time differ. Freshreference
+nowqualified forsamebuildcandidatecomparison, notcoldstartbenchmark.
+
+### EXP85 — prerejestracja: FP32direct W.3 matched fresh reference
+
+Onlybasisrepresentation/operations change vsEXP84: FP32DIRECT, allFP64operator/
+factor/reduction/residual, samefrozenmesh/port/freq/order/warmguess/K64/tol1e-6/
+pool256MiB/releaseflags. ReferencefreshEXP84 plusitsindependenttightcontrol.
+Compare actualraw,wholefields,S/Z/VSWR,energy/portpower,allocation/cgroup/time;
+no newtrace/profiler, no deadline/capchange, no environment/app intervention.
+Rawguard1e-6 and frozenK fields1%/ΔS1e-3/VSWR.01/power1e-3; fallbackretained.
+Rootverifiedfreshreferenceinput beforelaunch; sameoneGPU/local/no paidcompute.
+Exactargv:
+`python3 tools/dev.py run tshaped-medium artifacts/m3-antenna-native-direct-20261019 --basis fp32 --direct-basis --native-complex-coarse --pc-side right --krylov-size 64 --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver --save-fields --initial-fields artifacts/m1-antenna-resident-fp64-20261018 --field-reference artifacts/m3-antenna-native-fp64-20261019 --seconds 1800`.
+
+EXP85 terminalPASS, rootverifiedsamecurrentnative/state/raw/wholefields/S/energy.
+35iter/no restart, rawRHS8.35625e-7, maxΔE/B1.1323e-8/1.5949e-9. ΔS3.447e-10,
+ΔVSWRP2 6.777e-10,Δportpower5.123e-11,Δenergy1.388e-9 allfrozenKPASS.
+Cgroup58889510912→56018751488B (−2870759424B/~4.87%); managed55147611962→
+52276667194B (−2870944768B/~5.21%). cuDSSsame25008217684B. GPUprocesscounter
+2147483648→2176843776B excludesfullUVMresidency, not VRAMreductionproof.
+Time414.164→409.715s onlyonepair, no statisticallyestablishedspeedup.
+Allocationowner model:36materializedFP64vectors vs36packed+2FP64workvectors+
+1MiBpartials predicts EXACTmanagedpeakdelta;45logicalVcapacity includesuntouched
+device allocations, don't calllogicalbytesphysical. Rootanalysis complete in
+artifacts/m3-antenna-root-analysis-20261019.json. Goalusefulmemorygain observed
+but NOTcomplete: M3policy test, M4/M5/M6/M7/finalqualification stillrequired.
+Docs mixed-basis-validation, PLAN/M3/INDEX/ARCH/testing updated; M3ACTIVE.
+
+Finalvalidation EXP80–85:112unitPASS pinned; system96PASS/16SKIP. SameLuna
+read-only docs-gardenPASS, source/metric/scope reviewed incl actualprobe receipt,
+EXP82FAIL retained, W2shards andsamebuildwarmW3, no falseVRAM/speed/defaultclaim.
+Checker/diffcheckPASS; rootanalysis matches currentnative andterminalstates.
+M3ACTIVE/policyexperiment next; M4–M7pending. Localcommit only/no push.

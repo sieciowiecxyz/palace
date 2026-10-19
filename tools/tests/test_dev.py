@@ -12,6 +12,36 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_one_coax_frequency_is_from_frozen_sweep_and_keeps_both_ports(self):
+        _,_,config=dev.fixture('coax-medium')
+        for frequency in [3.3,3.55,3.8]:
+            selected=dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True,coax_frequency=frequency)
+            self.assertEqual(selected['Solver']['Driven']['Samples'],[{'Type':'Point','Freq':[frequency]}])
+            self.assertEqual(selected['Boundaries'],config['Boundaries'])
+        for frequency in [0.,2.4,float('nan'),True]:
+            with self.assertRaises(ValueError):
+                dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True,coax_frequency=frequency)
+        with self.assertRaises(ValueError):
+            dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True,preserve_coax_sweep=True,coax_frequency=3.3)
+
+    def test_coax_diagnostics_preserve_three_frequency_sweep_only_if_explicit(self):
+        _,_,config=dev.fixture('coax-medium')
+        expected=json.loads(json.dumps(config['Solver']['Driven']))
+        selected=dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True)
+        kept=dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True,preserve_coax_sweep=True)
+        self.assertEqual(kept['Solver']['Driven'],expected)
+        self.assertEqual(len(kept['Domains']['Postprocessing']['Probe']),18)
+        self.assertNotEqual(selected['Solver']['Driven'],expected)
+        with patch.object(dev,'require_host_memory') as host:
+            for name,kwargs in [('tshaped-medium',dict(coax_l2=True)),('coax-medium',{})]:
+                with self.assertRaises(ValueError):dev.run(name,'/unused',60,coax_sweep=True,**kwargs)
+            host.assert_not_called()
+
+    def test_direct_fp32_native_coarse_is_explicit_and_reaches_resource_guard(self):
+        with patch.object(dev,'require_host_memory',side_effect=RuntimeError('resource gate')):
+            with self.assertRaisesRegex(RuntimeError,'resource gate'):
+                dev.run('coax-medium','/unused',180,basis='fp32',direct_basis=True,native_complex_coarse=True)
+
     def test_direct_basis_rejects_fp64_before_allocation(self):
         with patch.object(dev,'require_host_memory') as host:
             with self.assertRaisesRegex(ValueError,'requires FP32'):

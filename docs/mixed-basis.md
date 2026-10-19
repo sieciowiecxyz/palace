@@ -1,8 +1,8 @@
 # M3 — bezpośrednie operacje na bazie FP32
 
-Status: **eksperyment opt-in, bez promocji**. Arytmetyka CUDA i pierwszy filtr
-Palace coax-tiny PASS; rzeczywista ortogonalność MGS/realpath, większy coax i
-T-Shaped medium pozostają do kwalifikacji. M3 nadal ACTIVE.
+Status: **eksperyment opt-in, bez zmiany defaultu**. Najnowsze EXP80–85:
+[actual API / W.2 / W.3](mixed-basis-validation.md) PASS, W.3 pamięć−2,87GB;
+brak udowodnionego speedupu. M3 nadal ACTIVE (polityka migracji), W.4/W.5 otwarte.
 
 ## Implementacja i zakres
 
@@ -23,8 +23,8 @@ stopping/restarts bez zmian. Tensor Cores nie są używane.
 
 Domyślna ścieżka FP64 i dotychczasowa FP32/unpack są zachowane; runner czyści
 odziedziczoną nową flagę, wymusza jawny `--direct-basis` tylko z `--basis fp32`.
-Nie zmieniono medium/siatek/fizyki. Wariant native-complex-coarse + FP32 nadal
-blokowany istniejącym guardem; nie przeskakiwać tej kombinacji do dużej anteny.
+Nie zmieniono medium/siatek/fizyki. Wariant native-complex-coarse + FP32 od EXP82 jest dopuszczony tylko z jawnym
+DIRECT; nowa kombinacja przeszła W.2/W.3 w EXP83–85. FP32/unpack nadal blokowany.
 
 ## EXP77–78 — cache i mały probe
 
@@ -81,6 +81,6 @@ python3 tools/dev.py run coax-tiny artifacts/new-tiny-direct --basis fp32 --dire
 Dowody: `artifacts/m3-mixed-basis-cuda{,-v2}-20261019/`,
 `artifacts/m3-coax-tiny-{fp64,fp32-unpack,fp32-direct}-20261019/`,
 rootverified `artifacts/m3-coax-tiny-root-analysis-20261019.json`.
-Następne: jawny test błędnej koniugacji, rzeczywista ortogonalność MGS/realpath,
-potem większy coax i dopiero para referencja/kandydat W.3. Nie zmieniać restartu
-w tym samym eksperymencie co reprezentacji.
+Historyczne następne kroki EXP79 zrealizowano w EXP80–85;
+[aktualne wyniki](mixed-basis-validation.md). Nie zmieniać restartu w tym samym
+eksperymencie co reprezentacji.

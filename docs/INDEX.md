@@ -21,7 +21,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Bezpośrednie FP32 storage/FP64 arithmetic, mały CUDA probe, późniejsze K/W.1–W.3.
 - [M3: bezpośrednia baza FP32](mixed-basis.md)
   - Czytaj gdy: uruchamiasz opt-in direct basis albo oceniasz pierwszy filtr
-  - Opis: EXP77–79 shared CUDA arithmetic i complex coax-tiny PASS; brak wykazanego zysku anteny, większe kontrole otwarte.
+  - Opis: EXP77–79 implementacja/probe; aktualna walidacja i korzyść pamięci w raporcie EXP80–85.
+- [M3: actual API i walidacja medium](mixed-basis-validation.md)
+  - Czytaj gdy: oceniasz aktualny wariant FP32direct lub planujesz politykę migracji
+  - Opis: EXP80–85 W.1/W.2/W.3 PASS,−2,87GB cgroup na T-Shaped; bez speedup/defaultpromotion, W.4/W.5 otwarte.
 - [M2: Maxwell oracle i kompresja](maxwell-oracle.md)
   - Czytaj gdy: uruchamiasz PEC/Mie lub oceniasz pierwszy H-matrix CUDA apply
   - Opis: Przypięte źródła/cache, historyczne EXP23–24 PEC PASS i wolny per-block apply; dalsze wyniki w EXP25–29.

@@ -272,8 +272,15 @@ def coax_geometry(name):
 
 def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size=None,
                       initial_fields=False, linear_tol=None, cpu_reference=False,
-                      complex_coarse=False, native_complex_coarse=False):
+                      complex_coarse=False, native_complex_coarse=False, preserve_coax_sweep=False,
+                      coax_frequency=None):
     """Explicit runtime diagnostics; never change a frozen fixture on disk."""
+    if coax_frequency is not None:
+        samples=config['Solver']['Driven']['Samples']
+        allowed=[value for sample in samples if sample.get('Type')=='Point' for value in sample.get('Freq',[])]
+        if (name not in ['coax-tiny','coax-medium'] or not coax_fields or preserve_coax_sweep or
+                isinstance(coax_frequency,bool) or coax_frequency not in allowed):
+            raise ValueError('Select one existing coax fixture frequency with fields/L2; do not combine with sweep')
     if cpu_reference:
         config['Solver']['Device'] = 'CPU'
         config['Solver']['Backend'] = '/cpu/self'
@@ -299,7 +306,8 @@ def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size
         config['Solver']['Linear']['InitialGuess'] = True
     if coax_fields:
         geometry = coax_geometry(name)
-        config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [3.55]}]
+        if not preserve_coax_sweep:
+            config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [3.55]}]
         probes = []
         for fraction in [0.25, 0.5, 0.75]:
             z = fraction*geometry['length_mm']
@@ -308,6 +316,8 @@ def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size
                     probes.append({'Index': len(probes)+1,
                                    'Center': [radius*math.cos(angle), radius*math.sin(angle), z]})
         config['Domains']['Postprocessing'] = {'Probe': probes}
+        if coax_frequency is not None:
+            config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [coax_frequency]}]
     if pc_side:
         config['Solver']['Linear']['PCSide'] = pc_side.title()
     return config
@@ -542,9 +552,13 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
-        nsys_window=None, direct_basis=False):
+        nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None):
     if direct_basis and basis != 'fp32':
         raise ValueError('Direct basis requires FP32 storage')
+    if coax_sweep and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2)):
+        raise ValueError('Coax sweep requires coax fields/L2 on a coax fixture')
+    if coax_frequency is not None and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2) or coax_sweep):
+        raise ValueError('Coax frequency requires coax fields/L2 and no simultaneous sweep')
     profiler = profile = None
     if nsys_window is not None:
         if basis != 'fp64' or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
@@ -555,8 +569,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         phase_trace = True
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
-    if native_complex_coarse and (basis != 'fp64' or cpu_reference or ceed_qpool):
-        raise ValueError('Native complex coarse requires FP64 basis without CPU or Q-pool')
+    if native_complex_coarse and ((basis != 'fp64' and not (basis == 'fp32' and direct_basis)) or cpu_reference or ceed_qpool):
+        raise ValueError('Native complex coarse requires FP64 or explicit direct FP32 basis, without CPU or Q-pool')
     if cpu_reference and (ceed_qpool or basis != 'fp64' or complex_coarse):
         raise ValueError('CPU reference requires FP64 basis without GPU Q-pool or complex-coarse profile')
     if hypre_pool_mib is not None and (not isinstance(hypre_pool_mib, int) or isinstance(hypre_pool_mib, bool)
@@ -568,7 +582,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     directory, info, config = fixture(name)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
                                bool(initial_fields), linear_tol, cpu_reference, complex_coarse,
-                               native_complex_coarse)
+                               native_complex_coarse, coax_sweep, coax_frequency)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -846,6 +860,8 @@ def main():
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
     r.add_argument('--direct-basis', action='store_true', help='Experimental direct FP32 basis dot/axpy with FP64 arithmetic; requires --basis fp32')
+    r.add_argument('--coax-sweep', action='store_true', help='Keep fixture frequencies with coax fields/L2 diagnostics instead of selecting 3.55 GHz only')
+    r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
     r.add_argument('--ceed-qpool', action='store_true', help='Unqualified in-memory libCEED workspace prototype; requires separate cached build')
@@ -902,7 +918,7 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),
