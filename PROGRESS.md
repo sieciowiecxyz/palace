@@ -19,7 +19,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP30–31: actualMFEM4.9ND1/Bemppcoupling ze zbieżnością, trace/pair~1e−15/energyPASS. Całkowity1%E/HFAIL:6,12/5,79%, comparatorFEM6,18/5,82%; Δcoupled–FEM0,57/0,76% niekwalifikujeND2/anteny. docs/maxwell-coupling.md.
 - EXP32: primalRWG/SNCGramtracirank90/120,330/480; odrzucićinwersjędoprowadzeniaND2projection. DualRWG/RBCfullrank/κscaled≤2,93, physicalpairing/transforms/constanttracePASS. Plane-traceRWG0błąd20,99→10,43→5,16%, nadalnieND2mortar. docs/maxwell-coupling.md.
 - EXP33: actualglobalMFEMND2/faceDOFtransforms/physicalbasis/CSR, Dirichletplane-waveE/H0,1505/0,3317%PASS na8936DOF/1280tet.5,514s/433MB/CSR8,79MB; interpolacjaH1,468%FAIL. BrakcoupledBEM/antenna speedup; docs/maxwell-nd2.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.69testsPASSwpinnedenv; systemowo63PASS/6SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP34: actualND2/BC-RBCmortar/localbasisassembler/sparseSchurPASS, currentwholefieldFAIL17,74/15,22→10,07/5,64% mimo raw/far/energyPASS. NativeT/K≤1,22e−16, tinydenseSchur≤1,94e−14; brakpromocjianteny. docs/maxwell-nd2-coupling.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.71testsPASSwpinnedenv; systemowo63PASS/8SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -39,7 +40,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: ND1interface1%fieldFAIL. EXP32odrzuciłosobnąinwersjęGprimal; GdualRBC małytestPASS. EXP33actualglobalND2/boundedDirichletreferencePASS. Następne fizyczny B/Dmortar: D=<RBC,v×n>=−B^T, GdualR=D, constanttrace i błądpolynomial/planewavetrace. Potem sparseFEM+Schur kontrolowanywzględemtinydense, coupledE/H≤1%/energy/farfield; zbieżnośćpowierzchni przy stałymFEM (RWG0niejestND2trace). DalejdielectricFEMtransmission/stabilizacja/scalableassembly/antena. M2otwarty, bezpaidcompute.
+2. M2: ND1interface1%fieldFAIL. EXP32GdualRBCmałytestPASS; EXP33globalND2DirichletPASS. EXP34B/Dmortar/localassembler/sparseSchurPASS, coupledfieldsFAIL. Następne tani traceprobe RWGvsBC dla obu electric/magneticduality z upstream, potem niezależna powierzchnia przy stałym zakwalifikowanymFEM — oddzielić traceE, reprezentacjęhBC i błądmortaru. Nieponawiaćślepo matchedrefinement obu siatek. Potem coupledE/H≤1%/energy/farfield, dielectricFEM/stabilizacja/scalableassembly/antena. M2otwarty, bezpaidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -450,3 +451,53 @@ bezprzenoszeniażądań1%na samąinterpolację ani deklaracjiantenna speedup.
 Docs-gardenLuna/rootreview/checker/diffcheckPASS; dodatkowycachecheck
 `MFEM bridge unchanged: cached library retained` bezrekompilacji.
 Lokalnycommitbezpush, goal/M2aktywne.
+
+### EXP34 — prerejestracja: actual ND2/BC-RBC mortar i sparseSchur
+
+Rootprojektuje `bempp_nd2_coupling.py`: B=<vND2,BC> i niezależnie
+D=<RBC,vND2×n>, pełnefaceDOF/barycentrictransforms. Gate D=−B^T,
+normal/coordinates/interiortangentleak≤1e−12; exactconstanttrace≤1e−12,
+lineartraceerrorraportowany (RWG0nieND2trace). GdualR=D zamiastGprimalinverse.
+FEM A=K−M pozostajesparse; [A,−ikB; C*R,T][u,h]=[0,rhs], C=G/2+Kbem.
+Schur=T+ik*C*Gdual^-1*D*A^-1*B; RHSbloki16, nie alokowaćdenseglobalFEM.
+Tylko≤512FEMDOF sprawdzićcałyfullcoupled układ≤1e−10. Na większymreference
+boundedDirichlet zEXP33+independentwholeE/Hplane-wave. TargetE/H≤1%, raw≤1e−10,
+q6vs8≤1e−6, absolutezero-scatterfarfield≤0,01 i energyerror/π≤1e−3.
+PrzypiętyBempp `electric_dual` używa RWG/BC i RBC/SNC, kontrolaAPIwsource.
+Limit180s/6GiB/4CPU/tmpfs/noaddedSwap, cachedMFEM/JIT, brakbuilda/GPU/paidcompute.
+Dokładnyargv: `python3 tools/experiments/bempp_oracle.py run
+artifacts/m2-nd2-bc-coupling-level1-20261019 --physics nd2-coupling --level 1 --seconds 180`.
+Level2/3 dopiero po rootanalizie. BrakCFIE/stabilizacji/transmission/ports;
+to transparentprobe, nie promocja solveraanteny ani zamknięcieM2.
+
+EXP34pierwszylevel1FAIL15,625s/exit1/noOOM. Mortarvalidated12,261s, ale
+standardowyBemppDenseAssembler odrzuca requires_dof_transformation dlaBC/RBC.
+Brakcoupledfields/Schur/farfieldwyników. Źródłoprzypiętegoassemblera potwierdza
+tenbrak, niezmieniaćupstreamenv/nieomijaćchecku. Korekta: lokalnycustomassembler
+używa tychsamychregular/singularMaxwellkernels wmake_localised_space, potem
+Qtest^T*A_local*Qtrial, gdzieQ=map_to_localised*dof_transformation. Kontrola
+punktowalocal/globalbasis≤1e−12, dodatkowo publicznyMaxwellRWG/SNC vs ta ścieżka
+dla obuT/K≤1e−12 wlevel1. To kosztownylocaldense tylko małyprototyp, nie scalableBEM.
+Poprawionyrun `artifacts/m2-nd2-bc-coupling-level1-local-20261019`, te samebramki/limity.
+
+EXP34locallevel1exit0/noOOM/executionPASS35,789s/RSS680MB. Mortaradjoint1,79e−16,
+constanttrace8,74e−16, lineartrace34,055%. CustomMaxwellvsnativeT/K≤1,22e−16,
+pointwisemaps≤3,37e−16. Schurraw3,37e−15, tinyfullcrosscheck1,93e−14;
+FEM184/BEM30, lokalneBEM360²complex128=2,074MB, reducedSchur14,4KB.
+CoupledE/H17,743/15,224%FAIL vs boundedDirichlet2,205/3,341%; q6vs8≤8,06e−13.
+Spuriousfar0,005935/energy3,26e−7PASS — far/residuum niekwalifikującałychpól.
+Następnylevel2 przytejsamejfizyce/180s/6GiB do
+`artifacts/m2-nd2-bc-coupling-level2-local-20261019`; zbieżnośćdecydujeolevel3.
+
+EXP34level2exit0/noOOM/executionPASS43,671s/RSS718MB. CoupledE/H10,072/5,645%FAIL,
+Dirichlet0,591/1,054%, deltaE/H10,111/5,827%. Adjoint/interiortangent/normal≤8,28e−16,
+constant9,79e−16, linear16,634%, raw1,14e−14, qdelta9,80e−15. Far0,002338/energy7,20e−7PASS.
+FEM1228/BEM120, Schur230,4KB, lokalneBEM1440²=33,178MB/operator (144×finaldata).
+Do mortaru12,33s/T27,92s/C38,40s/Schur38,43s/pola38,84s; setup/JIT/assembly
+dominują, nieLU0,03005s. Nieekstrapolowaćczystegokernelczasu z 2poziomów/JIT.
+Rootaktywnesource/helper/binarySHA/terminal/FAILsprawdzone w
+artifacts/m2-nd2-bc-coupling-root-analysis-20261019.json. Level3NOTRUN: następne
+rozdzieleniesamejgranicyprzyustalonymFEM, najpierwcheaptrace-spaceprobe.
+71testsPASSwpinnedenv,systemowo63PASS/8SKIP; docs-gardenLuna/rootreview/checker/diffcheckPASS.
+Wynikizapisane w lokalnymcommicie, bezpushdo upstream.
+Brakmatched-errorporównania/promocjianteny/M2closure; goalaktywny.

@@ -24,7 +24,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Rzeczywiste integratory MFEM/Calderón, ND1 fieldgate FAIL oraz audyt utraty rzędu RWG/SNC i kandydata RWG/RBC; global ND2 w EXP33, mortar nadal otwarty.
 - [M2: globalne ND2](maxwell-nd2.md)
   - Czytaj gdy: przygotowujesz rzeczywisty ND2mortar lub kontrolujesz dokładność objętościową
-  - Opis: Globalne MFEM/faceDOFtransforms, sparseCSR i plane-waveDirichletPASS; interpolacja to inny wektor, sprzężenie BEM nadal otwarte.
+  - Opis: Globalne MFEM/faceDOFtransforms, sparseCSR i plane-waveDirichletPASS; interpolacja to inny wektor, kwalifikacja sprzężenia BEM nadal otwarta.
+- [M2: sprzężenie ND2 i sparse Schur](maxwell-nd2-coupling.md)
+  - Czytaj gdy: diagnozujesz błąd sprzężenia lub planujesz niezależny test powierzchni BEM
+  - Opis: Fizyczny BC/RBCmortar, localbasisassembler i sparseSchur PASS; wholefieldFAIL mimo farfield/energii, bez promocji anteny.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

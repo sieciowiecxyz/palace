@@ -182,9 +182,10 @@ Wszystkie tablice wRAM, CPU6GiB/4CPU/noaddedSwap/tmpfs; istniejący cacheJIT.
    małych siatkach. Gprimal jest skew, nie zakładać SPD/odwracalności. Kandydat na
    zgodny mortar: t wRWG, h wBC, testRBC=n×BC; wtedy GdualR=−B^T i
    B=−R^TGdual^T z fizycznej całki FEMv·BC. EXP32 potwierdza znaki, transforms
-   i exactconstanttrace; **rzeczywisty ND2mortar nadal niewdrożony**.
-   Niezależna kontrola globalMFEMND2 na plane-waveDirichlet jest jużPASS wEXP33; dalej B/R i
-   zbieżność powierzchni przy stałymFEM, żeby oddzielić błędy obu przestrzeni.
+   i exactconstanttrace. **[EXP34](maxwell-nd2-coupling.md) wdrożył ND2mortar
+   i sparseSchur**, ale wholefieldFAIL10,07/5,64%, bezkwalifikacjiinterfejsu.
+   GlobalMFEMND2/DirichletPASS wEXP33; dalej dobórprzestrzeni i zbieżność
+   powierzchni przy stałymFEM, żeby oddzielić błędy obu przestrzeni.
 3. Podnieść dokładność tegoprzypadku do1%E/H, potem dielectricFEMtransmission
    i kontrola far-field/energii względem niezależnego oracle.
 4. Przy wzroście DOF zachować sparseFEM; rozważyć dokładne Schur/staticcondensation

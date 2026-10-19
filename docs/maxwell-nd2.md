@@ -92,13 +92,14 @@ Brak paidcompute/wyłączania aplikacji użytkownika/GPUrunów.
 
 ## Następne prace
 
-1. Rzeczywisty BC/RBC mortar: sparse B=∫v_FEM·BC i niezależnie
-   D=<RBC,v_FEM×n>; gate D=−Bᵀ. Wyznaczać R przez GdualR=D,
-   nie odwracać Gprimal ani nie traktować niedopasowanych przestrzeni jako exacttrace.
+1. [EXP34](maxwell-nd2-coupling.md) wykonał BC/RBCmortar: sparseB=∫v_FEM·BC,
+   niezależnieD=<RBC,v_FEM×n>, D=−Bᵀ oraz GdualR=D, z kontrolą≤1e−12.
+   Nie odwraca Gprimal ani nie traktuje niedopasowanych przestrzeni jako exacttrace.
+   CoupledE/H nadalFAIL10,07/5,64%, więc nie jest zakwalifikowanym interfejsem.
 2. Odtworzyć constanttrace; zmierzyć błąd liniowego/płaskiego trace i wpływ
    zbieżności samej powierzchni przy ustalonym FEMND2. Małe Gramrank/condition
    z EXP32 nie dowodzą stabilności dla portów/siatek graded.
-3. SparseFEM + mały dokładny Schur; kontrola względem pełnego coupled dense
-   tylko na najniższym poziomie. Potem coupledE/H≤1%, farfield/energia,
+3. SparseFEM + mały dokładny Schur i kontrola względem tinydense jużPASS wEXP34.
+   Potem coupledE/H≤1%, farfield/energia,
    dielectricFEMtransmission/stabilizacja/scalableBEMassembly i kosztanteny.
 4. Nie zamykać M2 ani przechodzić do M3 na podstawie tej referencji.
