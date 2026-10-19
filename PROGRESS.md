@@ -23,8 +23,9 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP35–37: duality/trace diagnostics i niezależny brzeg. Magnetic F2/B3 E/H0,560/0,751% PASS, F3/B3 0,358/0,904% PASS (H gorsze). Root source/SO/state/quality verification PASS; docs/maxwell-trace-duality.md. Dielectric transmission/rezonanse/scalable assembly/koszt pozostają otwarte.
 - EXP38–41: dielectric eps2,94 wykonany, centroidscreening FAIL E/H1,092/1,320% względem PMCHWTB4/q12. RefEchange0,408%>0,3%; potentialB4q8/q12<1e−6. Raw/far/energy małe nie kwalifikują pola. Zachowane NPZ do dalszej analizy bez solve; docs/maxwell-transmission.md.
 - EXP42–43: saved-solution volume replay640/2240pts. Degree5 E/H2,888/1,612%, refchange1,945/1,158%, potentialqdelta~7,4e−4 FAIL. Root SHA/state/complexintegral verificationPASS; H_FEM własnanorma q2/q5 zgadza się2,11e−15. Następna hipoteza adaptive near-panel correction; niepromować i nie skalować ślepo referencji.
-- EXP44–47: RWGpanel/native i niezależny static-normalcontrolPASS, ratio2 czterokrotnie mniejliści. FullfineB4nearcorrection117,617s/217MB adaptive/cutoffPASS, E/H2,888/1,611% nadal FAIL. Root allpoint/weights/input/sourceSHA/complexnorm/subsetregression PASS. Następne coarseB3 i degree2/5, docs/maxwell-near-panels.md.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.85testsPASSwpinnedenv; systemowo71PASS/14SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP44–47: RWGpanel/native i niezależny static-normalcontrolPASS, ratio2 czterokrotnie mniejliści. FullfineB4nearcorrection117,617s/217MB adaptive/cutoffPASS, E/H2,888/1,611% nadal FAIL. Root allpoint/weights/input/sourceSHA/complexnorm/subsetregression PASS. Dalsze EXP48–53 poniżej, docs/maxwell-near-panels.md.
+- EXP48–53: cached NumBa native/parityPASS, pełny coarse replay18,089s/RSS217MB (NumPyTIMEOUT180s). Obie strony adaptivePASS; correctedreferencechange degree5E/H1,647/0,781%FAIL0,3%, volume2/5agreementFAIL, brakpromocjianteny. docs/maxwell-near-panels.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.88testsPASSwpinnedenv; systemowo74PASS/14SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -44,7 +45,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: EXP44–47 fineB4nearpotential opanowany (native/solid-angle/adaptive/cutoffPASS); pola2,888/1,611% nadal FAIL. Następne coarseB3correction i volume-degree2/5agreement z zachowanych danych, potem niezależny FEM przy zgodnej referencji. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
+2. M2: EXP48–53 obie strony nearpotential opanowane; correctedreferencechange i volume-degree2/5agreement nadal FAIL. Następne kontrolowane oszacowanie błędu objętości/referencji, potem niezależny FEM. Nadal pola/rezonanse/koszt/decisionM2; bezpromocji/cloud.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -859,3 +860,104 @@ Bez assembly/solve/build/GPU/cloud/swap/offload, zwykłe NPZinput/results wRAM.
 i rootreview PASS; root doprecyzował brak assembly operatorów FEM/BEM oraz
 usunął dodatkowy nieaktualny licznik71unit z docs/testing. Checker/diffcheckPASS.
 Lokalny commit bezpush; M2 ACTIVE, zero productionpromotion.
+
+
+### EXP48 — prerejestracja: coarseB3subset i koszt przed pełnym replay
+
+Poprzedni goalturn PROGRESS: commit5dbb3f2 fineB4nearcontrolPASS, polaFAIL.
+Teraz nowy explicit--near-side coarse wybiera savedPMCHWTB3currents i cached
+coarse_E/Hq12 na tych samychdegree5points. FineB4niezmienione, zeroassembly/solve.
+Najpierw32targets(samefine q12/q16biasedselection +span), nie normafullvolume.
+Nativecachedq12control3points<1e-12, adaptive6/8 i selectionradius2/4 E/H<1e-6,
+zeroexhaustion. Zapiszold_q12vs corrected; old_q16=None bo brakcoarseq16cache.
+Prądów/kandydataniezmieniać. Pomiar czasu/leaves przedall2240,deadline120s.
+85unitPASS.6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-coarse-subset-20261019 --physics near-correction --level 2 --near-side coarse --volume-inputs artifacts/m2-transmission-volume-degree5-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Przyfailzdiagnozowaćcache/side/normalization, bez zmianyprogów. Niepromować.
+
+
+EXP48 coarse32pilot execution/correctionPASS9,268s/RSS216MB/noOOM. Nativeq12
+vs rebuiltE/H3,83e-15/5,04e-15, adaptive6/8~1,4e-12,cutoff2/4~3,7e-14,
+zeroexhaustion. Coarseoldq12→correctedE/H2,0627/2,2191% na biasedsubset;
+niepełnanorma. q6r2 .874s/10104leaves,q8r2 .950s/10104,q8r4 1,437s/13854.
+Rootstaty i weightedq12delta niezależnie przeliczone. Oldq16None zgodnie z cache.
+
+### EXP49 — prerejestracja: all2240coarseB3 i porównanie ze skorygowanymB4
+
+Zmienić tylko32→all, ten sam degree5/innyrefside już kontrolowany wEXP48.
+KandydatFEM2/BEM3 i oba PMCHWTcurrents pozostająniezmienne. Każdyadaptive6/8 i
+cutoff2/4globalE/H<1e-6,native3points<1e-12,zeroexhaustion. Dopiero po pełnym
+runie rootporówna coarse/fine corrected na identycznychpointach/weights.
+Prognoza~155–180s z pilotem i biasem; cap6GiB4CPU/tmpfs/noaddedSwap,deadline180s
+bez przedłużania. Zeroassembly/solve/GPU/cloud/build. Dokładnyargv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-volume-b3-20261019 --physics near-correction --level 2 --near-count 0 --near-side coarse --volume-inputs artifacts/m2-transmission-volume-degree5-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180`.
+Nadal niepromowaćM2/FEM–BEM; field/volume-rule/mesh controls dopiero rozstrzygane.
+
+
+EXP49 terminalny TIMEOUT 180 s, exit255, RunningFalse/OOMKilledFalse.
+Ostatni etap q8/r4:1950/2240 punktów przy179,338s; brak case.json i pełnych pól.
+Czasy z logów: nativecontrol4,987s; q6/r2 pełne44,564s; q8/r2 pełne48,028s;
+q8/r4 częściowe81,759s. Nie jest to wynik jakościowy ani powód przedłużenia limitu.
+
+### EXP50 — prerejestracja: cached Numba tych samych całek
+
+Poprzedni turn odpowiedział na pytanie o UVM i sprawdził stan; NO PROGRESS
+w implementacji. Następna bezpieczna akcja to kontrola gotowego JIT, nie restart EXP49.
+Nowy opcjonalny backend numba FP64/complex128, bez fastmath; bounded DFS,
+te same całki i kolejność dzieci, cache kodu /jit-cache, dane robocze RAM.
+Default NumPy bez zmian. 88 unit PASS w pinned env; testy stubnjit nie dowodzą
+kompilacji LLVM. Teraz rzeczywisty mały control: native/operator i NumPy/JIT<1e-12,
+adaptiveq6/q8<1e-6, solid-angle abs<1e-8, zero depth exhaustion, podpis nopython.
+Osobno czas compile/load i ciepłych kerneli. 6GiB/4CPU/tmpfs/noaddedSwap,
+120s, bez GPU/chmury/Palace rebuild. Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-numba-control-20261019 --physics near-control --level 1 --near-backend numba --seconds 120`.
+Tylko po PASS rozważyć pełny coarse replay z nowym backendem. M2 ACTIVE.
+
+EXP50 PASS exit0/noOOM16,184s runner,14,873s case,RSS296MB. Actualnopython
+signature,compile/load1,337s. JITvsNumPyregular<=4,11e-16/adaptive<=1,05e-15,
+native<=1,92e-15,static1,929e-12,zerohits. Warmq8ratio2 .0103s vsNumPy.2093s;
+ratio4 .0390s vs.8492s: microkernel~20x, not solver/antenna speedup.
+Root terminal/sourceSHA/gates audit: artifacts/m2-near-numba-root-analysis-20261019.json.
+
+### EXP51 — prerejestracja: pełny coarse replay z kontrolowanym JIT
+
+Nowa hipoteza względem EXP49TIMEOUT: tylko backendNumPy→Numba, identyczne
+2240point/weights/currents/FP64complex128/q6q8/radii2,4. Nativecontrol<1e-12,
+adaptive/cutoffE/H<1e-6,zeroexhaustion. Porównać32savedsubsetEXP48 i pełny
+fineB4EXP47; żadnej zmianyprogów. 180s/6GiB4CPU/tmpfs/noaddedSwap/noGPU/cloud/build.
+Dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-volume-b3-numba-20261019 --physics near-correction --level 2 --near-count 0 --near-side coarse --near-backend numba --volume-inputs artifacts/m2-transmission-volume-degree5-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 180`.
+
+EXP51 PASS exit0/noOOM18,089s/RSS217MB,all2240points. CoarsecorrectedE/H
+2,8260/1,7906%FAIL1%; native<=5,19e-15,adaptive<=1,44e-12,cutoff<=2,85e-14.
+Zeroexhaustion. Q6r2/q8r2/q8r4:2,151/3,183/6,850s vsNumPy44,564/48,028/partial81,759s.
+Paired32EXP48regression<3e-16. CorrectedB3→B4E/H1,6474/0,7806%: mesh-reference
+stillnotconverged, nearquadraturewasnotsolecause. Rootanalysis artifact
+m2-near-coarse-full-root-analysis-20261019.json; sources/inputSHA/gates audited.
+
+### EXP52–53 — prerejestracja: degree2 reference replay
+
+Same saved FEM2coefficients and PMCHWTB3/B4currents; change only saved volume
+rule degree5→degree2(640positivepoints). Qualified NumBa backend, allpoints;
+first fineB4, then coarseB3. Nativecontrol<1e-12,adaptive/cutoff<1e-6,zerohits.
+Root compares correcteddegree2/5 whole-volume estimates AND reference change;
+no looser tolerances or new solve. 120s EACH/6GiB4CPU/tmpfs/noaddedSwap/noGPU/build.
+Exact argv52:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-degree2-b4-numba-20261019 --physics near-correction --level 2 --near-count 0 --near-side fine --near-backend numba --volume-inputs artifacts/m2-transmission-volume-degree2-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+Exact argv53 (only after52 terminal):
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-near-correction-degree2-b3-numba-20261019 --physics near-correction --level 2 --near-count 0 --near-side coarse --near-backend numba --volume-inputs artifacts/m2-transmission-volume-degree2-20261019 artifacts/m2-transmission-reference-b3-b4-20261019 --seconds 120`.
+
+EXP52/53 PASS exit0/noOOM7,981/9,165s,RSS217/216MB; all640points,
+native<=9,82e-15/adaptive/cutoff<=1,28e-12/zeroexhaustion. FineE/H2,15175/.86299%;
+coarse1,75728/.88825%; correctedreferencechange1,08557/.44227%FAIL0,3%.
+Degree5fine2,88847/1,61091%; error-estimate degree2→5 relativechange25,5/46,4%
+FAIL1e-6. Root verified weightedcomplexnorms/points/weights and terminal gates:
+artifacts/m2-near-volume-degree-root-analysis-20261019.json. Bothreference sides
+nearquadraturecontrolled, volume/reference discretization still notqualified.
+Next: controlled volume/reference convergence before FEMperturbation; no blindB5/q.
+Docs updated; no Palacechanges/build/GPU/cloud/productionpromotion. M2 ACTIVE.
+
+Walidacja końcowa:88unitPASS pinned/system74PASS14SKIP, docschecker i diffcheckPASS.
+Ta sama Luna wykonała read-only docs-garden: zgodność wyniku/kodu/scopePASS;
+wskazała trzy nieaktualne bieżące liczniki, root poprawił je i checkpoint/nextstep.
+Historyczne liczniki EXP zachowano. Lokalne źródła/cache, bezpush.

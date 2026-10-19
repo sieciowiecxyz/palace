@@ -34,7 +34,7 @@ def blend(values,rho):
     return values[1]+values[2]/rho,values[3]-rho*values[0]
 
 
-def correct(points,panels,epsilon,e,h,order,radius,stage):
+def correct(points,panels,epsilon,e,h,order,radius,stage,kernel=near):
     rho=np.sqrt(epsilon)
     regular=rule(12)
     adaptive=pairing.quadrature(order)
@@ -48,8 +48,8 @@ def correct(points,panels,epsilon,e,h,order,radius,stage):
         delta=np.zeros((4,3),complex)
         for index in selected:
             panel=panels[index]
-            old=near.integrate(point,panel,rho,*regular)
-            new,stats=near.adaptive(point,panel,rho,*adaptive,ratio=2.)
+            old=kernel.integrate(point,panel,rho,*regular)
+            new,stats=kernel.adaptive(point,panel,rho,*adaptive,ratio=2.)
             delta+=new-old
             leaves+=stats['leaves'];hits+=stats['depth_hits'];deepest=max(deepest,stats['max_depth'])
         de,dh=blend(delta,rho)
@@ -60,8 +60,11 @@ def correct(points,panels,epsilon,e,h,order,radius,stage):
                                 depth_hits=hits,max_depth=deepest,seconds=time.monotonic()-before)
 
 
-def run(level,output,candidate,reference,count=32):
+def run(level,output,candidate,reference,count=32,side='fine',backend='numpy'):
     begin=time.monotonic()
+    if backend=='numba':import maxwell_near_jit as kernel
+    elif backend=='numpy':kernel=near
+    else:raise ValueError('Unknown near-panel backend')
     def stage(name,**extra):
         row=dict(stage=name,elapsed_s=time.monotonic()-begin,**extra)
         (output/'progress.json').write_text(json.dumps(row)+'\n')
@@ -73,7 +76,8 @@ def run(level,output,candidate,reference,count=32):
     indices=select(scores,count)
     points,weights=data['points'][indices],data['weights'][indices]
     epsilon=case['epsilon_r']
-    ref_level=case['reference_surface_level']
+    if side not in ['fine','coarse']:raise ValueError('Reference side must be fine or coarse')
+    ref_level=case['reference_surface_level']-(side=='coarse')
     with np.load(reference/f'pmchwt-level{ref_level}.npz',allow_pickle=False) as current:
         if float(current['epsilon_r'])!=epsilon or int(current['level'])!=ref_level:raise ValueError('Current physics mismatch')
         t,h=current['electric_trace'],current['magnetic_trace']
@@ -83,40 +87,43 @@ def run(level,output,candidate,reference,count=32):
     control_indices=np.unique([0,len(points)-1,int(np.argmax(scores[indices]))])
     reconstructed_e,reconstructed_h=[],[]
     for index in control_indices:
-        values=sum((near.integrate(points[index],p,np.sqrt(epsilon),*rule(12)) for p in panels),np.zeros((4,3),complex))
+        values=sum((kernel.integrate(points[index],p,np.sqrt(epsilon),*rule(12)) for p in panels),np.zeros((4,3),complex))
         e,magnetic=blend(values,np.sqrt(epsilon))
         reconstructed_e.append(e);reconstructed_h.append(magnetic)
-    old_e,old_h=data['reference_q12_E'][indices],data['reference_q12_H'][indices]
+    base='reference_q12_' if side=='fine' else 'coarse_'
+    old_e,old_h=data[base+'E'][indices],data[base+'H'][indices]
     native_checks=dict(E=transmission.relative(np.asarray(reconstructed_e),old_e[control_indices]),
                        H=transmission.relative(np.asarray(reconstructed_h),old_h[control_indices]))
     if max(native_checks.values())>1e-12:raise ValueError('Saved-current panel reconstruction differs from native q12')
     stage('saved_current_native_q12_control_complete',points=len(control_indices))
-    e6,h6,s6=correct(points,panels,epsilon,old_e,old_h,6,2.,stage)
-    e8,h8,s8=correct(points,panels,epsilon,old_e,old_h,8,2.,stage)
-    e4,h4,s4=correct(points,panels,epsilon,old_e,old_h,8,4.,stage)
+    e6,h6,s6=correct(points,panels,epsilon,old_e,old_h,6,2.,stage,kernel)
+    e8,h8,s8=correct(points,panels,epsilon,old_e,old_h,8,2.,stage,kernel)
+    e4,h4,s4=correct(points,panels,epsilon,old_e,old_h,8,4.,stage,kernel)
     rel=lambda a,b:transmission.relative(a,b,weights)
     quadrature=dict(E=rel(e6,e8),H=rel(h6,h8))
     cutoff=dict(E=rel(e8,e4),H=rel(h8,h4))
-    change=dict(E=rel(data['reference_E'][indices],e4),H=rel(data['reference_H'][indices],h4))
+    change=dict(E=rel(data['reference_E'][indices],e4),H=rel(data['reference_H'][indices],h4)) if side=='fine' else None
     finite=bool(all(np.isfinite(x).all() for x in [e6,h6,e8,h8,e4,h4]))
     all_points=len(indices)==len(scores)
-    report=dict(scope=__doc__,level=level,epsilon_r=epsilon,source_volume_degree=case['volume_degree'],
+    report=dict(scope=__doc__,level=level,backend=backend,epsilon_r=epsilon,source_volume_degree=case['volume_degree'],reference_side=side,
+                selection_basis='Fine-reference q12/q16 disagreement plus spanning points; count0 uses all',
                 original_points=len(scores),selected_points=len(indices),reference_level=ref_level,
                 all_volume_points=all_points,
                 corrected_volume_estimate=dict(E=rel(data['coupled_E'][indices],e4),H=rel(data['coupled_H'][indices],h4)) if all_points else None,
                 native_q12_control=native_checks,adaptive_q6_vs8=quadrature,near_radius2_vs4=cutoff,
-                old_q16_vs_corrected=change,correction_stats=[s6,s8,s4],
+                old_q16_vs_corrected=change,old_q12_vs_corrected=dict(E=rel(old_e,e4),H=rel(old_h,h4)),correction_stats=[s6,s8,s4],
                 execution_passed=finite,analytic_target_passed=False,
                 correction_control_passed=bool(finite and max(quadrature.values())<1e-6 and max(cutoff.values())<1e-6
                                               and not any(s['depth_hits'] for s in [s6,s8,s4])),
                 elapsed_seconds=time.monotonic()-begin,max_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*1024,
                 target=dict(native_kernel=1e-12,adaptive_quadrature=1e-6,near_radius=1e-6),
                 limitations=['Subset is biased; full replay still requires volume-rule convergence and coarse-reference control',
-                             'Only fine-reference potentials corrected; coarse-reference convergence remains unqualified',
+                             'One reference side corrected per run; mesh and volume-rule comparisons remain separate',
                              'No change to saved currents or FEM coefficients; no antenna promotion'])
-    np.savez(output/'correction-fields.npz',indices=indices,points=points,weights=weights,old_q16_E=data['reference_E'][indices],
-             old_q16_H=data['reference_H'][indices],corrected6_E=e6,corrected6_H=h6,corrected8_E=e8,corrected8_H=h8,
-             corrected_radius4_E=e4,corrected_radius4_H=h4)
+    arrays=dict(indices=indices,points=points,weights=weights,regular_q12_E=old_e,regular_q12_H=old_h,
+                corrected6_E=e6,corrected6_H=h6,corrected8_E=e8,corrected8_H=h8,corrected_radius4_E=e4,corrected_radius4_H=h4)
+    if side=='fine':arrays.update(old_q16_E=data['reference_E'][indices],old_q16_H=data['reference_H'][indices])
+    np.savez(output/'correction-fields.npz',**arrays)
     (output/'case.json').write_text(json.dumps(report,indent=2)+'\n')
     print(json.dumps(report),flush=True)
 
@@ -127,6 +134,8 @@ if __name__=='__main__':
     parser.add_argument('--candidate',type=Path,required=True)
     parser.add_argument('--reference',type=Path,required=True)
     parser.add_argument('--near-count',type=int,choices=[0,32],default=32,help='0 replays all saved points;32 is a bounded biased diagnostic')
+    parser.add_argument('--near-side',choices=['fine','coarse'],default='fine')
+    parser.add_argument('--near-backend',choices=['numpy','numba'],default='numpy')
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
-    run(args.level,args.output,args.candidate,args.reference,args.near_count)
+    run(args.level,args.output,args.candidate,args.reference,args.near_count,args.near_side,args.near_backend)

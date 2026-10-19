@@ -40,10 +40,16 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_near_backend_is_explicit_and_rejected_for_unrelated_cases(self):
+        with patch.object(oracle.dev,'require_host_memory') as check:
+            for physics,backend in [('pec','numba'),('volume','numba'),('near-control','invalid')]:
+                with self.assertRaises(ValueError):oracle.run(Path('/unused'),1,120,physics=physics,near_backend=backend)
+            check.assert_not_called()
+
     def test_near_control_stays_small_and_rejects_unused_input_flags(self):
         with patch.object(oracle.dev,'require_host_memory') as check:
             for level,options in [(2,{}),(1,dict(volume_inputs=['a','b'])),
-                    (1,dict(volume_degree=5)),(1,dict(surface_level=2)),(1,dict(epsilon_r=2.94)),(1,dict(near_count=0))]:
+                    (1,dict(volume_degree=5)),(1,dict(surface_level=2)),(1,dict(epsilon_r=2.94)),(1,dict(near_count=0)),(1,dict(near_side='coarse'))]:
                 with self.assertRaises(ValueError):oracle.run(Path('/unused'),level,120,physics='near-control',**options)
             check.assert_not_called()
             for options in [dict(),dict(volume_degree=5)]:

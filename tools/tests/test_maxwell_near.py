@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import sys
+import types
+from unittest.mock import patch
 
 AVAILABLE=importlib.util.find_spec('numpy') is not None
 if AVAILABLE:
@@ -8,10 +11,31 @@ if AVAILABLE:
     spec=importlib.util.spec_from_file_location('maxwell_near',Path(__file__).resolve().parents[1]/'experiments/maxwell_near.py')
     near=importlib.util.module_from_spec(spec)
     spec.loader.exec_module(near)
+    jit_spec=importlib.util.spec_from_file_location('maxwell_near_jit',Path(__file__).resolve().parents[1]/'experiments/maxwell_near_jit.py')
+    jit_python=importlib.util.module_from_spec(jit_spec)
+    stub=types.ModuleType('numba')
+    stub.njit=lambda **kwargs:lambda function:function
+    with patch.dict(sys.modules,{'numba':stub}):jit_spec.loader.exec_module(jit_python)
 
 
 @unittest.skipUnless(AVAILABLE,'Optional NumPy; pinned oracle includes it')
 class NearPanelTests(unittest.TestCase):
+    def test_explicit_jit_kernel_math_matches_numpy_without_compilation(self):
+        point=np.array([.23,.19,.15])
+        q=self.quadrature(4)
+        expected=near.integrate(point,self.panel(),1.7,*q)
+        actual=jit_python.integrate(point,self.panel(),1.7,*q)
+        np.testing.assert_allclose(actual,expected,rtol=1e-12,atol=1e-13)
+
+    def test_explicit_jit_tree_matches_numpy_with_bounded_stack(self):
+        point=np.array([.23,.19,.15])
+        q=self.quadrature(3)
+        expected,stats=near.adaptive(point,self.panel(),1.7,*q,ratio=2.,max_depth=2)
+        actual,other=jit_python.adaptive(point,self.panel(),1.7,*q,ratio=2.,max_depth=2)
+        np.testing.assert_allclose(actual,expected,rtol=1e-12,atol=1e-13)
+        self.assertEqual(stats,other)
+        self.assertGreater(stats['depth_hits'],0)
+
     @unittest.skipUnless(importlib.util.find_spec('scipy') is not None,'Optional SciPy; pinned oracle includes it')
     def test_independent_solid_angle_octant_orientation_and_scale(self):
         vertices=np.eye(3)

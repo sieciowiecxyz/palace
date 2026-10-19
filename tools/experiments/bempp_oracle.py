@@ -30,6 +30,7 @@ TRANSMISSION_CASE = dev.ROOT/'tools/experiments/bempp_transmission.py'
 VOLUME_CASE = dev.ROOT/'tools/experiments/bempp_volume.py'
 NEAR_CASE = dev.ROOT/'tools/experiments/bempp_near_control.py'
 NEAR_API = dev.ROOT/'tools/experiments/maxwell_near.py'
+NEAR_JIT_API = dev.ROOT/'tools/experiments/maxwell_near_jit.py'
 NEAR_CORRECTION_CASE = dev.ROOT/'tools/experiments/bempp_near_correction.py'
 ND_API = dev.ROOT/'tools/experiments/maxwell_nd.py'
 FEM_API = dev.ROOT/'tools/experiments/maxwell_fem.py'
@@ -199,7 +200,7 @@ def checked_volume_inputs(paths,level,candidate_physics='transmission'):
     return result
 
 
-def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False,volume_inputs=None,volume_degree=2,near_count=32,near_side='fine',near_backend='numpy'):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
@@ -224,6 +225,10 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
     if physics=='near-control' and level!=1:raise ValueError('Near-panel control is bounded at level1')
     if near_count not in [0,32] or (physics!='near-correction' and near_count!=32):
         raise ValueError('Near count0/all or32 applies only to near correction')
+    if near_side not in ['fine','coarse'] or (physics!='near-correction' and near_side!='fine'):
+        raise ValueError('Reference side fine/coarse applies only to near correction')
+    if near_backend not in ['numpy','numba'] or (physics not in ['near-control','near-correction'] and near_backend!='numpy'):
+        raise ValueError('Near backend numpy/numba applies only to near controls/correction')
     saved=checked_volume_inputs(volume_inputs,level,'volume' if physics=='near-correction' else 'transmission') if physics in ['volume','near-correction'] else None
     source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,
               'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE,'volume':VOLUME_CASE,'near-control':NEAR_CASE,'near-correction':NEAR_CORRECTION_CASE}[physics]
@@ -264,6 +269,7 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['-v',f'{ND_COUPLING_CASE}:/scripts/bempp_nd2_coupling.py:ro'] if nd_coupling_helper else []),
             *(['-v',f'{TRANSMISSION_CASE}:/scripts/bempp_transmission.py:ro'] if transmission_helper else []),
             *(['-v',f'{NEAR_API}:/scripts/maxwell_near.py:ro'] if near_helper else []),
+            *(['-v',f'{NEAR_JIT_API}:/scripts/maxwell_near_jit.py:ro'] if near_backend=='numba' else []),
             *([arg for role in ['candidate','reference'] for arg in ['-v',f'{saved[role]["path"]}:/{role}:ro']] if saved else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
             '-u','/scripts/case.py','--level',str(level),'--output','/work',
@@ -275,7 +281,8 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--reference-only'] if reference_only else []),
             *(['--candidate','/candidate','--reference','/reference'] if saved else []),
             *(['--volume-degree',str(volume_degree)] if physics=='volume' else []),
-            *(['--near-count',str(near_count)] if physics=='near-correction' else []),
+            *(['--near-count',str(near_count),'--near-side',near_side] if physics=='near-correction' else []),
+            *(['--near-backend',near_backend] if near_helper else []),
             *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
                                       physics=physics,duality=duality if physics=='nd2-coupling' else None,
@@ -287,6 +294,9 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
                                       near_api_sha256=dev.sha(NEAR_API) if near_helper else None,
                                       volume_inputs=saved,volume_degree=volume_degree if physics=='volume' else None,
                                       near_count=near_count if physics=='near-correction' else None,
+                                      near_side=near_side if physics=='near-correction' else None,
+                                      near_backend=near_backend if near_helper else None,
+                                      near_jit_api_sha256=dev.sha(NEAR_JIT_API) if near_backend=='numba' else None,
                                       case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
                                       native_cuda=cuda,
@@ -335,9 +345,11 @@ if __name__=='__main__':
     parser.add_argument('--volume-inputs',type=Path,nargs=2,metavar=('CANDIDATE','REFERENCE'))
     parser.add_argument('--volume-degree',type=int,choices=[2,5],default=2)
     parser.add_argument('--near-count',type=int,choices=[0,32],default=32)
+    parser.add_argument('--near-side',choices=['fine','coarse'],default='fine')
+    parser.add_argument('--near-backend',choices=['numpy','numba'],default='numpy')
     args = parser.parse_args()
     if args.action=='setup': setup()
     elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only,args.volume_inputs,args.volume_degree,args.near_count,args.near_side,args.near_backend)

@@ -36,7 +36,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP38–43, niezależny PMCHWT i replay całej objętości; centroidy zaniżały błąd, degree5/potentialquadrature FAIL. Następna hipoteza: korekcja tylko bliskich paneli.
 - [M2: potencjały bliskich paneli](maxwell-near-panels.md)
   - Czytaj gdy: kontrolujesz near-field reference lub odtwarzasz korekcję savedvolume
-  - Opis: EXP44–47 native/solid-angle/adaptive controls PASS, full B4 potential correction; pola2,888/1,611% nadal FAIL, bez promocji.
+  - Opis: EXP44–53 native/solid-angle/JIT controls PASS, korekcja B3/B4 i degree2/5; zbieżność/pola nadal FAIL, bez promocji.
 - [M1: diagnostyka i audyt anteny](optimization-baseline.md)
   - Czytaj gdy: oceniasz residuum lub opłacalność FEM–BEM
   - Opis: Kontrole coax i pól, audyt domen oraz historyczne runy anteny z disk basis oznaczone REJECT.

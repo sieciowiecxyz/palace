@@ -50,7 +50,7 @@ Pierwszy szybki test: `python3 tools/dev.py run coax-tiny artifacts/tiny-smoke -
 
 L2 pochodzi z MFEM ComputeL2Error, oddzielne real/imag, dwie kwadratury4/6. Testy parsera używają faktycznych jednostek CSV Wb/m² i sprawdzają, że błędny znak B/NaN nie przechodzą niezauważone. Diagnostyka CPU ma osobne czasy i nie jest włączona w rutynowym pomiarze szybkości.
 
-Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 85 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 71 PASS/14 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
+Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż jeden port dał użyteczne L2. Pełne tiny runy spełniły z góry ustalony filtr. Dokładne wyniki: [M1](optimization-baseline.md). Aktualna kontrola: 88 unittestów narzędzi PASS w przypiętym środowisku oracle (systemowy Python: 74 PASS/14 SKIP); pełna kampania testów C++ upstream nadal NOT RUN.
 
 ## Snapshoty i porównanie masowe
 
@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:85testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo71PASS/14SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:88testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo74PASS/14SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -90,7 +90,10 @@ complexblock i chunking/immutability; rzeczywiste MFEM/Bempp są w runach, nie w
 [EXP35–37](maxwell-trace-duality.md): trace hierarchy i obie dualności, independent BEM refinement oraz fixed-BEM FEM control; transparent E/H<1% na dwóch siatkach. Nowe regresje sprawdzają projekcję/q-order, parent lookup i odrzucanie niepoprawnych flag przed alokacją. Dielectric FEM transmission wykonany jako niezaliczony centroidscreening w EXP38–41; nie kwalifikacja całego pola.
 [EXP38–41](maxwell-transmission.md): eps1/2,94 coupled vs same-geometry PMCHWT, niezależne reference-only q/mesh calibration i bez powtarzania coupled solve. ScreeningFAIL zachowany; testy walidują eps/reference-only przed alokacją, weightedcomplexerror oraz płaską refinementB4/closededges/volume/outwardorientation.
 EXP42–43:80unitPASS obejmuje dokładność wszystkich jednomianów dodatnich reguł2/5 oraz inputstate/role/level/material/basis guards replay. Dwa realne bounded volume runy są executionPASS, qualityFAIL; root niezależnie przelicza wszystkie normy z NPZ. Korekcja paneli wykonana w EXP44–47 poniżej.
-[EXP44–47](maxwell-near-panels.md): nativeT/K i niezależny solid-angle control, ratio2/4, subset i full2240point fineB4correction. Adaptive/cutoffPASS, polescreenFAIL zachowany. Unit85: rotation/translation,childarea/depth/target guards,solidangleoctant/orientation/scale, CLI/fullreplay i inputgeometryrole safeguards. Brak coarsecorrection/volumeagreement qualification.
+[EXP44–47](maxwell-near-panels.md): nativeT/K i niezależny solid-angle control, ratio2/4, subset i full2240point fineB4correction. Adaptive/cutoffPASS, polescreenFAIL zachowany. Unit85: rotation/translation,childarea/depth/target guards,solidangleoctant/orientation/scale, CLI/fullreplay i inputgeometryrole safeguards. EXP48–53: coarsecorrection wykonane, volume/reference convergence nadal FAIL.
+NumBa actualnopython/native/NumPy parity wEXP50; EXP51–53 fullsavedreplay.
+88unit w pinned env obejmuje jawne pętle kernela/DFS, ale używa identitynjit
+w unitach: to nie test LLVM; dowód rzeczywistego JIT jest wyłącznie wEXP50.
 Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
 [oracle](maxwell-oracle.md). Palace nie był zmieniany/przebudowywany.
 
