@@ -66,8 +66,8 @@ Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego
 
 ## M2 — niezależny Maxwell
 
-Aktualny suite:74testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
-systemowo64PASS/10SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
+Aktualny suite:77testsPASS w `build/m2-oracle/venv/bin/python -m unittest discover -s tools/tests`;
+systemowo65PASS/12SKIP z brakuSciPy. Testy parowania obejmują kwadraturę
 trójkąta, rank/diagonalnąskalęGram i użycieobuDOFtransformwcałcefizycznej.
 Testy obejmują własne PEC/dielectricMie/optical theorem/Rayleigh/topologia,
 mount aliasu Python i complex H-matrix/coverage/exact overlapping support.
@@ -87,7 +87,8 @@ dielectricFEMtransmission aniantena. [EXP34](maxwell-nd2-coupling.md) wykonuje
 coupledND2/BC-RBC i sparseSchur: mortar/localmap/nativeT-K/tinydense/energyPASS,
 wholefieldFAIL17,74/15,22→10,07/5,64%. Dwa nowe unitSchur testują niezależny
 complexblock i chunking/immutability; rzeczywiste MFEM/Bempp są w runach, nie w mockach.
-[EXP35–37](maxwell-trace-duality.md): trace hierarchy i obie dualności, independent BEM refinement oraz fixed-BEM FEM control; transparent E/H<1% na dwóch siatkach. Nowe regresje sprawdzają projekcję/q-order, parent lookup i odrzucanie niepoprawnych flag przed alokacją. Dielectric FEM transmission nadal NOT RUN.
+[EXP35–37](maxwell-trace-duality.md): trace hierarchy i obie dualności, independent BEM refinement oraz fixed-BEM FEM control; transparent E/H<1% na dwóch siatkach. Nowe regresje sprawdzają projekcję/q-order, parent lookup i odrzucanie niepoprawnych flag przed alokacją. Dielectric FEM transmission wykonany jako niezaliczony centroidscreening w EXP38–41; nie kwalifikacja całego pola.
+[EXP38–41](maxwell-transmission.md): eps1/2,94 coupled vs same-geometry PMCHWT, niezależne reference-only q/mesh calibration i bez powtarzania coupled solve. ScreeningFAIL zachowany; testy walidują eps/reference-only przed alokacją, weightedcomplexerror oraz płaską refinementB4/closededges/volume/outwardorientation.
 Nie testowano pełnegoGPUsolveraanianteny nowym silnikiem. Źródła/limity w
 [oracle](maxwell-oracle.md). Palace nie był zmieniany/przebudowywany.
 

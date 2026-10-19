@@ -21,7 +21,8 @@ Aktualizacja: 2026-10-19. Mode: goal, Active: M2. [PLAN](PLAN.md), [MILESTONES](
 - EXP33: actualglobalMFEMND2/faceDOFtransforms/physicalbasis/CSR, Dirichletplane-waveE/H0,1505/0,3317%PASS na8936DOF/1280tet.5,514s/433MB/CSR8,79MB; interpolacjaH1,468%FAIL. BrakcoupledBEM/antenna speedup; docs/maxwell-nd2.md.
 - EXP34: actualND2/BC-RBCmortar/localbasisassembler/sparseSchurPASS, currentwholefieldFAIL17,74/15,22→10,07/5,64% mimo raw/far/energyPASS. NativeT/K≤1,22e−16, tinydenseSchur≤1,94e−14; brakpromocjianteny. docs/maxwell-nd2-coupling.md.
 - EXP35–37: duality/trace diagnostics i niezależny brzeg. Magnetic F2/B3 E/H0,560/0,751% PASS, F3/B3 0,358/0,904% PASS (H gorsze). Root source/SO/state/quality verification PASS; docs/maxwell-trace-duality.md. Dielectric transmission/rezonanse/scalable assembly/koszt pozostają otwarte.
-- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.74testsPASSwpinnedenv; systemowo64PASS/10SKIP(SciPy). Kod Palace/medium bez zmian.
+- EXP38–41: dielectric eps2,94 wykonany, centroidscreening FAIL E/H1,092/1,320% względem PMCHWTB4/q12. RefEchange0,408%>0,3%; potentialB4q8/q12<1e−6. Raw/far/energy małe nie kwalifikują pola. Zachowane NPZ do dalszej analizy bez solve; docs/maxwell-transmission.md.
+- Praca RAM/VRAM. FEMcap60GiB/guard6GiB; nowe małe oraclecap6GiB/noadditionalSwap, noOOM. Bezpaidcompute/closedapps; cachekompilacji osobno.77testsPASSwpinnedenv; systemowo65PASS/12SKIP(SciPy). Kod Palace/medium bez zmian.
 
 ## Rejestr eksperymentów
 
@@ -41,7 +42,7 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 ## Następny krok
 
 1. M1 zakończony:47tests/docs-garden/rootreviewPASS, normalpath6/6pola/rawPASS; zachować referencję i cachednative.
-2. M2: transparent ND2 coupling PASS w EXP35–37. Następne sprzężona transmisja eps=2,94 z niezależnym odniesieniem na tej samej geometrii, kontrola rezonansów i koszt przy zgodnym błędzie. Bez promocji anteny i bez płatnego compute; M2 pozostaje otwarty.
+2. M2: eps2,94 screening wykonany i FAIL w EXP38–41. Następne wspólna kontrola objętościowa z zachowanych rozwiązań oraz niezależna perturbacja FEM; bez powtarzania assembly dla postprocessingu i bez ślepego B5. Nadal potrzebne kwalifikacja transmisji/rezonanse/koszt. M2 otwarty, bez promocji i paidcompute.
 3. KierunekpóźniejszychoptymalizacjiFEM: zredukowaćworking set i ping-pong UVMfaktorów/workspace. NiepowtarzaćNVTX/captured-onlywariantów z ostrzeżeniami. NiepromowaćTCna podstawie FLOPspecs; obecnyprofil pokazujepresjępamięci i dominacjępreconditionera.
 
 ## Reguły pracy
@@ -584,3 +585,100 @@ poprawiono sprawdzanie stosowalnych hashy, bez zmiany progów fizycznych.
 Dokumentacja EXP35–37: docs-garden read-only tej samej Luny i root review PASS;
 74testsPASS w pinnedenv, system64PASS/10SKIP, checker/diffcheckPASS.
 Bez rebuilda Palace/deps, zmian medium i promocji; lokalny commit bez push.
+
+
+### EXP38 — prerejestracja: transmisja, niezależny PMCHWT na tym samym wielościanie
+
+Nowy izolowany bempp_transmission.py, bez zmian Palace/MFEM/medium. eps=1 najpierw
+sprawdza konwencję exp(-iwt), E=K*t+T*h/rho i H=K*h-rho*T*t przez porównanie
+z analityczną falą. Potem eps=2,94: FEM A=curlcurl-eps*M i ten sam zewnętrzny
+Calderon; niezależny PMCHWT ma dwa operatory wnętrza/zewnętrza oraz brak mortaru.
+Pierwotne źródło: pinned Bempp examples/maxwell/maxwell_dielectric.py i
+bempp_cl/api/operators/potential/maxwell.py (commit a1eaaef9...). Publiczne fetch
+przez web niedostępne; zweryfikowano istniejący przypięty lokalny checkout.
+Kontrola centroidów wszystkich tetra z wagami objętości to screening, NIE pełne
+L2 pól. Raport ma analytic_target_passed=false bez względu na screening, żeby
+nie zaliczyć M2 samymi próbkami. PMCHWT B1/B2 pozwala zmierzyć niepewność
+referencji; screening wymaga <1% probe error, <0,3% zmiany referencji, raw<1e-10,
+energy/pi<1e-3, farfield<1% (dla eps1 kontrola analityczna). Nie luzować K.
+
+Pierwszy dokładny argv:
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-transparent-f2-b2-20261019 --physics transmission --level 2 --surface-level 2 --epsilon-r 1 --seconds 180`.
+6GiB/4CPU, bez dodatkowego swap, temp/cwd tmpfs, bez GPU/płatnego compute.
+Niezmieniony cached MFEM SO. Unit76PASS; nowa walidacja eps/siatki przed alokacją
+oraz zespolonego weighted probe error. Jeśli znaki/reference nie przejdą,
+nie uruchamiać eps2,94 przed analizą; nie przechodzić doM3.
+
+
+EXP38: exit0/noOOM51,407s/RSS761MB, raw3,05e-14 ienergy/pi3,61e-7.
+ScreeningFAIL: coupled analytic centroidE/H0,6156/1,3266%, PMCHWT B2analytic
+E/H2,6213/2,6363%, refB1→B2change13,678/13,651%. Nie traktować tej referencji
+jako dokładnej. Przed eps2,94 oddzielić niedokładność prądów BEM od potencjałów.
+
+### EXP39 — prerejestracja: tylko referencja, bez powtarzania coupled solve
+
+Ten sam zestaw160tetcentroidów (FEMsampling2), PMCHWT B2/B3 i te same solved
+currents oceniane potential quadrature4/8. Nie zmieniać boundaryassembly q4,
+fizyki eps=1 ani punktów. Zmiana jednej kwadratury po solve rozdziela jej wpływ
+od zmiany siatki. Jeśli q4→8 mocno poprawi pole, trzeba osobno zakwalifikować
+kwadraturę; jeśli nie, dominuje błąd discretization/reference. Bez promocji.
+Zapis małych wyników pmchwt-level*.npz pozwoli uniknąć ponownego assembly przy
+następnej diagnostyce. To zwykły artefakt wyniku, nie roboczy offload solvera.
+
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-reference-q4-q8-20261019 --physics transmission --level 2 --surface-level 3 --epsilon-r 1 --reference-only --seconds 180`.
+6GiB/4CPU/tmpfs/noadditionalSwap, bezGPU/build/płatnego compute.
+
+
+EXP39: executionPASS34,290s/RSS456MB/noOOM. B2 q4E/H2,621/2,636%,
+q8 1,824/1,830%; B3 q4 0,216/0,217%, q8 0,158/0,158%. Oba czynniki
+siatka oraz potentialquadrature wpływają na pole. PMCHWT raw≤4,72e-15.
+Root sprawdził stany i błędy B3<0,3%; nie jest to globalL2 ani kwalifikacja
+transmisji. Użyj potentialq8 dla kolejnego porównania, boundaryassemblyq4 bez zmian.
+
+### EXP40 — prerejestracja: właściwy kontrast eps=2,94
+
+FEM2/BEM3, zmiana A=curlcurl-eps*M, zewnętrzny Calderon bez zmian. Independent
+PMCHWT na tym samym wielościanie, B2/B3 i potentialq8. Porównać kompleksowe
+E/H w160tetcentroidach oraz farfield i bilans energii. Raw<1e-10/mortar<1e-12;
+screen1% probes/far, refchange0,3%, energy/pi1e-3; pełneL2 i kwadratury nadal
+osobną bramką, analytic_target_passed=false. Nie promować tylko za zgodnośćS.
+Zapisz mały wynik coupled-solution i prądy PMCHWT do ponownej analizy bez solve.
+
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-eps294-f2-b3-20261019 --physics transmission --level 2 --surface-level 3 --epsilon-r 2.94 --seconds 180`.
+6GiB4CPU/tmpfs/noaddedSwap, bezGPU/cloud/build. Jeśli nieprzejdzie, ustalić czy
+referencja, FEM czy sprzężenie; bez ślepego podnoszenia obu siatek.
+
+
+EXP40: exit0/noOOM/executionPASS112,166s/RSS1,309GB. ScreeningFAIL: E/Hweighted
+centroids0,8851/1,3597%, farrelative0,1116%, raw5,14e-14, energy/pi1,02e-7.
+RefB2→B3E/H3,2015/1,9748% — referenceuncertainty ponad0,3%. Root independently
+recomputed complex probe differences from npz, positive volumeweights4pi/3 and
+state/helper/SO/current-case hashes in artifacts/m2-transmission-root-analysis-20261019.json.
+Nie przypisywać różnicy wyłącznie FEM i nie promować. Eksperyment nie kwalifikuje
+pełnegoL2/anteny. Zapisane rozwiązania nie wymagają ponownego coupled solve.
+
+### EXP41 — prerejestracja: zwiększyć tylko niezależną referencję
+
+Reference-only eps2,94, te same160centroidów, B3/B4, potentialq8/q12 na tych samych
+prądach. B4 uzyskane przez płaskie1→4 subdivisionB3, bez radialprojection; unit
+sprawdza1280tri/1920edges, closed2incidence, volume4pi/3 i outward normals/planes.
+Nie zmieniać FEM2/BEM3 kandydata, nie powtarzać jego assembly/solve. Po runie
+root porówna zachowane probes z nową referencją i sprawdzi jej zbieżność.
+Łączny PMCHWTB4ma3840currentDOF, denseblock235,93MB; limit6GiB/180s utrzymany.
+77unitPASS. To koszt jednego rozstrzygającego referencecheck, nie większy medium.
+
+`python3 tools/experiments/bempp_oracle.py run artifacts/m2-transmission-reference-b3-b4-20261019 --physics transmission --level 2 --surface-level 4 --epsilon-r 2.94 --reference-only --seconds 180`.
+BezFEMsolve/nativebuild/GPU/cloud/swap. Jeśli referencechange nadal>0,3%,
+raportować niezbieżność; nie luzować progu ani na ślepo zagęszczać doB5.
+
+
+EXP41: exit0/noOOM126,619s/RSS1,145GB. PMCHWTB4 3840DOF/235,93MBblock,
+raw8,39e-15; B3→B4E/Hreferencechange0,4076/0,1657%. B4q8→q12delta
+0,0000830/0,0000837% (<1e-6 względnie); potentialquadrature mały wpływ,
+referenceE nadal>0,3%screen. Root independentweightedcomparison zachowanych
+EXP40probes vs B4/q12: E/H1,0923/1,3205%FAIL1%, bez nowego coupled solve.
+Stan/SHA/helpery i błędy zweryfikowane w artifacts/m2-transmission-refinement-analysis-20261019.json.
+To centroiddiagnostic, nie globalL2 i nie measuredantenna memory/speedgain.
+77unitPASS w pinnedenv, system65PASS/12SKIP. Docs-garden read-only tej samej
+Luny, root review, checker i diffcheck PASS. Lokalny commit bez push.
+Bez rebuilda/deps/paidcompute/GPU. M2 ACTIVE, bez promocji solvera.

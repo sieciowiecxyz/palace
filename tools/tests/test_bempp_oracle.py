@@ -40,6 +40,22 @@ class PythonMountTests(unittest.TestCase):
 
 
 class NativeManifestTests(unittest.TestCase):
+    def test_transmission_options_rejected_before_host_allocation(self):
+        with patch.object(oracle.dev,'require_host_memory') as check:
+            for physics,level,surface,epsilon in [('pec',2,None,2.94),
+                    ('transmission',1,None,1.),('transmission',2,1,2.94),
+                    ('transmission',2,2,-1.),('transmission',2,2,float('nan'))]:
+                with self.assertRaises(ValueError):
+                    oracle.run(Path('/unused'),level,120,physics=physics,surface_level=surface,epsilon_r=epsilon)
+            check.assert_not_called()
+            for physics,epsilon in [('pec',1.),('transmission',None),('transmission',-1.)]:
+                with self.assertRaises(ValueError):
+                    oracle.run(Path('/unused'),2,120,physics=physics,epsilon_r=epsilon,reference_only=True)
+            check.assert_not_called()
+            with self.assertRaises(ValueError):
+                oracle.run(Path('/unused'),2,120,physics='transmission',surface_level=4,epsilon_r=2.94)
+            check.assert_not_called()
+
     def test_duality_option_rejected_before_running_an_unrelated_case(self):
         with patch.object(oracle.dev,'require_host_memory') as check:
             for physics in ['pec','traces','nd2']:

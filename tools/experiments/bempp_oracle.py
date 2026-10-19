@@ -26,6 +26,7 @@ PAIRING_CASE = dev.ROOT/'tools/experiments/bempp_pairing.py'
 ND2_CASE = dev.ROOT/'tools/experiments/mfem_nd2.py'
 ND_COUPLING_CASE = dev.ROOT/'tools/experiments/bempp_nd2_coupling.py'
 TRACE_CASE = dev.ROOT/'tools/experiments/bempp_trace_spaces.py'
+TRANSMISSION_CASE = dev.ROOT/'tools/experiments/bempp_transmission.py'
 ND_API = dev.ROOT/'tools/experiments/maxwell_nd.py'
 FEM_API = dev.ROOT/'tools/experiments/maxwell_fem.py'
 REFERENCE = dev.ROOT/'tools/maxwell_reference.py'
@@ -155,24 +156,31 @@ def python_mounts(env, base):
     return [arg for source,target in mounts for arg in ['-v',f'{source}:{target}:ro']]
 
 
-def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None):
+def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec',volume_preserving=False,duality='electric',surface_level=None,epsilon_r=None,reference_only=False):
     if level not in [1,2,3] or not 30<=seconds<=180:
         raise ValueError('Oracle requires level1..3, limit30..180s')
     if not 1<=eta<=4: raise ValueError('Compression eta must be in [1,4]')
-    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces'] or (physics!='pec' and (compression or native)):
+    if physics not in ['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission'] or (physics!='pec' and (compression or native)):
         raise ValueError('Only PEC supports the optional CUDA compression probe')
     if volume_preserving and physics!='dielectric': raise ValueError('Volume rule is an explicit dielectric mesh variant')
     if duality not in ['electric','magnetic'] or (duality!='electric' and physics!='nd2-coupling'):
         raise ValueError('Magnetic duality applies only to the ND2 coupling probe')
-    if surface_level is not None and (physics!='nd2-coupling' or not level<=surface_level<=3):
+    maximum_surface=4 if physics=='transmission' and reference_only else 3
+    if surface_level is not None and (physics not in ['nd2-coupling','transmission'] or not level<=surface_level<=maximum_surface):
         raise ValueError('Independent surface hierarchy must refine the ND2 coupling boundary')
+    if epsilon_r is not None and (physics!='transmission' or epsilon_r not in [1.,2.94]):
+        raise ValueError('Explicit epsilon applies only to the transmission screening case')
+    if physics=='transmission' and (level if surface_level is None else surface_level)<2:
+        raise ValueError('Transmission requires BEM level2 or3 for a reference hierarchy')
+    if reference_only and (physics!='transmission' or epsilon_r not in [1.,2.94]):
+        raise ValueError('Reference-only calibration requires explicit transmission epsilon1/2.94')
     source = {'pec':CASE,'dielectric':DIELECTRIC_CASE,'coupling':COUPLING_CASE,'pairing':PAIRING_CASE,
-              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE}[physics]
+              'nd2':ND2_CASE,'nd2-coupling':ND_COUPLING_CASE,'traces':TRACE_CASE,'transmission':TRANSMISSION_CASE}[physics]
     dev.require_host_memory()
     manifest = verified()
     if native and not compression: raise ValueError('--native-apply requires --compression')
     cuda = verified_cuda() if native else None
-    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling'] else None
+    bridge = mfem_bridge.verified() if physics in ['coupling','nd2','nd2-coupling','transmission'] else None
     output = Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     (BASE/'jit-cache').mkdir(exist_ok=True)
@@ -193,25 +201,31 @@ def run(output,level,seconds,compression=False,native=False,eta=2.0,physics='pec
             *(['--device','nvidia.com/gpu=all'] if compression else []),
             *(['-v',f'{CUDA_LIBRARY}:/native/libmaxwell_apply.so:ro'] if native else []),
             *(['-v',f'{mfem_bridge.LIBRARY}:/native/libmfem_bridge.so:ro'] if bridge else []),
-            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if physics in ['coupling','pairing','nd2','nd2-coupling','traces'] else []),
-            *(['-v',f'{ND_API}:/scripts/maxwell_nd.py:ro'] if physics in ['nd2','nd2-coupling'] else []),
-            *(['-v',f'{PAIRING_CASE}:/scripts/bempp_pairing.py:ro'] if physics in ['nd2-coupling','traces'] else []),
+            *(['-v',f'{FEM_API}:/scripts/maxwell_fem.py:ro'] if physics in ['coupling','pairing','nd2','nd2-coupling','traces','transmission'] else []),
+            *(['-v',f'{ND_API}:/scripts/maxwell_nd.py:ro'] if physics in ['nd2','nd2-coupling','transmission'] else []),
+            *(['-v',f'{PAIRING_CASE}:/scripts/bempp_pairing.py:ro'] if physics in ['nd2-coupling','traces','transmission'] else []),
+            *(['-v',f'{ND_COUPLING_CASE}:/scripts/bempp_nd2_coupling.py:ro'] if physics=='transmission' else []),
             '--entrypoint',str(ENV/'bin/python'),settings['runtime_image'],
             '-u','/scripts/case.py','--level',str(level),'--output','/work',
             *(['--compression'] if compression else []),*(['--native-apply'] if native else []),
             *(['--compression-eta',str(eta)] if physics=='pec' else []),
             *(['--duality',duality] if physics=='nd2-coupling' else []),
             *(['--surface-level',str(surface_level)] if surface_level is not None else []),
+            *(['--epsilon-r',str(2.94 if epsilon_r is None else epsilon_r)] if physics=='transmission' else []),
+            *(['--reference-only'] if reference_only else []),
             *(['--volume-preserving'] if volume_preserving else [])]
     dev.write(output/'command.json',dict(argv=args,environment=manifest,
                                       physics=physics,duality=duality if physics=='nd2-coupling' else None,
-                                      surface_level=(level if surface_level is None else surface_level) if physics=='nd2-coupling' else None,
+                                      surface_level=(level if surface_level is None else surface_level) if physics in ['nd2-coupling','transmission'] else None,
+                                      epsilon_r=(2.94 if epsilon_r is None else epsilon_r) if physics=='transmission' else None,
+                                      reference_only=reference_only,
+                                      coupling_api_sha256=dev.sha(ND_COUPLING_CASE) if physics=='transmission' else None,
                                       case_sha256=dev.sha(source),reference_sha256=dev.sha(REFERENCE),
                                       compression_sha256=dev.sha(COMPRESSION),
                                       native_cuda=cuda,
-                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if physics in ['coupling','pairing','nd2','nd2-coupling','traces'] else None,
-                                      nd_api_sha256=dev.sha(ND_API) if physics in ['nd2','nd2-coupling'] else None,
-                                      pairing_api_sha256=dev.sha(PAIRING_CASE) if physics in ['nd2-coupling','traces'] else None,
+                                      mfem_bridge=bridge,fem_api_sha256=dev.sha(FEM_API) if physics in ['coupling','pairing','nd2','nd2-coupling','traces','transmission'] else None,
+                                      nd_api_sha256=dev.sha(ND_API) if physics in ['nd2','nd2-coupling','transmission'] else None,
+                                      pairing_api_sha256=dev.sha(PAIRING_CASE) if physics in ['nd2-coupling','traces','transmission'] else None,
                                       scope='CPU Maxwell oracle, optional CUDA compressed apply; no antenna promotion'))
     started = time.monotonic()
     result = dict(complete=False,analytic_target_passed=False,level=level)
@@ -245,13 +259,15 @@ if __name__=='__main__':
     parser.add_argument('--compression',action='store_true',help='Probe exact-near/low-rank far Maxwell and CUDA apply')
     parser.add_argument('--native-apply',action='store_true',help='Compare a cached two-kernel FP64 CUDA apply')
     parser.add_argument('--compression-eta',type=float,default=2.0,help='Geometric admissibility only; fixed SVD/quality gates')
-    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces'],default='pec')
+    parser.add_argument('--physics',choices=['pec','dielectric','coupling','pairing','nd2','nd2-coupling','traces','transmission'],default='pec')
     parser.add_argument('--volume-preserving',action='store_true',help='Explicit dielectric sphere geometry variant, no field fit')
     parser.add_argument('--duality',choices=['electric','magnetic'],default='electric')
-    parser.add_argument('--surface-level',type=int,choices=[1,2,3])
+    parser.add_argument('--surface-level',type=int,choices=[1,2,3,4])
+    parser.add_argument('--epsilon-r',type=float,choices=[1.,2.94])
+    parser.add_argument('--reference-only',action='store_true')
     args = parser.parse_args()
     if args.action=='setup': setup()
     elif args.action=='build-cuda': build_cuda()
     elif args.action=='check': print(json.dumps(verified(),indent=2))
     elif args.output is None: parser.error('run requires new output directory')
-    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level)
+    else: run(args.output,args.level,args.seconds,args.compression,args.native_apply,args.compression_eta,args.physics,args.volume_preserving,args.duality,args.surface_level,args.epsilon_r,args.reference_only)

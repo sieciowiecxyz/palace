@@ -19,10 +19,43 @@ if AVAILABLE:
     coupling=importlib.util.module_from_spec(spec)
     with patch.dict(sys.modules,{'bempp_cl':package,'bempp_cl.api':api}):
         spec.loader.exec_module(coupling)
+    transmission_spec=importlib.util.spec_from_file_location('bempp_transmission',
+        Path(__file__).resolve().parents[1]/'experiments/bempp_transmission.py')
+    transmission=importlib.util.module_from_spec(transmission_spec)
+    with patch.dict(sys.modules,{'bempp_cl':package,'bempp_cl.api':api,'bempp_nd2_coupling':coupling}):
+        transmission_spec.loader.exec_module(transmission)
 
 
 @unittest.skipUnless(AVAILABLE,'Optional NumPy/SciPy; pinned oracle includes both')
 class ND2SchurTests(unittest.TestCase):
+    def test_reference_surface_refinement_preserves_planes_volume_and_orientation(self):
+        from collections import Counter
+        vertices,faces=transmission.surface_mesh(4)
+        self.assertEqual(len(faces),1280)
+        edges=Counter(tuple(sorted((int(a),int(b)))) for face in faces for a,b in zip(face,np.roll(face,-1)))
+        self.assertEqual(len(edges),1920)
+        self.assertEqual(set(edges.values()),{2})
+        a,b,c=vertices[faces].transpose(1,0,2)
+        self.assertAlmostEqual(float(np.einsum('ij,ij->',a,np.cross(b,c))/6),4*np.pi/3,places=12)
+        self.assertTrue(np.all(np.einsum('ij,ij->i',np.cross(b-a,c-a),(a+b+c)/3)>0))
+        base_vertices,base_faces=transmission.surface_mesh(1)
+        for face in base_faces:
+            triangle=base_vertices[face]
+            n=np.cross(triangle[1]-triangle[0],triangle[2]-triangle[0])
+            n/=np.linalg.norm(n)
+            self.assertLessEqual(float(np.max((vertices-triangle[0])@n)),1e-12)
+        with self.assertRaises(ValueError):transmission.surface_mesh(5)
+
+    def test_transmission_incident_phase_and_weighted_complex_error(self):
+        points=np.array([[0.,0.,0.],[.2,-.1,.7]])
+        electric,magnetic=transmission.incident(points)
+        np.testing.assert_allclose(electric[:,0],np.exp(1j*points[:,2]))
+        np.testing.assert_allclose(magnetic[:,1],electric[:,0])
+        self.assertEqual(np.count_nonzero(electric[:,1:]),0)
+        self.assertEqual(np.count_nonzero(magnetic[:,[0,2]]),0)
+        self.assertAlmostEqual(transmission.relative((1.+.2j)*electric,electric,np.array([.3,.7])),.2)
+        self.assertEqual(transmission.relative(electric,electric),0.)
+
     def test_nested_surface_parents_and_rejection_of_crossed_cells(self):
         def volume(level):
             vertices,tets,faces=coupling.fem.mesh(level)

@@ -25,7 +25,7 @@ Rozdzielono błąd reprezentacji powierzchniowej od błędu objętościowego:
 
 Źródło konwencji: przypięty Bempp-cl commit
 `a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0`,
-[`maxwell.py`](https://github.com/bempp/bempp-cl/blob/a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0/bempp/api/operators/boundary/maxwell.py).
+[`maxwell.py`](https://github.com/bempp/bempp-cl/blob/a1eaaef9f96b9dd3d7c56b076740e06852a6e1c0/bempp_cl/api/operators/boundary/maxwell.py).
 MFEM v4.9 release; źródłowego Git SHA zainstalowana biblioteka nie ujawnia.
 
 ## EXP35 — tani test reprezentacji śladu

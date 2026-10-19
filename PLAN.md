@@ -65,6 +65,7 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 - [x] EXP33: actualglobalMFEMND2/faceDOFs/physicalbasis/CSR i boundedDirichletplane-wavePASS0,151/0,332%E/H,5,514s/433MB. SamainterpolacjaH1,468%niezaliczona. DalejBC/RBCmortar/coupling, niezamknięcieM2. docs/maxwell-nd2.md.
 - [x] EXP34: actualND2/BC-RBCmortar i sparseSchur, nativeT/K/physicalmap/tinyfull/energyPASS. WholefieldFAIL17,74/15,22→10,07/5,64%, brakpromocji. Dalejniezależnaprzestrzeńbrzegowa/fixedFEM, nie ślepy matchedrefinement; docs/maxwell-nd2-coupling.md.
 - [x] EXP35–37: trace-space audit, paired magnetic/electric-dual, niezależny brzeg i kontrola FEM. Transparent ND2 PASS E/H0,560/0,751% (F2/B3); F3/B3 poprawia E, pogarsza H. Bez promocji anteny; docs/maxwell-trace-duality.md.
+- [x] EXP38–41: wykonano eps1/2,94 i niezależny PMCHWT na tej samej geometrii; rozdzielono siatkę i potentialquadrature. F2/B3 vs referenceB4 E/H1,092/1,320% centroidscreening FAIL; nie globalL2. Rozwiązania zachowane, docs/maxwell-transmission.md.
 - [ ] Zweryfikować sprzężoną transmisję dielektryczną i ryzyko rezonansów; nie utożsamiać osobnego PMCHWT/Mie z interfejsem FEM–BEM.
 - [ ] Zmierzyć setup+solve, macierz/kompresję/workspace i przewidywany koszt docelowej anteny; gęsta macierz BEM bez kompresji może przegrać.
 - [ ] Jeśli prototyp daje przewagę i poprawne pola/energię, przygotować izolowaną integrację operatora blokowego w Palace i porównać reprezentatywny case. Inaczej zapisać odrzucenie/ograniczenie; wynik Helmholtz nie kwalifikuje Maxwell.
