@@ -3,6 +3,9 @@
 
 #include "ams.hpp"
 
+#include <cstdlib>
+#include <string_view>
+
 #include "fem/bilinearform.hpp"
 #include "fem/fespace.hpp"
 #include "fem/integrator.hpp"
@@ -145,6 +148,22 @@ void HypreAmsSolver::InitializeSolver()
   HYPRE_AMSSetMaxIter(ams, ams_it);
   // HYPRE_AMSSetTol(ams, 1.0e-16);  // Avoid issues with zero RHS
 
+  const char *fixed_gpu = std::getenv("PALACE_AMS_FIXED_GPU");
+  if (fixed_gpu && std::string_view(fixed_gpu) == "1")
+  {
+    // Explicit fixed-cycle experiment: keep a stationary preconditioner for GMRES.
+    HYPRE_MemoryLocation memory;
+    HYPRE_ExecutionPolicy policy;
+    MFEM_VERIFY(HYPRE_GetMemoryLocation(&memory) == 0 &&
+                    HYPRE_GetExecutionPolicy(&policy) == 0 &&
+                    memory == HYPRE_MEMORY_DEVICE && policy == HYPRE_EXEC_DEVICE &&
+                    mfem::Device::Allows(mfem::Backend::CUDA_MASK),
+                "Fixed GPU AMS requires HYPRE device memory/execution and CUDA!");
+    MFEM_VERIFY(HYPRE_AMSSetTol(ams, 0.0) == 0, "Could not set fixed AMS cycles!");
+    Mpi::Print("PALACE_AMS_GPU_CONFIG: cycles={} tolerance=0 memory_device=1 execution_device=1\n",
+               ams_it);
+  }
+
   // Set this option when solving a curl-curl problem with zero mass term.
   if (ams_singular)
   {
@@ -209,6 +228,10 @@ void HypreAmsSolver::SetOperator(const Operator &op)
   MFEM_VERIFY(A, "HypreAmsSolver requires a HypreParMatrix operator!");
   height = A->Height();
   width = A->Width();
+  if (const char *fixed_gpu = std::getenv("PALACE_AMS_FIXED_GPU");
+      fixed_gpu && std::string_view(fixed_gpu) == "1")
+    Mpi::Print("PALACE_AMS_OPERATOR: dimension={} cycle_type={}\n", height, cycle_type);
+
 
   // From mfem::HypreAMS: Update HypreSolver base class.
   setup_called = 0;

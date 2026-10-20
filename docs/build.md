@@ -104,3 +104,11 @@ factor; infeasible oznacza przerwanie, nie automatyczne zwiększenie budżetu.
 256..16384MiB to zakres parsera, nie gwarancja dopasowania do wolnej pamięci.
 Nie łączyć CPU/hybridexecute/profiler. Obecnie niepromowany: większy budżet
 spowolnił W.3 mimo poprawnych pól. [Dane i ograniczenia](native-hybrid-memory.md).
+
+## Badawczy AMS — M5
+
+`--ams-cycles 2` wybiera istniejący realny shifted auxiliary PC i stałe cykle;
+właściwy complexMaxwell i medium pozostają. Nie łączyć native/complexcoarse,
+hybrid/CPU/Qpool/setupaudit/reuse. Wymagana rzeczywista HYPREdevicepolicy.
+Przetestowano2 z parserowego zakresu1..4; W3FAIL, więc brak promocji. Zwykły
+nativeFP64fallback zachowany. [Ocena i ograniczenia](ams-assessment.md).

@@ -34,6 +34,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M5: hybrid cuDSS](native-hybrid-memory.md)
   - Czytaj gdy: oceniasz actual hybrid memory lub wracasz do odrzuconego budżetu GPU
   - Opis: API i W.3P2 poprawne, ale4/6GiB bez net speedup; coarse2× szybciej, reszta PC wolniej. UVM fallback, actualminimum i granice pomiarów.
+- [M5: GPU AMS](ams-assessment.md)
+  - Czytaj gdy: oceniasz pozytywny pomocniczy PC zamiast25GB complex LU
+  - Opis: Tiny/medium i actualCUDA PASS, W3P2 deadlineFAIL; brak kwalifikacji anteny/memorysaving.
+- [M5.3: scaled mixed coarse](milestones/mixed-coarse-plan.md)
+  - Czytaj gdy: po AMS planujesz nową próbę FP32factors z FP64residual correction
+  - Opis: NOT RUN; manufactured ill-scaled probe przed nativeprototype, jawna ocena stationarity/FGMRES i brak blind-cast.
 - [M6.6: sweepy](milestones/sweeps.md)
   - Czytaj gdy: po M5 planujesz wiele częstotliwości z reuse/PROM/recycling
   - Opis: Cel3,3–3,9GHz/oba porty; kontrola całego kosztu, pamięci i błędu bez ślepego reuse faktorów.

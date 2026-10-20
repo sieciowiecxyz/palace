@@ -612,6 +612,31 @@ def port_setup_audit(log, config, reuse=False):
                 csr_fingerprints=hashes, setup_seconds=[dict(analysis=float(a),factor=float(f)) for a,f in phases])
 
 
+def validate_ams(cycles, *incompatible):
+    if cycles is not None and (not isinstance(cycles, int) or isinstance(cycles, bool)
+            or not 1 <= cycles <= 4 or any(v is not None and v is not False for v in incompatible)):
+        raise ValueError('AMS requires fixed integer cycles 1..4, GPU and no native/complex coarse, hybrid, Q-pool or setup reuse/audit')
+
+
+def ams_config(config, cycles):
+    validate_ams(cycles)
+    if cycles is None:
+        raise ValueError('Explicit AMS cycles required')
+    config = json.loads(json.dumps(config))
+    config['Solver']['Linear'].update(Type='AMS', PCMatReal=True, PCMatShifted=True,
+        ComplexCoarseSolve=False, AMSMaxIts=cycles, AMSSingularOperator=False,
+        AMGAggressiveCoarsening=False, MGCycleIts=1)
+    return config
+
+
+def ams_applied(log, cycles, solves):
+    configs = re.findall(r'PALACE_AMS_GPU_CONFIG: cycles=(\d+) tolerance=0 memory_device=1 execution_device=1', log)
+    operators = re.findall(r'PALACE_AMS_OPERATOR: dimension=(\d+) cycle_type=(\d+)', log)
+    return (solves > 0 and configs == [str(cycles)]*solves and len(operators) == solves
+            and all(int(dim) > 0 and int(cycle) in [1, 14] for dim, cycle in operators)
+            and 'PALACE_NATIVE_COMPLEX_COARSE:' not in log and 'CUDSS_MEMORY:' not in log)
+
+
 def validate_native_hybrid(mib, native, cpu, profile):
     if mib is None:
         return
@@ -667,7 +692,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
-        release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None):
+        release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None):
+    validate_ams(ams_cycles, native_complex_coarse, complex_coarse, cpu_reference, cudss_hybrid_mib,
+                 ceed_qpool, setup_audit, port_setup_reuse)
     if direct_basis and basis != 'fp32':
         raise ValueError('Direct basis requires FP32 storage')
     if basis_prefetch and (basis != 'fp32' or not direct_basis or cpu_reference):
@@ -705,6 +732,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
                                bool(initial_fields), linear_tol, cpu_reference, complex_coarse,
                                native_complex_coarse, coax_sweep, coax_frequency)
+    if ams_cycles is not None:
+        config = ams_config(config, ams_cycles)
     config = port_batch_config(config, both_ports, port_setup_reuse, excitation)
     if release_postprocess_energy and (len(expected_field_files(config)) < 4 or config['Solver']['Driven'].get('Save')
             or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0):
@@ -749,6 +778,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
     if cudss_hybrid_mib is not None:
         flags['PALACE_CUDSS_HYBRID_MIB'] = str(cudss_hybrid_mib)
+    if ams_cycles is not None:
+        flags['PALACE_AMS_FIXED_GPU'] = '1'
     if phase_trace:
         flags['PALACE_PHASE_TRACE'] = '1'
     if hypre_pool_mib is not None:
@@ -807,6 +838,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_RELEASE_FINAL_SOLVER',
             '--unsetenv', 'PALACE_LINE_BUFFERED_LOG',
             '--unsetenv', 'PALACE_CUDSS_HYBRID_EXECUTE', '--unsetenv', 'PALACE_CUDSS_HYBRID_MIB',
+            '--unsetenv', 'PALACE_AMS_FIXED_GPU',
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_KRYLOV_PROFILE',
@@ -924,6 +956,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             write(output/'port-setup-audit.json',audit)
             status['port_setup_audit_passed'] = audit['passed']
             status['complete'] = status['complete'] and audit['passed']
+        if ams_cycles is not None:
+            status['ams_fixed_gpu_config_applied'] = ams_applied(
+                (output/'palace.log').read_text(), ams_cycles, status['expected_solves'])
+            if not profile:
+                status['complete'] = status['complete'] and status['ams_fixed_gpu_config_applied']
         if cudss_hybrid_mib is not None:
             expected_builds = 1 if port_setup_reuse else status['expected_solves']
             status['native_hybrid_applied'] = native_hybrid_applied(
@@ -1038,6 +1075,7 @@ def main():
     r.add_argument('--both-ports', action='store_true', help='Excite both existing lumped ports separately, preserving geometry and terminations')
     r.add_argument('--excitation', type=int, help='Solve only one existing lumped port index, preserving physical terminations')
     r.add_argument('--partial-initial-fields', action='store_true', help='Allow verified initial snapshot for a subset of requested excitations; others start at zero')
+    r.add_argument('--ams-cycles', type=int, help='Experimental fixed 1..4 AMS coarse cycles on a real shifted positive auxiliary PC; physical A unchanged')
     r.add_argument('--cudss-hybrid-mib', type=int, help='Experimental native FP64 cuDSS host/device memory budget; query actual minimum before factorization')
     r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
     r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
@@ -1101,7 +1139,7 @@ def main():
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
-            args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib)
+            args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

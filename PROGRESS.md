@@ -14,7 +14,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 - Wholefields/S/VSWR/power/energy PASS, W.2 trzyfreq/oba porty i tiny normalpathPASS. EXP92 OOM i EXP93 inline-reference OOM pozostają FAIL. Receipt artifacts/m4-deferred-antenna-root-analysis-20261020.json; dowody docs/milestones/M4.md.
 - Regresje124PASS, cachedbuild9,215s, zachowane native/cache i fallback build/m4-reuse/pre-exp94-native. Gorące dane RAM/VRAM; SSDpolicy w PLAN. Bez płatnego compute/zamykania aplikacji.
 - M5/EXP95–96: hybrid cuDSS API/tiny/medium/W.3P2 PASS, ale REJECT jako net speedup: UVM350,371s vs4GiB363,872s/6GiB511,069s. Coarse około2× szybciej, pozostały PC wolniej; nowy profil potrzebny do dowodu przyczyny. DefaultUVM/fallback zachowane.
-- Następny krok: M5 źródłowy audyt AMS/iterative coarse i polityki pamięci faz, bez dalszego losowego hybridbudgettuning. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria dodane na prośbę użytkownika, NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
+- EXP97 AMS: tiny/mediumquality i CUDAprofilePASS, W3P2deadline900sFAIL (iter264/recurrence1,501e−3, brak rawfinal/pól); REJECT obecnegoC2. Partialcgroup29,32GB nie kwalifikuje oszczędności anteny.
+- Następny krok: M5.3 scaled nativecomplexFP32/fixed FP64correction, najpierw mały known-solution i ill-scaled probe (NOT RUN). Brak kolejnych losowych hybridbudget/AMSfull retries. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria dodane na prośbę użytkownika, NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
 
 ## Historyczny skrót M1/M2
 
@@ -2172,3 +2173,78 @@ order, nativebudgetguard, mandatoryapplied/cleanupmarkers andoriginalequation
 field/S/energy receipts. Currentnativeverified sourcehash
 f156542d507a69bf07ddc3b742b0d52f852ab745b2ffff22103fc17ed2498298.
 No livePalaceruncontainers. Localcommit/no push(publicupstreamonly). Goal/M5active.
+
+## EXP97 — shifted real auxiliary AMS on GPU (2026-10-21)
+Previousgoalturn: progress (hybrid actualW3+assessment andcommit1f8b629). M5 active.
+Sourceaudit ksp.cpp chooses HypreAmsSolver oncoarsep1, geometricMG onfinep2.
+spaceoperator.cpp realPC path uses K+omega*sigma+abs(omega²)*abs(eps) plus
+positiveport/absorbingboundary terms; physicalcomplexA=K+iomegaC−omega²M
+unchanged. ExplicitPCMatReal/PCMatShifted true/ComplexCoarseSolvefalse,
+AMSSingularfalse,2fixedAMScycles,MGCycleIts1. NotCG onindefinitefullA.
+Fixed HYPRE_AMSSetTol0 under opt-inPALACE_AMS_FIXED_GPU keepsstationarycycles
+forGMRES. Verify publicHYPRE_GetMemoryLocation/GetExecutionPolicy frompinned
+3.1.0header/CUDA_MASK; logconfiguration andactualoperator dimension. Configuration
+isnotactualkernelproof; laterboundedNsightwindowmustshowHYPRE CUDAkernels.
+Upstreamdocs checked2026-10-21 https://hypre.readthedocs.io/en/latest/solvers-ams.html
+and https://github.com/hypre-space/hypre/wiki/GPUs ;latestdocs3.2notclaimpinned3.1
+featureswithoutsource/APIcheck. GPUoptions existingams.cpp coarsen8/relax1.
+
+Hypothesis: remove25GBexactLU byusingcheapshiftedauxiliaryPC; extraouteriterations
+maynegatethesaving. SmallcoaxanalyticTEM/fields first, thenmedium355 andW3P2
+onlyifvalidandplausiblecost. Samegeometry/Tol1e−6/RIGHT/K64/directFP32basis,
+FP64physicaloperators/residual. No nativecoarse/hybrid/CPU/Qpool/reuseauditflags
+withAMS; formernativefallback build/m5-ams/pre-ams-native preserved. Newflag
+--ams-cycles1..4 optin/runtime, no defaultschange/dependencyrebuild. CachedAMS TU.
+Preregister tiny2cycles60s/twoparts/referenceM5tinycontrol, raw/S/VSWR/energy/
+wholefields/TEM frozenK. Stopfailure, no higheriterationtol ormeshrelaxation.
+No paidcompute/appsclosing/SSDworkspace/swap; cap60GiB/guard6GiB unchanged.
+
+EXP97 cachedbuild7,2s/no deps. TinyC2 numericalPASS23,8155s/244,239iterations,
+raw≤9,412e−7, wholeE3,15945e−5/B4,39199e−7, Sdelta1,8215e−8/energy9,871e−8,
+TEM<0,496%E/0,456%B. Configdevice/executionmarker andAMSdimension17146/cycle14
+present; noCUDSSalloc. RootCSVchecks independentlyPASS. Moreiterations than
+native39/42, tinytime~43%slower; no promotion. Managedpeak196373968B, cgroup786MB
+notcomparabletomultiGBantenna. NextpartialNsight0:2 validatesactualAMSGPUkernels
+(nonRFprofile,180slimit), thenmedium355bothports180s/previousqualifiedreference.
+Stoponfailure; iftimeoutretainincompleteplusiterationrate, notraiseTol/cap.
+
+EXP97 actualtinyNsight0:2 strictPASS/zerowarnings/clock+coverage+cleanstop;
+CoarseSolve6978CUDAkernels/14,894ms, HYPREspgemm/IVAXPY andcuSPARSESpMV kernels
+inmeasuredcoarsephase. Sourceactualcoarse=HypreAms; this isobservedCUDAwork,
+not100%GPUtime guarantee (CPUsetup/controlremains). profile deliberatelypartial,
+complete=false; noRFqualification fromtrace. Artifactm5-ams-tiny-profile-c2-20261021.
+Medium355twoportC2 PASS146,825s/433,397iter/raw≤9,992e−7/wholeE9,032e−6/
+B6,288e−7/TEM<0,494/0,457%; cgroup1822355456B/managed1841160104B.
+Fewerworkingbytes butslowerthanUVM101,893s; rootS/energychecksPASS.
+
+Next W3P2C2 fullfilter only: remove25GBLU andreducecomplexPC torealshifted
+mayavoidVRAMthrashing despite~9×iterationsoncoax. This is hypothesis, not
+predictedwin. Samephysicalmedium/RIGHT/K64/Tol/verifiedseed andW3P2reference.
+Artifactm5-ams-antenna-p2-c2-20261021,900s/60GiB/noswap/guard6GiB, stopfailure,
+no freshcontrolcostunlesscandidateactuallyfinishes. Morememory-efficientPareto
+result maymatterevenifnotspeedwin; a timeoutisnotqualifiedmemorysaving.
+
+EXP97 W3terminal901,727s/exit255/deadline900s/completefalse. Lastvisible264
+(restart4) KSPrecurrencenorm1,501266e−3, notverifiedfinalraw. No fieldcomparison,
+final/basisrelease; peakcgroup29319639040B observedonlyinpartialrun. Managed
+16110654486B islastmarkthroughsetup, notfinalpeak. Cudsslive0/nodevicefactors,
+AMSdimension2196005cycle14. Rootreceipt artifacts/m5-ams-root-analysis-20261021.json.
+REJECTexistingC2 forW3; tiny/medium remainnumericPASS, notwithdrawn. No further
+fullAMSC2runwithoutnewhypothesis. GPUkernelproof fromboundedtinycoarsephase,
+not100%GPUsetupclaim. FP64nativefallback intact.
+
+M5.3 nextplannedresearch basedonactualoldshim: oldFP32adapter convertsrealR64
+only; nativecomplexC64 notsupported. Newprototype mustbecomplexC32GENERAL,
+DAD/Db equilibration andoriginalFP64CSRresidual correction, strict dtype/control/
+stagnation/fallback. CoarseFP32alone isn'tclaimedstable; adaptivecorrection/PC
+requiresstationarityorFGMRES+Zbudgetassessment. docs/milestones/mixed-coarse-plan.md
+holds pre-integrationgate; NO FP32nativeprototype run yet. CurrentUVMfulltimer
+Amdahl:63,413/348,416=18,2%coarse→max~1,22×ifcoarsefree, notwholePCspeedup.
+AMS/hybrid assessmentcheckboxes updated only, M5stillACTIVE; FDTD/mixedprototype/
+M6sweeps/M7generalization+qualification remainpending. No goalcompletion.
+
+EXP97 finalvalidation129pinnedPASS/8shellPASS/currentnativeverified sourcehash
+db205b5d63d0746cba3c791af11e89bc87754e168bd0ae5ce6112943b6886c90.
+Root S/VSWR/power/energy andprofile/terminalscopechecksPASS forcompletedfilters.
+Read-onlyLuna docs-garden/diffcheck/checkerPASS,nodiscrepancies. No livePalace
+containers, fallbackunchanged, localcommitonly/no publicupstreampush. M5active.

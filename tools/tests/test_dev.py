@@ -12,6 +12,39 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_ams_changes_preconditioner_only_and_preserves_physics(self):
+        _, info, original = dev.fixture('coax-tiny')
+        build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}
+        changed = dev.ams_config(original, 2)
+        self.assertEqual(original['Solver']['Linear']['Type'], 'cuDSS')
+        self.assertEqual(changed['Solver']['Linear']['Type'], 'AMS')
+        for key in ['PCMatReal', 'PCMatShifted']:
+            self.assertIs(changed['Solver']['Linear'][key], True)
+        self.assertIs(changed['Solver']['Linear']['ComplexCoarseSolve'], False)
+        self.assertEqual(changed['Solver']['Linear']['AMSMaxIts'], 2)
+        for key in ['Tol', 'MaxIts', 'MaxSize', 'KSPType']:
+            self.assertEqual(original['Solver']['Linear'][key], changed['Solver']['Linear'][key])
+        self.assertEqual(dev.field_identity(changed, info, build), dev.field_identity(original, info, build))
+        dev.validate_ams(None, True)
+        dev.validate_ams(2, False, None)
+        for cycles in [0, 5, True, 2.0, '2']:
+            with self.assertRaisesRegex(ValueError, 'AMS'):
+                dev.validate_ams(cycles)
+        for option in [True, 256]:
+            with self.assertRaisesRegex(ValueError, 'AMS'):
+                dev.validate_ams(2, option)
+
+    def test_ams_audit_requires_fixed_device_policy_and_no_cudss(self):
+        cfg = 'PALACE_AMS_GPU_CONFIG: cycles=2 tolerance=0 memory_device=1 execution_device=1\n'
+        op = 'PALACE_AMS_OPERATOR: dimension=123 cycle_type=14\n'
+        self.assertTrue(dev.ams_applied(cfg+op+cfg+op, 2, 2))
+        for text in ['', cfg+op, cfg+op+op, (cfg+op)*3,
+                     (cfg+op)*2+'CUDSS_MEMORY:',
+                     (cfg+op).replace('memory_device=1', 'memory_device=0')*2,
+                     (cfg+op).replace('dimension=123', 'dimension=0')*2,
+                     (cfg+op).replace('cycles=2', 'cycles=1')*2]:
+            self.assertFalse(dev.ams_applied(text, 2, 2))
+
     def test_native_hybrid_guards_and_actual_configuration_coverage(self):
         dev.validate_native_hybrid(None, False, False, None)
         dev.validate_native_hybrid(256, True, False, None)

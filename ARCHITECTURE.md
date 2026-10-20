@@ -56,3 +56,8 @@ Nowy eksport ma `numerically_validated=false`. Historyczna kwalifikacja dotyczy 
   włącza host/device memory przedanalysis, jawny limit po MIN/estimates. CuDSS
   deviceworkspace nieUVM, reszta FEM UVM; runner weryfikuje actualconfig i cleanup.
   Badawcze/niepromowane, docs/native-hybrid-memory.md. Brak TF32/BF16 factors.
+
+- M5 `--ams-cycles`: opt-in realshiftedPC z istniejącym HypreAms/GMG, stały
+  AMS tol0, audyt HYPREdevicepolicy/operatorów. FullA niezmienione; profilepokazuje
+  CUDAkernelswcoarse, ale W3deadlineFAIL. docs/ams-assessment.md. ScaledcomplexFP32
+  z FP64correction jest osobnym niezrealizowanym planem, nie starym realnym shim.

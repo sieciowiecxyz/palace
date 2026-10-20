@@ -106,10 +106,10 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 
 ### M5 — tańszy preconditioner i wybór algorytmu
 
-- [ ] Sprawdzić w źródłach/aktualnej dokumentacji zgodność cuDSS hybrid memory, hybrid execute, UVM i MPI; przypiąć wersje.
-- [ ] Porównać dwa wykonalne budżety hybrid z UVM, po odczycie wymaganego minimum.
-- [ ] Zbadać AMS dla właściwego operatora pomocniczego; potwierdzić wykonanie na GPU.
-- [ ] FP32 faktory tylko z nową hipotezą: scaling, korekcja FP64, stagnacja i fallback. Jeśli potrzebny FGMRES, najpierw kompatybilność bazy i rachunek dodatkowych wektorów Z.
+- [x] Audyt cuDSS0.7.1.4 hybrid memory/execute/UVM/rank1, actualAPI i ograniczeń; docs/native-hybrid-memory.md.
+- [x] Dwa wykonalne budżety hybrid po odczycie minimum, W.3P2 vsUVM: numeryczniePASS/netperformanceREJECT, EXP96.
+- [x] AMS na realnym shifted pomocniczym PC, actualCUDAtracePASS; tiny/mediumqualityPASS, W3deadlineFAIL. Ocena EXP97, bez promocji.
+- [ ] FP32 faktory tylko z nową hipotezą: scaling, korekcja FP64, stagnacja i fallback. Jeśli potrzebny FGMRES, najpierw kompatybilność bazy i rachunek dodatkowych wektorów Z. Plan nowej hipotezy: docs/milestones/mixed-coarse-plan.md (NOT RUN).
 
 - [ ] Rozdzielić koszt PC na analizę, faktoryzację, apply, migracje i zmianę liczby iteracji; oszacować limit zysku pełnego zadania przed kolejnym prototypem.
 - [ ] M5.6 — research jednego konkurenta FDTD/CUDA (najpierw gprMax): koszt siatki/CFL/zaniku, porty i kilka częstotliwości z jednego przebiegu; mały test tylko po pozytywnej ocenie zasobów.

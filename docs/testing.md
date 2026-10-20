@@ -170,3 +170,11 @@ SamebuildUVMcontrol wymagany; spadek coarse kernelcost nie wystarcza do promocji
 bo całe zadanie4/6GiB wolniejsze. [Raport](native-hybrid-memory.md).
 Siedemfreqsweep/generalizacja nowej geometrii są dodanymi bramkami M6.6/M7.5,
 jeszcze NOT RUN; nie zmieniają kwalifikacji starszych artefaktów.
+
+## M5 AMS — EXP97
+
+Tiny/mediumC2 raw/fields/TEMPASS; source i testy pilnują PCMatReal/Shifted,
+niezmienionej fizyki/outertol, jawnych2cycles/tol0/devicepolicy i brakuCuDSS.
+Tinyprofile0:2 actualHYPRE/cuSPARSE CUDA wcoarsephase/strictPASS, umyślniepartial.
+AntenaW3P2deadline900sFAIL; nie ma końcowego residuum ani porównania pól.
+Nie podnosić deadline/Tol, by zmienić status. [Dane](ams-assessment.md).
