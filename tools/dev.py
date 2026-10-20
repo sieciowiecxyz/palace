@@ -612,6 +612,23 @@ def port_setup_audit(log, config, reuse=False):
                 csr_fingerprints=hashes, setup_seconds=[dict(analysis=float(a),factor=float(f)) for a,f in phases])
 
 
+def validate_native_hybrid(mib, native, cpu, profile):
+    if mib is None:
+        return
+    if (not isinstance(mib, int) or isinstance(mib, bool) or not 256 <= mib <= 16384
+            or not native or cpu or profile):
+        raise ValueError('Native hybrid requires integer MiB 256..16384, native complex FP64 coarse and no CPU/profile mode')
+
+
+def native_hybrid_applied(log, mib, builds):
+    matches = re.findall(r'PALACE_NATIVE_HYBRID: limit_bytes=(\d+) minimum_device_bytes=(\d+) estimated_host_bytes=(\d+)', log)
+    if builds < 1 or len(matches) != builds:
+        return False
+    return all(int(limit) == mib*1024**2 and 0 <= int(minimum) <= int(limit)
+               for limit, minimum, host in matches) and bool(re.search(
+                   r'CUDSS_MEMORY: precision=fp64 managed=0 peak_bytes=\d+ live_bytes=0 allocations=\d+', log))
+
+
 def validate_deferred_postprocessing(config, release_final_solver):
     boundaries = config['Boundaries']
     excitations = {int(p['Excitation']) for p in boundaries['LumpedPort'] if p.get('Excitation')}
@@ -650,7 +667,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
-        release_postprocess_energy=False, defer_postprocessing=False):
+        release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None):
     if direct_basis and basis != 'fp32':
         raise ValueError('Direct basis requires FP32 storage')
     if basis_prefetch and (basis != 'fp32' or not direct_basis or cpu_reference):
@@ -673,6 +690,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         phase_trace = True
     if basis not in ['fp32', 'fp64']:
         raise ValueError('Working data must remain in RAM/VRAM; disk basis was removed')
+    validate_native_hybrid(cudss_hybrid_mib, native_complex_coarse, cpu_reference, nsys_window)
     if native_complex_coarse and ((basis != 'fp64' and not (basis == 'fp32' and direct_basis)) or cpu_reference or ceed_qpool):
         raise ValueError('Native complex coarse requires FP64 or explicit direct FP32 basis, without CPU or Q-pool')
     if cpu_reference and (ceed_qpool or basis != 'fp64' or complex_coarse):
@@ -729,6 +747,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                       'OMP_NUM_THREADS': '8', 'OPENBLAS_NUM_THREADS': '1'})
     if native_complex_coarse:
         flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
+    if cudss_hybrid_mib is not None:
+        flags['PALACE_CUDSS_HYBRID_MIB'] = str(cudss_hybrid_mib)
     if phase_trace:
         flags['PALACE_PHASE_TRACE'] = '1'
     if hypre_pool_mib is not None:
@@ -904,6 +924,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             write(output/'port-setup-audit.json',audit)
             status['port_setup_audit_passed'] = audit['passed']
             status['complete'] = status['complete'] and audit['passed']
+        if cudss_hybrid_mib is not None:
+            expected_builds = 1 if port_setup_reuse else status['expected_solves']
+            status['native_hybrid_applied'] = native_hybrid_applied(
+                (output/'palace.log').read_text(), cudss_hybrid_mib, expected_builds)
+            status['complete'] = status['complete'] and status['native_hybrid_applied']
         if defer_postprocessing:
             status['deferred_postprocessing_applied'] = deferred_postprocessing_applied(
                 (output/'palace.log').read_text(), config)
@@ -1013,6 +1038,7 @@ def main():
     r.add_argument('--both-ports', action='store_true', help='Excite both existing lumped ports separately, preserving geometry and terminations')
     r.add_argument('--excitation', type=int, help='Solve only one existing lumped port index, preserving physical terminations')
     r.add_argument('--partial-initial-fields', action='store_true', help='Allow verified initial snapshot for a subset of requested excitations; others start at zero')
+    r.add_argument('--cudss-hybrid-mib', type=int, help='Experimental native FP64 cuDSS host/device memory budget; query actual minimum before factorization')
     r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
     r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
     r.add_argument('--coax-sweep', action='store_true', help='Keep fixture frequencies with coax fields/L2 diagnostics instead of selecting 3.55 GHz only')
@@ -1075,7 +1101,7 @@ def main():
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
-            args.release_postprocess_energy, args.defer_postprocessing)
+            args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

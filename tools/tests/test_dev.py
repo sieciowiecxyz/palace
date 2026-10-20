@@ -12,6 +12,23 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_native_hybrid_guards_and_actual_configuration_coverage(self):
+        dev.validate_native_hybrid(None, False, False, None)
+        dev.validate_native_hybrid(256, True, False, None)
+        for args in [(True, True, False, None), (255, True, False, None),
+                     (16385, True, False, None), (256, False, False, None),
+                     (256, True, True, None), (256, True, False, '0:2')]:
+            with self.assertRaisesRegex(ValueError, 'Native hybrid'):
+                dev.validate_native_hybrid(*args)
+        marker = 'PALACE_NATIVE_HYBRID: limit_bytes=268435456 minimum_device_bytes=123 estimated_host_bytes=456\n'
+        cleanup = 'CUDSS_MEMORY: precision=fp64 managed=0 peak_bytes=1024 live_bytes=0 allocations=1\n'
+        self.assertTrue(dev.native_hybrid_applied(marker+cleanup, 256, 1))
+        for text in [marker, cleanup, marker+marker+cleanup,
+                     marker+cleanup.replace('managed=0', 'managed=1'),
+                     marker+cleanup.replace('live_bytes=0', 'live_bytes=1'),
+                     marker.replace('minimum_device_bytes=123', 'minimum_device_bytes=268435457')+cleanup]:
+            self.assertFalse(dev.native_hybrid_applied(text, 256, 1))
+
     def test_deferred_postprocess_requires_safe_two_port_single_frequency_batch(self):
         _, _, config = dev.fixture('tshaped-medium')
         config = dev.port_batch_config(config, True)

@@ -10,6 +10,11 @@ Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po ref
 
 Skrócić czas do **wiarygodnego wyniku medium** i zmniejszyć pamięć na RTX 5070 Ti 16 GB + 96 GB RAM. Rozwijać Palace/MFEM/libCEED w C++/CUDA: UVM, cuDSS, mixed precision i Tensor Cores tam, gdzie pomiar uzasadnia ich użycie. FEM–BEM/MoM to obowiązkowy kierunek researchu i prototypowania. Aktualny cel obejmuje jedną kartę; multi-GPU pozostaje poza kryteriami ukończenia. Narzędzia pozostają małe, z cache i odtwarzalnym buildem.
 
+Priorytet użytkownika2026-10-21: optymalizacja pod tę konfigurację sprzętową,
+bez hardcodowania jednej geometrii PCB. Reflektory/directory i inne anteny mogą
+zmienić koszt oraz najlepszą politykę; uniwersalność algorytmu nie dowodzi zysku
+na każdej geometrii. Ocena sweepów M6.6 i dodatkowej geometrii M7.5 obowiązkowa.
+
 Wymagania i uzasadnienie: [speedup](docs/speedup.md). Kryteria: [MILESTONES](MILESTONES.md). Stan wznowienia i wyniki prób: [PROGRESS](PROGRESS.md). Reguły wykonania: [workflow](docs/workflow.md).
 
 Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szczytu pamięci roboczej. Historyczne 955,176 s to punkt odniesienia do odtworzenia w M1, a nie automatycznie baseline nowego buildu. Oddzielnie mierzyć VRAM, RAM, rozmiar alokacji i transfery; samo przeniesienie danych do RAM nie wystarcza. Szukać najlepszego zmierzonego kompromisu czas/pamięć/błąd/koszt; nie obiecywać globalnego optimum.
@@ -119,11 +124,15 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
 - [ ] Gdy profil wskazuje koszt ruchu pamięci/launches: ocenić fuzję własnych operatorów, batching real/imag i reuse lokalnych danych, także bez Tensor Cores; policzyć narzut i cały solve.
 
+- [ ] M6.6 — szybsze sweepy3,3–3,9GHz/oba porty: audyt existingPROM, continuation/warmstart, symbolic reuse i recycling; cały czas/pamięć/jakość vs niezależne solve. docs/milestones/sweeps.md.
+
 ### M7 — utrwalić najlepszy zaakceptowany wariant
 
 - [ ] Wykonać kwalifikację częstotliwości/portów według MILESTONES, trzy pomiary finalisty bez profilera.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.
 - [ ] Pakiet z manifestem, cache, jawnymi opcjami i blokadą niewspieranych kombinacji; odtworzyć przykład z pakietu.
+
+- [ ] M7.5 — co najmniej jedna istotnie zmodyfikowana geometria anteny (np. reflektor/director), nowy mesh/reference i te same K; brak geometry-specific hardcode. Raportować zmianę fizyki osobno od błędu przyspieszonego solvera.
 
 ## Oszczędzanie czasu i compute
 

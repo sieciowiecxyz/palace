@@ -31,6 +31,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M5: preconditioner](milestones/M5.md)
   - Czytaj gdy: wznawiasz aktywny etap PC i mixed precision
   - Opis: Punkt wyjścia EXP94, audyt istniejących trybów cuDSS/AMS oraz kolejność małych prób przed pełnym modelem.
+- [M5: hybrid cuDSS](native-hybrid-memory.md)
+  - Czytaj gdy: oceniasz actual hybrid memory lub wracasz do odrzuconego budżetu GPU
+  - Opis: API i W.3P2 poprawne, ale4/6GiB bez net speedup; coarse2× szybciej, reszta PC wolniej. UVM fallback, actualminimum i granice pomiarów.
+- [M6.6: sweepy](milestones/sweeps.md)
+  - Czytaj gdy: po M5 planujesz wiele częstotliwości z reuse/PROM/recycling
+  - Opis: Cel3,3–3,9GHz/oba porty; kontrola całego kosztu, pamięci i błędu bez ślepego reuse faktorów.
 - [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
   - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
   - Opis: Ocena kosztu siatki/CFL i wielu częstotliwości przed benchmarkiem; tylko przyspieszanie obliczeń, bez Rust/GUI/CAD.

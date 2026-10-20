@@ -51,3 +51,8 @@ Nowy eksport ma `numerically_validated=false`. Historyczna kwalifikacja dotyczy 
   a defer trzyma tylko pierwszy true-DOF E do pomiarów po `ksp.reset()`.
   DomainPostOperator reset/rebuild nie kasuje pól/CSV. Runner audytuje coverage,
   setup i kolejność; brak zmiany defaultów. Dowody/ograniczenia: docs/milestones/M4.md.
+
+- M5 `--cudss-hybrid-mib`: nativecomplex FP64 pozostaje GENERAL/GPU; adapter
+  włącza host/device memory przedanalysis, jawny limit po MIN/estimates. CuDSS
+  deviceworkspace nieUVM, reszta FEM UVM; runner weryfikuje actualconfig i cleanup.
+  Badawcze/niepromowane, docs/native-hybrid-memory.md. Brak TF32/BF16 factors.

@@ -9,6 +9,9 @@
 #include <cmath>
 #include <complex>
 #include <cstdio>
+#include <cstdlib>
+#include <cstdint>
+#include <string>
 #include <map>
 #include <stdexcept>
 #include <type_traits>
@@ -20,13 +23,14 @@ using Complex = std::complex<double>;
 using Clock = std::chrono::steady_clock;
 
 struct Allocation {
+  bool hybrid=false;
   std::atomic<size_t> live{0}, peak{0};
   static int alloc(void *ctx, void **p, size_t n, cudaStream_t) {
     *p=nullptr;
     if(!n) return 0;
-    auto error=cudaMallocManaged(p,n,cudaMemAttachGlobal);
-    if(error!=cudaSuccess) return 1;
     auto &self=*static_cast<Allocation *>(ctx);
+    auto error=self.hybrid?cudaMalloc(p,n):cudaMallocManaged(p,n,cudaMemAttachGlobal);
+    if(error!=cudaSuccess) return 1;
     size_t current=self.live.fetch_add(n)+n, previous=self.peak.load();
     while(previous<current && !self.peak.compare_exchange_weak(previous,current)) {}
     return 0;
@@ -62,7 +66,7 @@ std::vector<std::map<int,Complex>> matrix(int side, int update) {
   return rows;
 }
 
-template <typename T> void run_case(int side) {
+template <typename T> void run_case(int side, int hybrid_mib) {
   constexpr bool native=std::is_same<T,cuDoubleComplex>::value;
   const int n=side*side*side, dim=native?n:2*n, nrhs=2;
   auto source=matrix(side,0);
@@ -92,6 +96,9 @@ template <typename T> void run_case(int side) {
   std::copy(offsets.begin(),offsets.end(),ri.p);
   std::copy(columns.begin(),columns.end(),ci.p);
   Allocation allocation;
+  allocation.hybrid=hybrid_mib!=0;
+  int64_t minimum_device_bytes=0, estimated_host_bytes=0;
+  int64_t limit_bytes=int64_t(hybrid_mib)*1024*1024;
   cudssHandle_t handle; cudssConfig_t config; cudssData_t data; cudssMatrix_t a,b,x;
   DSS(cudssCreate(&handle));
   cudssDeviceMemHandler_t handler{};
@@ -99,6 +106,12 @@ template <typename T> void run_case(int side) {
   std::snprintf(handler.name,sizeof(handler.name),"probe RAM/VRAM");
   DSS(cudssSetDeviceMemHandler(handle,&handler));
   DSS(cudssConfigCreate(&config)); DSS(cudssDataCreate(handle,&data));
+  if(hybrid_mib) {
+    int mode=1;
+    DSS(cudssConfigSet(config,CUDSS_CONFIG_HYBRID_MODE,&mode,sizeof(mode)));
+    DSS(cudssConfigSet(config,CUDSS_CONFIG_HYBRID_DEVICE_MEMORY_LIMIT,&limit_bytes,sizeof(limit_bytes)));
+  }
+
   auto dtype=native?CUDA_C_64F:CUDA_R_64F;
   DSS(cudssMatrixCreateCsr(&a,dim,dim,values.size(),ri.p,nullptr,ci.p,av.p,
                          CUDA_R_32I,dtype,native?CUDSS_MTYPE_GENERAL:CUDSS_MTYPE_SYMMETRIC,
@@ -125,7 +138,21 @@ template <typename T> void run_case(int side) {
       else { bv.p[k*dim+i]=rhs[k*n+i].real(); bv.p[k*dim+i+n]=rhs[k*n+i].imag(); }
     }
     DSS(cudssMatrixSetValues(a,av.p)); DSS(cudssMatrixSetValues(b,bv.p)); DSS(cudssMatrixSetValues(x,xv.p));
-    if(!update) analysis_s=execute(CUDSS_PHASE_ANALYSIS);
+    if(!update) {
+      analysis_s=execute(CUDSS_PHASE_ANALYSIS);
+      if(hybrid_mib) {
+        size_t written=0;
+        DSS(cudssDataGet(handle,data,CUDSS_DATA_HYBRID_DEVICE_MEMORY_MIN,
+                        &minimum_device_bytes,sizeof(minimum_device_bytes),&written));
+        if(written!=sizeof(minimum_device_bytes) || minimum_device_bytes<0 || minimum_device_bytes>limit_bytes)
+          throw std::runtime_error("hybrid minimum exceeds explicit budget or invalid query");
+        int64_t estimates[16]{};
+        DSS(cudssDataGet(handle,data,CUDSS_DATA_MEMORY_ESTIMATES,estimates,sizeof(estimates),&written));
+        if(written<6*sizeof(int64_t) || estimates[5]<0)
+          throw std::runtime_error("invalid hybrid memory estimates");
+        estimated_host_bytes=estimates[5];
+      }
+    }
     factor_s+=execute(CUDSS_PHASE_FACTORIZATION);
     int info=0; size_t written=0;
     DSS(cudssDataGet(handle,data,CUDSS_DATA_INFO,&info,sizeof(info),&written));
@@ -150,13 +177,22 @@ template <typename T> void run_case(int side) {
   DSS(cudssMatrixDestroy(a)); DSS(cudssMatrixDestroy(b)); DSS(cudssMatrixDestroy(x));
   DSS(cudssDataDestroy(handle,data)); DSS(cudssConfigDestroy(config)); DSS(cudssDestroy(handle));
   bool passed=std::isfinite(error_max) && std::isfinite(residual_max) && error_max<=1e-10 && residual_max<=1e-10 && allocation.live==0;
-  std::printf("{\"mode\":\"%s\",\"n\":%d,\"dimension\":%d,\"nrhs\":2,\"updates\":2,\"relative_solution\":%.17g,\"relative_rhs_residual\":%.17g,\"cudss_peak_bytes\":%zu,\"cudss_live_after_destroy\":%zu,\"analysis_s\":%.9g,\"factor_s\":%.9g,\"solve_s\":%.9g,\"passed\":%s}\n",
-    native?"native_complex_fp64":"real_block_fp64",n,dim,error_max,residual_max,allocation.peak.load(),allocation.live.load(),analysis_s,factor_s,solve_s,passed?"true":"false");
+  std::printf("{\"mode\":\"%s\",\"n\":%d,\"dimension\":%d,\"nrhs\":2,\"updates\":2,\"relative_solution\":%.17g,\"relative_rhs_residual\":%.17g,\"cudss_peak_bytes\":%zu,\"cudss_live_after_destroy\":%zu,\"analysis_s\":%.9g,\"factor_s\":%.9g,\"solve_s\":%.9g,\"hybrid_limit_bytes\":%lld,\"minimum_device_bytes\":%lld,\"estimated_host_bytes\":%lld,\"passed\":%s}\n",
+    native?"native_complex_fp64":"real_block_fp64",n,dim,error_max,residual_max,allocation.peak.load(),allocation.live.load(),analysis_s,factor_s,solve_s,(long long)limit_bytes,(long long)minimum_device_bytes,(long long)estimated_host_bytes,passed?"true":"false");
   std::fflush(stdout);
   if(!passed) throw std::runtime_error("quality/cleanup failed");
 }
 
 int main() {
-  try { run_case<cuDoubleComplex>(8); run_case<double>(8); return 0; }
+  try {
+    int hybrid_mib=0;
+    if(const char *value=std::getenv("PALACE_PROBE_HYBRID_MIB")) {
+      char *end=nullptr; long parsed=std::strtol(value,&end,10);
+      if(!value[0] || *end || parsed<256 || parsed>16384)
+        throw std::runtime_error("invalid hybrid MiB budget");
+      hybrid_mib=int(parsed);
+    }
+    run_case<cuDoubleComplex>(8,hybrid_mib); run_case<double>(8,hybrid_mib); return 0;
+  }
   catch(const std::exception &error) { std::fprintf(stderr,"probe: %s\n",error.what()); return 1; }
 }

@@ -95,3 +95,12 @@ portów po zwolnieniu solvera. Wymaga dokładnie2LP/1f/rank1/fixedmesh/restart1,
 bez wizualizacji/wave/Floquet. Snapshoty kontrolne nadal normalnymi plikami.
 Każdy run zapisuje audyty, rawresidual i manifest; pełne argv w PROGRESS EXP94.
 To opcje runtime bez przebudowy; nie globalny default. [Zakres](milestones/M4.md).
+
+## Badawczy cuDSS hybrid memory — M5
+
+`--native-complex-coarse --cudss-hybrid-mib N` to jawny budżet urządzenia cuDSS;
+inne dane FEM nadal UVM. Query minimum po analysis, limit zweryfikowany przed
+factor; infeasible oznacza przerwanie, nie automatyczne zwiększenie budżetu.
+256..16384MiB to zakres parsera, nie gwarancja dopasowania do wolnej pamięci.
+Nie łączyć CPU/hybridexecute/profiler. Obecnie niepromowany: większy budżet
+spowolnił W.3 mimo poprawnych pól. [Dane i ograniczenia](native-hybrid-memory.md).

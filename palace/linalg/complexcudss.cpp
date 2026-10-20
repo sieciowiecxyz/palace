@@ -23,9 +23,9 @@ namespace palace
 namespace
 {
 
-void Check(cudssStatus_t status)
+void Check(cudssStatus_t status, const char *operation = "cuDSS API")
 {
-  MFEM_VERIFY(status == CUDSS_STATUS_SUCCESS, "Native complex cuDSS error: " << int(status));
+  MFEM_VERIFY(status == CUDSS_STATUS_SUCCESS, "Native complex cuDSS error in " << operation << ": " << int(status));
 }
 
 void Sync()
@@ -82,9 +82,8 @@ ComplexCuDSSSolver::ComplexCuDSSSolver(MPI_Comm comm, bool drop)
 {
   MFEM_VERIFY(Mpi::Size(comm) == 1 && mfem::Device::Allows(mfem::Backend::CUDA_MASK),
               "Native complex coarse requires one MPI rank and CUDA!");
-  MFEM_VERIFY(!Enabled("PALACE_CUDSS_FP32") && !Enabled("PALACE_CUDSS_HYBRID_EXECUTE") &&
-                  !std::getenv("PALACE_CUDSS_HYBRID_MIB"),
-              "Native complex coarse is FP64 GPU-only; no hybrid or FP32 adapter!");
+  MFEM_VERIFY(!Enabled("PALACE_CUDSS_FP32") && !Enabled("PALACE_CUDSS_HYBRID_EXECUTE"),
+              "Native complex coarse requires FP64 factors and GPU execution!");
 }
 
 ComplexCuDSSSolver::~ComplexCuDSSSolver() = default;
@@ -181,11 +180,42 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   Sync();
   const auto analysis_begin = std::chrono::steady_clock::now();
   Check(cudssExecute(impl->handle, CUDSS_PHASE_ANALYSIS, impl->config, impl->data,
-                    impl->matrix, impl->solution_matrix, impl->rhs_matrix));
+                    impl->matrix, impl->solution_matrix, impl->rhs_matrix), "analysis");
   if (audit) Sync();
+  if (std::getenv("PALACE_CUDSS_HYBRID_MIB"))
+  {
+    Sync();
+    int mode = 0;
+    const char *request = std::getenv("PALACE_CUDSS_HYBRID_MIB");
+    char *end = nullptr;
+    const long long mib = std::strtoll(request, &end, 10);
+    MFEM_VERIFY(request[0] && !*end && mib >= 256 && mib <= 16384, "Invalid hybrid MiB budget!");
+    int64_t limit = mib * 1024 * 1024, observed_limit = 0, minimum = 0, estimates[16]{};
+    size_t written = 0;
+    Check(cudssConfigGet(impl->config, CUDSS_CONFIG_HYBRID_MODE, &mode, sizeof(mode), &written));
+    MFEM_VERIFY(written == sizeof(mode) && mode == 1, "Hybrid memory adapter was not applied!");
+    Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_HYBRID_DEVICE_MEMORY_MIN,
+                      &minimum, sizeof(minimum), &written), "hybrid minimum query");
+    MFEM_VERIFY(written == sizeof(minimum) && minimum >= 0, "Invalid hybrid minimum query!");
+    Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_MEMORY_ESTIMATES,
+                      estimates, sizeof(estimates), &written), "hybrid estimates query");
+    MFEM_VERIFY(written >= 6 * sizeof(int64_t) && estimates[5] >= 0,
+                "Invalid hybrid host estimate!");
+    Mpi::Print("PALACE_NATIVE_HYBRID_REQUIREMENT: requested_bytes={} minimum_device_bytes={} estimated_host_bytes={}\n",
+               limit, minimum, estimates[5]);
+    MFEM_VERIFY(minimum <= limit, "Hybrid device minimum exceeds requested budget; not factorizing!");
+    Check(cudssConfigSet(impl->config, CUDSS_CONFIG_HYBRID_DEVICE_MEMORY_LIMIT,
+                         &limit, sizeof(limit)), "hybrid limit after analysis");
+    Check(cudssConfigGet(impl->config, CUDSS_CONFIG_HYBRID_DEVICE_MEMORY_LIMIT,
+                         &observed_limit, sizeof(observed_limit), &written));
+    MFEM_VERIFY(written == sizeof(observed_limit) && observed_limit == limit,
+                "Hybrid device budget was not applied!");
+    Mpi::Print("PALACE_NATIVE_HYBRID: limit_bytes={} minimum_device_bytes={} estimated_host_bytes={}\n",
+               observed_limit, minimum, estimates[5]);
+  }
   const auto factor_begin = std::chrono::steady_clock::now();
   Check(cudssExecute(impl->handle, CUDSS_PHASE_FACTORIZATION, impl->config, impl->data,
-                    impl->matrix, impl->solution_matrix, impl->rhs_matrix));
+                    impl->matrix, impl->solution_matrix, impl->rhs_matrix), "factorization");
   Sync();
   if (audit)
   {

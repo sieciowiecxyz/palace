@@ -56,7 +56,8 @@ def build():
         print(json.dumps(dev.read(manifest), indent=2))
 
 
-def parse_probe(text):
+def parse_probe(text, hybrid_mib=None):
+    validate_hybrid_mib(hybrid_mib)
     rows = [json.loads(line) for line in text.splitlines() if line.startswith('{')]
     if [r.get('mode') for r in rows] != ['native_complex_fp64', 'real_block_fp64']:
         raise ValueError('Missing or duplicated representation results')
@@ -65,6 +66,15 @@ def parse_probe(text):
                 or row.get('n') != 512 or row.get('cudss_live_after_destroy') != 0
                 or row.get('dimension') != (512 if row['mode']=='native_complex_fp64' else 1024)):
             raise ValueError('Unexpected case coverage or cleanup')
+        if row.get('hybrid_limit_bytes', 0) != (hybrid_mib or 0)*1024**2:
+            raise ValueError('Requested memory mode/budget was not applied')
+        if hybrid_mib is not None:
+            for key in ['minimum_device_bytes', 'estimated_host_bytes']:
+                value = row.get(key)
+                if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                    raise ValueError('Missing or invalid hybrid memory query')
+            if row['minimum_device_bytes'] > row['hybrid_limit_bytes']:
+                raise ValueError('Hybrid minimum exceeds device budget')
         for key in ['relative_solution', 'relative_rhs_residual']:
             value = row.get(key)
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or not 0 <= value <= 1e-10:
@@ -76,7 +86,13 @@ def parse_probe(text):
     return rows
 
 
-def run(output):
+def validate_hybrid_mib(value):
+    if value is not None and (not isinstance(value, int) or isinstance(value, bool) or not 256 <= value <= 16384):
+        raise ValueError('Hybrid MiB must be an integer from 256 to 16384')
+
+
+def run(output, hybrid_mib=None):
+    validate_hybrid_mib(hybrid_mib)
     dev.require_host_memory()
     manifest = dev.read(OUTPUT/'manifest.json')
     if manifest['recipe'] != recipe() or manifest['binary_sha256'] != dev.sha(OUTPUT/'probe'):
@@ -90,6 +106,11 @@ def run(output):
             '--stop-timeout', '3', '--memory', '2g', '--memory-swap', '2g', '--cpus', '2',
             '--device', 'nvidia.com/gpu=all', '--security-opt=label=disable', '--unsetenv', 'LD_PRELOAD',
             '-v', f'{OUTPUT / "probe"}:/probe:ro', '--entrypoint', '/probe', settings['runtime_image']]
+    # Isolated runtime: never inherit a memory policy from the container image.
+    environment = ['--unsetenv', 'PALACE_PROBE_HYBRID_MIB']
+    if hybrid_mib is not None:
+        environment += ['-e', 'PALACE_PROBE_HYBRID_MIB='+str(hybrid_mib)]
+    args[2:2] = environment
     dev.write(output/'command.json', {'argv': args, 'build': manifest})
     started = time.monotonic()
     result = {'complete': False, 'scope': 'Manufactured API/filter only; not antenna accuracy or speedup'}
@@ -101,7 +122,7 @@ def run(output):
         dev.write(output/'container-state.json', state)
         if process.returncode or state['OOMKilled']:
             raise ValueError('Probe execution failed')
-        result['cases'] = parse_probe((output/'stdout.log').read_text())
+        result['cases'] = parse_probe((output/'stdout.log').read_text(), hybrid_mib)
         result['complete'] = True
     finally:
         subprocess.run(['podman', 'rm', '--force', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -114,10 +135,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['build', 'run'])
     parser.add_argument('output', type=Path, nargs='?')
+    parser.add_argument('--hybrid-mib', type=int, help='Explicit cuDSS hybrid device budget; inputs remain managed, factor device allocations are not UVM')
     args = parser.parse_args()
     if args.action == 'build':
         build()
     elif args.output is None:
         parser.error('run requires a new artifact directory')
     else:
-        run(args.output)
+        run(args.output, args.hybrid_mib)

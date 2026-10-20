@@ -93,6 +93,8 @@ Wymaga M5.
 
 - M6.5: gdy uzasadnione profilem, oceniona fuzja/batching/reuse danych we własnych kernelach, również bez TC. Podany ruch pamięci/launches, dodatkowy workspace oraz jakość i czas całego zadania; sama poprawa mikrobenchmarku nie kwalifikuje promocji.
 
+- M6.6: ocenione przyspieszenie całego sweepu3,3/3,4/3,5/3,6/3,7/3,8/3,9GHz/oba porty. Audyt aktualnych Uniform/Adaptive/PROM, reuse setupu/symboliki, warm start/recycling; nie przenosić LU między różnymi A(f). Mały filtr przed pełnym benchmarkiem; K i punkty niewykorzystane do budowy PROM, rawresidual oryginalnego układu, dodatkowe wektory i pełny koszt offline/online/fallbacków. Decyzja promote/reject z pomiarem lub konkretną niewykonalnością, nie sama lista pomysłów. Szczegóły docs/milestones/sweeps.md.
+
 ## M7 - Finalista na jednej 5070 Ti do używania
 
 Wymaga M6.
@@ -101,3 +103,5 @@ Wymaga M6.
 - M7.2: trzy poprawne pomiary finalisty/referencji na tym samym sprzęcie, mediana/rozrzut, pamięć i jakość. Tabela Pareto uwzględnia czasy/koszt/VRAM/RAM; raport podaje osiągnięty zysk i lukę do ambicji ≥1,5×/≥25%, osobno VRAM/RAM i rozmiar danych.
 - M7.3: pakiet z manifestem i przypiętymi zależnościami odtwarza przykład; konfiguracja precision/memory/GPU jawna, niewspierane kombinacje odrzucane, cleanup i deadline sprawdzone.
 - M7.4: regresje adekwatne do zmian, docs-garden i przegląd końcowy; znane ograniczenia, źródła i wybrane ustawienia zapisane. Goal nie jest osiągnięty wyłącznie dlatego, że zakończono eksperymenty; musi istnieć zmierzona użyteczna poprawa na jednej RTX 5070 Ti oraz zakończona ocena prototypu FEM–BEM/MoM. Wynik TC może być uczciwie negatywny.
+
+- M7.5: generalizacja na co najmniej jednej istotnie zmodyfikowanej geometrii anteny (np. zmiana/dodanie reflektora lub directora), z nową zahashowaną siatką i referencją tej samej fizyki. Kandydat przechodzi K względem tej nowej referencji, raportuje czas i pamięć na5070Ti; jeśli bez zysku, jawne ograniczenie/fallback, bez uniwersalnej promocji. Różnic fizyki między antenami nie traktować jako błędów solvera. Potwierdzić unieważnianie nieaktualnych seedów/faktorów/cache po zmianie mesh/materials/boundaries. Duże elektrycznie parabole wymagają osobnej oceny kosztu/metody, nie są obowiązkowym pełnym benchmarkiem obecnego celu.

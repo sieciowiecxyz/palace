@@ -167,10 +167,12 @@ extern "C" cudssStatus_t cudssConfigCreate(cudssConfig_t *config) {
   int mode=1;
   int64_t bytes=int64_t(mib)*1024*1024;
   status=cudssConfigSet(*config,CUDSS_CONFIG_HYBRID_MODE,&mode,sizeof(mode));
-  if(status==CUDSS_STATUS_SUCCESS)
+  // Native solver queries its actual minimum after analysis, before factorization.
+  const bool deferred=flag("PALACE_NATIVE_COMPLEX_COARSE");
+  if(status==CUDSS_STATUS_SUCCESS && !deferred)
     status=cudssConfigSet(*config,CUDSS_CONFIG_HYBRID_DEVICE_MEMORY_LIMIT,&bytes,sizeof(bytes));
   if(status!=CUDSS_STATUS_SUCCESS)cudssConfigDestroy(*config);
-  else std::fprintf(stderr,"CUDSS_HYBRID: device_limit_bytes=%lld; device_workspace_not_UVM\n",(long long)bytes);
+  else std::fprintf(stderr,"CUDSS_HYBRID: requested_device_limit_bytes=%lld limit_deferred=%d; device_workspace_not_UVM\n",(long long)bytes,int(deferred));
   return status;
 }
 

@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-20. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -13,7 +13,8 @@ Aktualizacja: 2026-10-20. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 - Deferred postprocessing: managedpeak65,353→53,084GB (−18,77%) i controlcgroup60,525→56,830GB (−6,11%); reuse sam nie zmienia tego peaku. Jeden dodatkowy E179,5MB w RAM/VRAM. Fizycznej rezydencji VRAM nie utożsamiać z alokacjami.
 - Wholefields/S/VSWR/power/energy PASS, W.2 trzyfreq/oba porty i tiny normalpathPASS. EXP92 OOM i EXP93 inline-reference OOM pozostają FAIL. Receipt artifacts/m4-deferred-antenna-root-analysis-20261020.json; dowody docs/milestones/M4.md.
 - Regresje124PASS, cachedbuild9,215s, zachowane native/cache i fallback build/m4-reuse/pre-exp94-native. Gorące dane RAM/VRAM; SSDpolicy w PLAN. Bez płatnego compute/zamykania aplikacji.
-- Następny krok: M5 audyt cuDSS0.7.1.4/UVM/hybrid/AMS i working set PC. M5 prototypy jeszcze NOT RUN. M6/M7/W.4/W.5 i końcowe trzy pomiary pozostają; Rust/FieldCraft/GUI/CAD poza zakresem.
+- M5/EXP95–96: hybrid cuDSS API/tiny/medium/W.3P2 PASS, ale REJECT jako net speedup: UVM350,371s vs4GiB363,872s/6GiB511,069s. Coarse około2× szybciej, pozostały PC wolniej; nowy profil potrzebny do dowodu przyczyny. DefaultUVM/fallback zachowane.
+- Następny krok: M5 źródłowy audyt AMS/iterative coarse i polityki pamięci faz, bez dalszego losowego hybridbudgettuning. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria dodane na prośbę użytkownika, NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
 
 ## Historyczny skrót M1/M2
 
@@ -2046,3 +2047,128 @@ SameLuna read-onlydocs-garden foundno materialdiscrepancies. Rootreviewed
 source lifecycle/ownership/guards, samebuildreceipts andactualraw/S/power/fields.
 Currentnative verified; no livePalacecontainers. Localcommit only (sole remote
 is publicupstream), no push. M5 begins source/APIresearch next; goalactive.
+
+## EXP95 — pinned cuDSS hybrid memory API filter (2026-10-21)
+Previousgoalturn: progress, M4 actualfullpair+commit. M5 active. Readruntime
+cuDSS0.7.1.4/CUDA12.9.1 andactualcudss.h0.7.1. Current nativecomplexguard
+explicitly forbids hybrid. Existingadapter already configuresHYBRID_MODE and
+DEVICE_MEMORY_LIMIT and uses realcudaMalloc forcuDSS workspaceinhybridmode;
+other FEM arrays remainUVM. Hybridexecute isdifferent andincompatible in0.7.
+Officialarchiveddocs: https://docs.nvidia.com/cuda/archive/12.9.1/cudss/advanced_features.html
+Sourceschecked2026-10-21; defaultreordering/factorizationonly, no MGMN.
+
+Hypothesis/preregistration: actualsamecomplexknown-solutionAPIprobe inUVM and
+hybrid256/512MiB, nativeCUDA_C_64F/GENERAL and equivalentreal2N/SYMMETRIC,
+2RHS/2valueupdates, errorsindependentlyhostFP64≤1e−10, allocatorlive0afterdestroy.
+Beforefactor query actualCUDSS_DATA_HYBRID_DEVICE_MEMORY_MIN andMEMORY_ESTIMATES;
+failifminimum>budget, no silentfallback. Hybridfactorworkspace devicecudaMalloc,
+notmanaged; matrices/RHS managed. Outputexplicitbudget/queryvalues, parserstrict.
+Tiny512DOFmayfitbothbudgets, soPASS provesAPI/accuracy only, notrealoffloadspeed
+orfullantennaresources. No nativePalacerebuild/integrationuntilfilterPASS.
+Samecachedprobecompiler,2GiB/noswap/2CPU/60scontainer/75swatchdog; eachterminal.
+NextifPASS: nativecoarseminimumquery andboundedactualproblem, notextrapolation.
+Artifacts planned m5-hybrid-api-{uvm,256,512}-20261021.
+
+EXP95 initialprobecompileFAIL: pinnedcudssConfigSet takes void* ratherthan
+constvoid*; pass mutable int64budget (sameexistingadapterpattern). NoAPIruns
+launched.126PythonregressionsPASS do notsubstituteCUDAcompile. Fixedtype only;
+nextbuildsamecachedrecipe, no limit/dependencychanges.
+
+EXP95 v2 cachedprobecompile1,732s; UVM/256/512 allAPIquality/cleanupPASS.
+Native min2517636B/hostestimate853424B; realblock min4749108B/host1025792B.
+Allcases2RHS/2updates, error≤1,251e−13. Root independentlyread result.json;
+smallfactorsfitbothbudgets, no proof ofoffloadspeed. Library0.7.1supports actual
+complexGENERAL hybrid; APIfilter justifies nextintegration, notFP32/TC claims.
+
+## EXP96 — native coarse hybrid memory prototype (2026-10-21)
+Root allows explicit --cudss-hybrid-mib for nativecomplex FP64 factors only,
+noCPU/hybridexecute/profiler. Existingadapterconfigurespolicy and usesactual
+cudaMallocforcuDSSworkspace, FEMstillUVM. NativequeriesactualHYBRID_MODE,
+DEVICE_MEMORY_LIMIT andafteranalysis MIN/MEMORY_ESTIMATES; logsactualbytes,
+rejects minimum>budget beforefactor, no automaticbudgetraise/fallback.
+Runner audits configmarker countperbuild +managed0FP64 andzeroallocatorafterdestroy.
+Preserved build/m5-hybrid/pre-hybrid-native. CachedbuildoneTU, defaultunchanged.
+First currentnative tinydefaultcontrol referenceM4, thenhybrid256tiny; onlyafter
+PASS medium355 hybrid256referenceM4medium.60s/180s,60GiB/noswap/guard6GiB.
+No fullantenna beforeAPI+tiny+medium gate. If actualminimum blocks a budget,
+reportinfeasible, notRFfailproof. Nativehostestimate isestimate, notmeasuredRAM.
+Next actualantenna minimum guard withsmallbudget under180s only afterfilters,
+thenrootchooses feasiblebudgets fromactualminimum/currentfreeGPU. No assumption
+16GBdevicebudget isusable onbusy desktop; no appsclosing/capraise.
+
+EXP96 firstnativebuild11,270s, tinycontrol16,641s/hybrid25616,663s bothPASS,
+39/42iter, raw<9,601e−7, wholeE<9,874e−7/B1,296e−8/TEMPASS.
+Medium256FAIL15,501s/cuDSSerror3 beforeanyminmarker, noRFdata. No antenna run.
+Rootverifiedstderr; genericCheck lacks operationlabel, so exact failingcall
+wasnotproven. Newrevision labelsanalysis/factor/queries. ArchivedAPI permits
+budget afteranalysis: nativeadapter nowdefersexplicitlimit, queriesMIN/estimate
+beforefactor thenrejects infeasiblebudget orsets/verifiesactualconfiglimit.
+No automaticbudgetraise oralgorithmchanges. This isnewhypothesis/APIordering,
+notrepeatunchangedfailure; samecaseswithv2outputnames, limitsunchanged.
+
+EXP96v2 build11,493s/tinyPASS39,42iter, actualhybridconfigPASS. Medium256
+naturalfeasibilityFAIL beforefactor15,704s: MIN716326660B (~683,14MiB),
+hostestimate3499154496B. Neworderingrevealsminimuminsteadgenericanalysiserror;
+notRFqualitymeasurement. Nexttwoexplicitfeasiblebudgets768/1024MiB selected
+byroot, notsilentautoretry. Medium355/2ports/deferredpolicy/fields vsM4samephysics,
+thenfreshsamebuildUVMcontrol forcostcomparison. No fullmodeluntildataPASS.
+
+EXP96 medium355768/1024MiB andsamebuildUVMcontrol all45/47iter/raw/fields/TEMPASS.
+Time108,160/108,881 vs101,893s, cgroup4,223/4,240 vs2,598GB. Hybriddevicepeak
+805306356/1073741812B (768MiB/1GiB−12B), UVMmanagedpeak1917315108B. No netRAM
+saving orspeedup inthisfitsVRAMfixture. RootCSVchecksPASS; receipt
+artifacts/m5-hybrid-medium-root-analysis-20261021.json. Hostestimate3499154496B
+notobservedRAM. Next fullantenna minimum-only feasibilityguard:256MiB isknown
+small; defaultanalysis thenqueryrejectbeforefactor ifminimumexceedsbudget.
+Newoutput artifacts/m5-hybrid-antenna-minimum-20261021,180s/60GiB/no swap,
+no retry/budgetraise. Expectedinfeasibility result isnotRFqualification.
+
+EXP96 actualfullanalysis95,310s beforefactor: MIN3901173764B (~3,633GiB),
+maxhostestimate32714788656B (~30,468GiB); 256MiBguard correctlyrejected.
+NoRFsolveinthatdiagnostic. cgrouppeak10712457216B, no capraise.
+Next efficient W.3P2only matchedsamebuildpair (35iterhistorically): UVMcontrol
+vs4096MiBhybrid, sameverifiedseed/RIGHT/K64/Tol1e−6 andallphysicalfields.
+No otherport/defer/cacheeffect; fieldreferenceM3direct forcontrol thenfreshcontrol.
+Output artifacts/m5-hybrid-antenna-p2-{uvm,4096}-20261021. Limit900s each,
+60GiB/noswap/guard6GiB; stopfailure. Halfworkbeforepossiblebothportpromotion.
+4096MiBchosenexplicitlyaboveactualminimum; no autoVRAMincrease. Actualhost
+working set mustbe observed, notassertedfromestimate. No performanceclaim from
+minimumquery; ifslow/OOM retainnegativeevidence andFP64UVMfallback.
+
+EXP96 W3P2 matchedsamebuildcontrol/hybrid4096 bothPASS/35iter/raw8,357e−7/
+weightedE<7,81e−9/B5,59e−10. UVM350,371s vs4096 363,872s (~3,85%slower),
+cgroup56023375872→55449051136B (−574324736B). DevicecuDSSactualmanaged0
+4294967284B, allocatorlive0; UVMmanaged25008217684B. NotlargeRAMspeedwin.
+Next onefinalbudget6144MiB (morefactorcachevsFEMUVMroom tradeoff), samebuild,
+sameseed/W3P2/caps900s/60GiB, referencefreshUVM. No furtherbudgetswithoutnew
+hypothesis. FulltwoportpromotionNOTRUN; ifnobenefit keepUVMfallback andmove
+M5researchtoactualAMS/iterativecoarse, notunboundedbudgettuning.
+
+EXP96 terminal6144MiB W3P2 PASS/35iter/raw8,35659e−7/7weightedregions,
+time511,069s,cgroup55434739712B/devicecuDSS6442450932B/live0. Root samebuild/
+configidentityverified threepolicies; maxΔS4,7764e−10/energyrelative9,2655e−10.
+Receipt artifacts/m5-hybrid-antenna-root-analysis-20261021.json. Thisisoneport/
+onepoint, notfullband/bothportsqualification orstatisticalspeedpromotion.
+Exclusivecurrenttimers: UVMcoarse63,413s→hybrid31,44s, remainingPC97,153→
+139,71/248,49s. SumexclusiveagreesTotalwithin0,1s. Hostestimate32,715GB not
+actualpeak; cgroup55,4vs56,0GB isonlymodestnetRAMchange. Largerfixeddevice
+workspace maystarveFEMUVM; no newmeasuredmigrationtracehere, keepashypothesis.
+Close hybridbudgetbranch REJECTfornow, keepoptinresearch/fallback, M5 ACTIVE.
+127regressionspreviouslyPASS; actualfull/min/error+quality evidencepreserved.
+
+User scope2026-10-21: optimizehardware5070Ti16GB/96GBRAM, notonePCBhardcode;
+PCB withreflectors/directors/parabola/otherantenna shapes within solverphysics,
+no blanketperformanceguarantee forlargeelectricalstructures. AddedM6.6 assessment
+frequency sweep3,3–3,9GHz/2ports: actualPROM audit, continuation/recycling,
+symbolicreuse, independentoriginalresidual/heldoutpoints/cost+RAM+offlinework.
+AddedM7.5 materiallychangedantennageometry/newmeshref, checkcache/seedinvalidation;
+physicalgeometrydelta distinctfromnumericalerror. M0–M7order/ActiveM5 unchanged.
+Newtasks plannedNOTRUN, notretroactivelypassedbycoax/oldantenna. References
+updated inPLAN/MILESTONES/index/newdocs/milestones/sweeps.md.
+
+EXP96 checkpointfinal:127pinnedtestsPASS/8shelltestsPASS, docschecker/diffcheck
+PASS, sameLuna read-onlydocs-garden no discrepancies. Rootreviewed config/query
+order, nativebudgetguard, mandatoryapplied/cleanupmarkers andoriginalequation
+field/S/energy receipts. Currentnativeverified sourcehash
+f156542d507a69bf07ddc3b742b0d52f852ab745b2ffff22103fc17ed2498298.
+No livePalaceruncontainers. Localcommit/no push(publicupstreamonly). Goal/M5active.

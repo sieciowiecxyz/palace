@@ -160,3 +160,13 @@ measure1/measure2; requires --release-final-solver, dokładnie2LP/1f/rank1/fixed
 bez visualization/wave/Floquet. `--port-setup-reuse` liczy faktyczne setupy i CSR.
 `--partial-initial-fields` nie rozluźnia rygoru accuracyreference; źródło jest
 zweryfikowanym seedem, brakujący port jawnie zerowany. [Dowody](milestones/M4.md).
+
+## M5 hybrid — EXP95–96
+
+127 pinned regressions PASS. Actual512DOF native/realblock2N,2RHS/2updates,
+UVM/256/512MiB PASS accuracy≤1,251e−13/cleanup0. Native tiny/medium i W.3P2
+4/6GiB raw/wholefields/S/energy PASS; jawne256MiB feasibilityFAIL przedfactor.
+SamebuildUVMcontrol wymagany; spadek coarse kernelcost nie wystarcza do promocji,
+bo całe zadanie4/6GiB wolniejsze. [Raport](native-hybrid-memory.md).
+Siedemfreqsweep/generalizacja nowej geometrii są dodanymi bramkami M6.6/M7.5,
+jeszcze NOT RUN; nie zmieniają kwalifikacji starszych artefaktów.
