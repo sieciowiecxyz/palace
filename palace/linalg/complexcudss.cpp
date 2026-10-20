@@ -10,6 +10,8 @@
 #include <cudss.h>
 #include <cuda_runtime_api.h>
 #include <cmath>
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -135,6 +137,18 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     }
   }
   offsets[n] = int(columns.size());
+  const bool audit = std::getenv("PALACE_PORT_SETUP_AUDIT") != nullptr;
+  if (audit)
+  {
+    const auto hash = [](std::uint64_t h, const auto &v) {
+      const auto *p = reinterpret_cast<const unsigned char *>(v.data());
+      for (std::size_t i = 0; i < v.size() * sizeof(v[0]); ++i) h = (h ^ p[i]) * 1099511628211ULL;
+      return h;
+    };
+    constexpr std::uint64_t seed = 14695981039346656037ULL;
+    Mpi::Print("PALACE_COARSE_CSR: algorithm=fnv1a64 structure={:016x} values={:016x}\n",
+               hash(hash(seed, offsets), columns), hash(seed, values));
+  }
   impl->offsets.SetSize(n + 1);
   impl->columns.SetSize(int(columns.size()));
   impl->values.SetSize(int(values.size()));
@@ -165,11 +179,21 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   Check(cudssMatrixCreateDn(&impl->solution_matrix, n, 1, n, impl->solution.Write(), CUDA_C_64F,
                            CUDSS_LAYOUT_COL_MAJOR));
   Sync();
+  const auto analysis_begin = std::chrono::steady_clock::now();
   Check(cudssExecute(impl->handle, CUDSS_PHASE_ANALYSIS, impl->config, impl->data,
                     impl->matrix, impl->solution_matrix, impl->rhs_matrix));
+  if (audit) Sync();
+  const auto factor_begin = std::chrono::steady_clock::now();
   Check(cudssExecute(impl->handle, CUDSS_PHASE_FACTORIZATION, impl->config, impl->data,
                     impl->matrix, impl->solution_matrix, impl->rhs_matrix));
   Sync();
+  if (audit)
+  {
+    const auto end = std::chrono::steady_clock::now();
+    Mpi::Print("PALACE_COARSE_SETUP: analysis_s={:.9e} factor_s={:.9e}\n",
+               std::chrono::duration<double>(factor_begin - analysis_begin).count(),
+               std::chrono::duration<double>(end - factor_begin).count());
+  }
   int info = 0;
   size_t written = 0;
   Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_INFO, &info, sizeof(info), &written));

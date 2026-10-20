@@ -1,6 +1,7 @@
 # M5 — research maksymalnej wydajności na jednej 5070 Ti
 
-Status: **PLANNED**, część M5.5–M5.6; start po zamknięciu M4.
+Status: część **ACTIVE M5**, zadania M5.5–M5.6 jeszcze niezaliczone.
+Checkpoint i kolejność całego etapu: [M5](M5.md).
 Cel: krótszy czas do wiarygodnego wyniku na RTX5070Ti16GB +96GB RAM.
 Rust, FieldCraft, GUI i integracja CAD są poza zakresem.
 

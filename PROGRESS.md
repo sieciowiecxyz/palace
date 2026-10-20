@@ -1,19 +1,19 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-19. Mode: goal, Active: M4. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-20. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
-**Dane robocze solvera wyłącznie w RAM/VRAM.** Bez SSD/NVMe scratch, disk basis, out-of-core, plikowego mmap ani swap jako sposobu na zmieszczenie obliczeń. UVM może migrować GPU↔RAM. Nie zamykać aplikacji użytkownika. Cache kompilacji oraz zwykłe wejścia i wyniki pozostają osobną funkcją. Usunięto disk basis; legacy env są odrzucane przed inicjalizacją MPI/CUDA.
+**Gorące dane solvera w RAM/VRAM.** Cache, wejścia/wyniki i sporadyczne odczyty SSD dozwolone; niewielkie zapisy mierzyć. Bez swapowania zadania i intensywnego dyskowego workspace. UVM GPU↔RAM. Nie zamykać aplikacji użytkownika. Disk basis pozostaje usunięty; polityka I/O w PLAN.md.
 
 ## Bieżący checkpoint
 
-- Active M4 / EXP93. M0–M3 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci, bez globalnej promocji czasu/defaultów.
-- EXP91: reuse setupu PASS na tiny i trzech punktach medium coax/obu portach; 3,55GHz, control115,196s vsreuse110,150s, dwie faktoryzacje vsjedna. Pełna antena niezakwalifikowana.
-- EXP92: pełny control obu portów anteny FAIL/OOM podczas P2. P1 zapisany, wholejob nie jest referencją; limit60GiB niezmieniony.
-- EXP93: tiny lifecycle operatorów energii PASS, rzeczywisty drop36,86MB; medium para przygotowana, NOT RUN. Następny krok: medium release-only vsrelease+reuse, potem pełna antena przy tym samym limicie.
-- Pamięć robocza wyłącznie RAM/VRAM, bez swap/offload. Aktualny kod M4 WIP; stabilny wcześniejszy commit840e764 i zachowane native/cache. Tej aktualizacji planu nie traktować jako walidacji kodu M4.
-- Nowe badania M5.5–M5.6 i M6.5 opisane w PLAN/MILESTONES. Zakres wyłącznie wydajność obliczeń na 5070 Ti/96GB; Rust/FieldCraft/GUI/CAD poza pracą. Cel końcowy i W.4/W.5 pozostają.
+- Active M5. M0–M4 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci; M4 pełna para EXP94 PASS, bez zmiany globalnych defaultów.
+- EXP94 T-Shaped medium3,50GHz/oba porty, samebuild/config: control681,698s → reuse602,944s,44/35iter. Jedna para −11,55%, nie mediana/promocja M7. Raw ||Ax−b||/||b|| ≤8,357e−7.
+- Deferred postprocessing: managedpeak65,353→53,084GB (−18,77%) i controlcgroup60,525→56,830GB (−6,11%); reuse sam nie zmienia tego peaku. Jeden dodatkowy E179,5MB w RAM/VRAM. Fizycznej rezydencji VRAM nie utożsamiać z alokacjami.
+- Wholefields/S/VSWR/power/energy PASS, W.2 trzyfreq/oba porty i tiny normalpathPASS. EXP92 OOM i EXP93 inline-reference OOM pozostają FAIL. Receipt artifacts/m4-deferred-antenna-root-analysis-20261020.json; dowody docs/milestones/M4.md.
+- Regresje124PASS, cachedbuild9,215s, zachowane native/cache i fallback build/m4-reuse/pre-exp94-native. Gorące dane RAM/VRAM; SSDpolicy w PLAN. Bez płatnego compute/zamykania aplikacji.
+- Następny krok: M5 audyt cuDSS0.7.1.4/UVM/hybrid/AMS i working set PC. M5 prototypy jeszcze NOT RUN. M6/M7/W.4/W.5 i końcowe trzy pomiary pozostają; Rust/FieldCraft/GUI/CAD poza zakresem.
 
 ## Historyczny skrót M1/M2
 
@@ -55,9 +55,9 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-1. Dokończyć EXP93 według ostatniej prerejestracji; brak podnoszenia limitu po OOM, bez ponawiania niezmienionej konfiguracji.
-2. Po bramkach M4 przejść do M5: koszt apply PC i faktorów, następnie ograniczone badania FDTD oraz interfejsu Rust. Nie zaczynać nowych backendów przed zamknięciem bieżącego etapu.
-3. Globalna kwalifikacja częstotliwości/portów i pakiet pozostają w M7; nie oznaczać celu jako ukończonego na podstawie samego planu/researchu.
+M5: audyt przypiętego cuDSS i istniejących preconditionerów; rachunek czasu oraz
+working set przed nowym prototypem. Kolejność docs/milestones/M5.md. M4 zamknięty
+po EXP94; końcowa promocja/default/pakiet oraz W.4/W.5 dopiero w M7.
 
 ## Reguły pracy
 
@@ -1964,3 +1964,85 @@ oceniać po pomiarze bajtów/częstotliwości i czasu. Gorące dane solvera RAM/
 Bez swapowania zadania i intensywnego przepisywania workspace na dysk.
 Nie przywrócono disk basis ani nie zmieniono runtime/limitów kontenera.
 Historyczne zakwalifikowanie wyników bez zmian. Aktualizacja wyłącznie MD.
+
+### EXP93 wznowienie, 2026-10-20
+Poprzedni turn: progress (polityka SSD zapisana w repo). M4 pozostaje aktywny.
+Docker był nieaktywny; uruchomiono lokalny daemon, bez przebudowy. RAM available
+około77GiB, GPU wolne13,26GiB; aplikacji użytkownika nie zamykano.
+Następny test: wcześniej zarejestrowana para coax-medium3,55GHz/bothports,
+release-only vsrelease+reuse, identyczny build i polityka pamięci. Limit180s.
+Nowe ścieżki artifacts/m4-energy-medium-{control,on}-20261020.
+
+EXP93 medium3,55GHz rootverifiedPASS: samebuild/config/mesh,45/47iterboth,
+control109,269s vsreuse102,770s (jedna para, nie statystyczna promocja).
+Cgrouppeak3253268480→2665140224B (−588128256B), GPU-processcounterbez
+zmiany; nie jest to pomiar całej rezydencji UVM. MaxΔS5,1434e−9,
+ΔVSWR5,09994e−9, energyrelative5,8431e−9; wholeE9,4406e−7/B1,1535e−8.
+Energyrelease manageddrop355899672B; control2setups, reuse1setup.
+Receipt artifacts/m4-energy-medium-root-analysis-20261020.json.
+
+Następny filtr EXP93 fullantenna3,50GHz/bothports: sameFP32direct/nativecoarse,
+RIGHT/K64/pool256, releaseenergyinboth/controlvsreuse, rawtolunchanged,
+partialinitial source artifacts/m1-antenna-resident-fp64-20261018(P2);
+P1explicit zero. Newoutputs artifacts/m4-energy-antenna-{control,on}-20261020.
+Limit1800s/60GiB/noswap/hostguard6GiB, no raising cap. Controlmaynotbe
+fullindependentaccuracyreference: compareP2toqualifiedreference separately;
+candidatefieldreference fullcontrol onlyafterwholejobcomplete. Stoponfailure.
+
+EXP93 fullcontrol PASS execution684,805s,44/35iter/raw7,494e−7/8,357e−7,
+peakcgroup60525092864B. Release managed65177433822→49902109334B,
+actualdrop15275324488B (agent incorrectly copied medium355899672B; rootcorrected).
+ReusecandidateFAIL/OOM137 entering P1 field diagnostics; cgroup64104218624B,
+managedlive65177433822B, no P2/wholefieldqualification. Not retried unchanged.
+Both share identical solver/postprocess managed phases until comparison begins;
+reference field diagnostics add scratch on top of retained25,008GBcuDSS and
+15,275GBenergy operators. Wholejobqualitycandidate remainsFAIL.
+
+## EXP94 — defer two-port measurements until solver destruction (2026-10-20)
+Hypothesis: avoid overlap of25GBfactors+energy/fielddiagnostics by solving both
+RHS before measuring. Cache only first true-DOF complex E in RAM/VRAM
+(16*Nbytes; antenna179499584B), compute B later with unchanged Curl/omega.
+No solver data on disk, no physics/tolerance/mesh changes; finalsolverdestroyed
+before any measurements, original excitation order/energy/fields preserved.
+Opt-in --defer-postprocessing; exactlytwoLP/onefreq/fixedmesh/restart1/rank1,
+no visualization/wave/Floquet; requires --release-final-solver. No newdefault.
+First tiny/reference EXP93tiny, then medium355/reference EXP93mediumcontrol,
+then samefullcontrol at1800s/60GiB/noswap/guard6GiB. SavefirstEonly once;
+log/audit exact storeP1→solverrelease→measureP1→measureP2. Raw/S/VSWR/energy/
+wholefields gates unchanged. New code needs cached build and regression suite.
+
+Runtime faktycznie używa Podman, nie Docker. Przywrócono niepotrzebnie
+uruchomiony Docker do uprzedniego stanu inactive; dalsze runy przez Podman.
+EXP94 regresje124PASS; fallback build/m4-reuse/pre-exp94-native zachowany.
+
+EXP94 cachedbuild9,215s/no deps; tiny39/42iter18,726s, medium45/47iter103,033s
+PASS raw/TEM/wholefields/deferredaudit. Root checked S+energy <1e−5 vs existing
+references, actual errors logged in next receipts. Next full matchedsamebuild
+control defer/no-reuse vsdefer/reuse, ref EXP93fullcontrol for first, thenfresh
+control forsecond. Both retainreleaseenergy andsamepartialseed/K64/pool256.
+Artifacts/m4-deferred-antenna-{control,on}-20261020,1800s/60GiB/noswap.
+This isolates reuse undercommondeferredpolicy andcheckswholequality vsEXP93.
+
+EXP94 pełna matched para rootverifiedPASS: control681,698s vsreuse602,944s,
+44/35iterboth; sameconfig/buildmanifest/fixture, dwa setupy vsjeden. Rawrelative
+candidate7,492212451061e−7/8,356430312650e−7. MaxΔcomplexS2,366618e−8,
+ΔVSWR5,138175e−8, Δsumymocy7,077207e−9, Δenergyrelative1,815256e−8,
+wholeE/B2,141e−7/1,782e−8;14regionentries. Deferredcontrol vsEXP93 E/B
+2,108e−7/1,500e−8. Rootreceipt artifacts/m4-deferred-antenna-root-analysis-20261020.json.
+Managedpeak65353018230→53084415322B; deferredcontrolcgroup60525092864→56829792256B,
+reuse56832888832B. Actualfullenergyreleasedrop15275324488B; firstEcache179499584B.
+No memorycapraise, no diskworkspace; nativecoarseFP64 unchanged.
+
+Final currentbuild filters: defaultposttiny17,712s/39,42iterPASS; deferredmedium
+3,30GHz102,608s/45,47 and3,80GHz102,785s/45,47 bothPASS/TEM/wholefields.
+MaxE1,034e−6/B1,142e−8 on3,30GHz, no phasefit. Mid355103,033s PASS earlier.
+M4.3 symbolicmultifrequency NOT RUN (one-f shard; single analysis17,35s max2,88%
+currentfulltime). Same verifiedpartialseed both runs, no warmstartspeedclaim.
+M4 complete assessment, M5 active withindexedcheckpoint; M7 wholeband/statistics
+remainNOTRUN. No globaldefaultpromotion. Docs-garden beforecommit required.
+
+EXP94 finalvalidation:124 pinnedregressionsPASS/8shellPASS/docscheckerPASS.
+SameLuna read-onlydocs-garden foundno materialdiscrepancies. Rootreviewed
+source lifecycle/ownership/guards, samebuildreceipts andactualraw/S/power/fields.
+Currentnative verified; no livePalacecontainers. Localcommit only (sole remote
+is publicupstream), no push. M5 begins source/APIresearch next; goalactive.

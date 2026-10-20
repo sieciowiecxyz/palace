@@ -26,8 +26,11 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Czytaj gdy: oceniasz prefetch, pomiar transferów albo zakończenie M3
   - Opis: EXP86–90, mała korzyść ortogonalizacji, strict selective profiling, aktualne W.2/W.3 PASS; bez globalnej promocji czasu.
 - [M4: reuse setup](milestones/M4.md)
-  - Czytaj gdy: wznawiasz aktywny audyt setup i faktoryzacji między portami
-  - Opis: EXP91 reuse coax PASS; pełna antena EXP92 OOM, EXP93 lifecycle energii tiny PASS; aktualnie średni filtr przed kolejnym pełnym runem.
+  - Czytaj gdy: sprawdzasz zamknięcie audytu setup i pamięci między portami
+  - Opis: EXP94 pełna para obu portów PASS; jedna faktoryzacja, pomiary po zwolnieniu solvera, zysk czasu i pamięci z jawnym zakresem.
+- [M5: preconditioner](milestones/M5.md)
+  - Czytaj gdy: wznawiasz aktywny etap PC i mixed precision
+  - Opis: Punkt wyjścia EXP94, audyt istniejących trybów cuDSS/AMS oraz kolejność małych prób przed pełnym modelem.
 - [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
   - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
   - Opis: Ocena kosztu siatki/CFL i wielu częstotliwości przed benchmarkiem; tylko przyspieszanie obliczeń, bez Rust/GUI/CAD.

@@ -2,9 +2,9 @@
 
 Polityka SSD doprecyzowana przez użytkownika (2026-10-19): gorące dane solvera w RAM/VRAM; UVM GPU↔RAM. Zwykłe wejścia/wyniki, cache i sporadyczny odczyt SSD są dozwolone. Niewielkie zapisy wymagają pomiaru wolumenu i częstotliwości I/O; nie deklarować zerowego zużycia dysku. Bez swapowania zadania i intensywnego przepisywania bazy/macierzowych workspace na SSD w pętli solvera. Obecny disk basis pozostaje usunięty; dawne wyniki z nim nie stają się przez tę korektę zakwalifikowanym baseline. Nową metodę używającą dysku oceniać po zmierzonym I/O, czasie i dokładności.
 Mode: goal
-Active: M4
+Active: M5
 
-Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, M3 zamknięty po ocenie pamięci i prefetchu; aktywny M4: reuse setup. Compute lokalny; bez najmu chmury.
+Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, M3 zamknięty po ocenie pamięci i prefetchu; M4 zamknięty po pełnej parze EXP94; aktywny M5: preconditioner. Compute lokalny; bez najmu chmury.
 
 ## Cel
 
@@ -20,8 +20,8 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 - [x] M1 — Referencja, niezależna jakość, profil i koszt powietrza w FEM; docs/milestones/M1.md.
 - [x] M2 — ocena FEM–BEM/MoM zakończona REJECT obecnej integracji; bramki promocji pozostają FAIL/niekompletne. docs/milestones/M2-decision.md.
 - [x] M3 — FP32direct memory gain i ocena prefetchu; W.1/W.2/W.3 PASS, bez globalnej promocji; docs/milestones/M3.md.
-- [ ] M4 — ACTIVE: reuse operatorów, preconditionera i faktorów między portami; docs/milestones/M4.md.
-- [ ] M5 — Preconditioner, mixed precision oraz ograniczony research FDTD/CUDA.
+- [x] M4 — reuse setup i deferred postprocessing; pełna para EXP94 PASS, docs/milestones/M4.md.
+- [ ] M5 — ACTIVE: preconditioner, mixed precision oraz ograniczony research FDTD/CUDA; docs/milestones/M5.md.
 - [ ] M6 — Gorące kernele CUDA: fuzja/batching oraz Tensor Cores/TF32/BF16 tam, gdzie pomagają.
 - [ ] M7 — Kwalifikacja najlepszego wariantu na jednej 5070 Ti i pakiet do użycia.
 
@@ -94,10 +94,10 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 
 ### M4 — setup raz, kilka RHS
 
-- [ ] Zmierzyć liczbę SetOperators/faktoryzacji i potwierdzić identyczność operatora oraz terminacji między portami.
-- [ ] Prototyp reuse na jednej częstotliwości i obu portach; zachować outputy, wznowienia i postprocessing.
-- [ ] Symbolic reuse między częstotliwościami i warm start/recycling badać osobno, tylko gdy koszt setup uzasadnia próbę.
-- [ ] Zmierzyć czas życia postprocessingu między RHS: zwalnianie/rebuild operatorów energii po pomiarach; oba porty muszą ukończyć run przy obecnym limicie, z niezmienionymi energiami/polami.
+- [x] Zmierzyć liczbę SetOperators/faktoryzacji i potwierdzić identyczność operatora oraz terminacji między portami.
+- [x] Prototyp reuse na jednej częstotliwości i obu portach; zachować outputy, wznowienia i postprocessing.
+- [x] Symbolic reuse między częstotliwościami i warm start/recycling badać osobno, tylko gdy koszt setup uzasadnia próbę.
+- [x] Zmierzyć czas życia postprocessingu między RHS: zwalnianie/rebuild operatorów energii po pomiarach; oba porty muszą ukończyć run przy obecnym limicie, z niezmienionymi energiami/polami.
 
 ### M5 — tańszy preconditioner i wybór algorytmu
 

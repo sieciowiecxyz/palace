@@ -397,12 +397,31 @@ def verified_initial_fields(directory, config, info, build):
     return _verified_field_snapshot(directory, config, info, build, require_accuracy=False)
 
 
-def field_restart_applied(log, config):
+def verified_partial_initial_fields(directory, config, info, build):
+    source = read(Path(directory)/'config.json')
+    files = expected_field_files(source)
+    if not files or not files <= expected_field_files(config):
+        raise ValueError('Partial seed excitations must be a nonempty subset of requested excitations')
+    adjusted = json.loads(json.dumps(config))
+    ports = {p['Index']:p for p in source['Boundaries']['LumpedPort']}
+    if set(ports) != {p['Index'] for p in adjusted['Boundaries']['LumpedPort']}:
+        raise ValueError('Partial seed requires identical physical ports')
+    for p in adjusted['Boundaries']['LumpedPort']:
+        p['Excitation'] = ports[p['Index']].get('Excitation',False)
+    # Only excitation requests differ; all original strict physics/byte checks remain.
+    return verified_initial_fields(directory, adjusted, info, build)
+
+
+def field_restart_applied(log, config, initial_config=None):
     matches = re.findall(r'PALACE_FIELD_RESTART: excitation=(\d+) frequency_index=(\d+) norm_E=([\deE+.-]+)', log)
     expected = {(int(stem.split('-')[0][1:]), int(stem.split('-')[1][1:]))
-                for stem in expected_field_files(config) if stem.endswith('-E.bin')}
+                for stem in expected_field_files(initial_config or config) if stem.endswith('-E.bin')}
+    target = {(int(stem.split('-')[0][1:]), int(stem.split('-')[1][1:]))
+              for stem in expected_field_files(config) if stem.endswith('-E.bin')}
+    zero = re.findall(r'PALACE_FIELD_RESTART_ZERO: excitation=(\d+) frequency_index=(\d+)',log)
     return (len(matches) == len(expected) and
             {(int(s), int(f)) for s, f, n in matches} == expected and
+            len(zero)==len(target-expected) and {(int(s),int(f)) for s,f in zero}==target-expected and
             all(math.isfinite(float(n)) and float(n) >= 0 for s, f, n in matches))
 
 
@@ -553,15 +572,93 @@ def basis_prefetch_applied(log, solves):
     return solves > 0 and len(markers) == solves and all(int(c) > 0 and int(b) >= 4*int(c) for c, b in markers)
 
 
+def port_batch_config(config, both_ports=False, reuse=False, excitation=None):
+    config = json.loads(json.dumps(config))
+    ports = config['Boundaries']['LumpedPort']
+    if excitation is not None:
+        if both_ports or isinstance(excitation,bool) or not isinstance(excitation,int) or excitation not in {p['Index'] for p in ports}:
+            raise ValueError('Single excitation must select one existing port, without both-ports')
+        for p in ports:
+            p['Excitation'] = excitation if p['Index']==excitation else False
+    if both_ports:
+        if len(ports) != 2 or len({p['Index'] for p in ports}) != 2:
+            raise ValueError('Both ports requires exactly two distinct lumped ports')
+        for p in ports:
+            p['Excitation'] = p['Index']
+    if reuse:
+        samples = config['Solver']['Driven']['Samples']
+        excitations = {p.get('Excitation') for p in ports if p.get('Excitation')}
+        if (len(samples) != 1 or samples[0].get('Type') != 'Point' or len(samples[0]['Freq']) != 1
+                or len(excitations) < 2 or any(isinstance(e,bool) or not isinstance(e,int) or e <= 0 for e in excitations)
+                or config['Boundaries'].get('WavePort') or config['Boundaries'].get('FloquetPort')
+                or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0
+                or config['Solver']['Driven'].get('Restart',1) != 1):
+            raise ValueError('Port setup reuse requires one point frequency, fixed mesh, distinct lumped excitations, no wave/Floquet ports and first solve')
+    return config
+
+
+def port_setup_audit(log, config, reuse=False):
+    excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
+    frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
+    expected = [('reuse' if reuse and i else 'build', str(e), str(f))
+                for i,e in enumerate(excitations) for f in range(frequencies)]
+    markers = re.findall(r'PALACE_PORT_SETUP: action=(build|reuse) excitation=(\d+) frequency_index=(\d+)',log)
+    hashes = re.findall(r'PALACE_COARSE_CSR: algorithm=fnv1a64 structure=([0-9a-f]{16}) values=([0-9a-f]{16})',log)
+    phases = re.findall(r'PALACE_COARSE_SETUP: analysis_s=([\deE+.-]+) factor_s=([\deE+.-]+)',log)
+    builds = sum(a=='build' for a,_,_ in expected)
+    passed = (builds > 0 and markers == expected and len(hashes)==builds and len(phases)==builds
+              and all(math.isfinite(float(t)) and float(t)>=0 for pair in phases for t in pair))
+    return dict(passed=passed, expected_builds=builds, markers=markers,
+                csr_fingerprints=hashes, setup_seconds=[dict(analysis=float(a),factor=float(f)) for a,f in phases])
+
+
+def validate_deferred_postprocessing(config, release_final_solver):
+    boundaries = config['Boundaries']
+    excitations = {int(p['Excitation']) for p in boundaries['LumpedPort'] if p.get('Excitation')}
+    driven = config['Solver']['Driven']
+    if (not release_final_solver or len(excitations) != 2
+            or sum(len(s['Freq']) for s in driven['Samples']) != 1
+            or driven.get('Restart', 1) != 1 or driven.get('Save')
+            or config.get('Model', {}).get('Refinement', {}).get('MaxIts', 0) != 0
+            or boundaries.get('WavePort') or boundaries.get('FloquetPort')):
+        raise ValueError('Deferred postprocessing requires two lumped excitations, one frequency, fixed mesh and final solver release without visualization/wave/Floquet ports')
+
+
+def deferred_postprocessing_applied(log, config):
+    excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
+    if len(excitations) != 2:
+        return False
+    matches = list(re.finditer(r'PALACE_DEFERRED_POSTPROCESS: action=(store|measure) excitation=(\d+) frequency_index=(\d+)', log))
+    expected = [('store', str(excitations[0]), '0')] + [('measure', str(e), '0') for e in excitations]
+    released = log.find('PALACE_FINAL_SOLVER_RELEASED: enabled=1')
+    return (len(excitations) == 2 and [m.groups() for m in matches] == expected
+            and matches[0].start() < released < matches[1].start())
+
+
+def postprocess_energy_release_applied(log, config):
+    excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
+    frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
+    order = [(str(e),str(f)) for e in excitations for f in range(frequencies)]
+    released = re.findall(r'PALACE_POSTPROCESS_ENERGY_RELEASED: excitation=(\d+) frequency_index=(\d+)',log)
+    rebuilt = re.findall(r'PALACE_POSTPROCESS_ENERGY_REBUILT: excitation=(\d+) frequency_index=(\d+)',log)
+    return len(order)>1 and released==order[:-1] and rebuilt==order[1:]
+
+
 def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, coax_l2=False,
         save_fields=False, field_reference=None, allocation_trace=False, ceed_qpool=False, hypre_pool_mib=None, memory_marks=False, release_gmres_basis=False,
         initial_fields=None, krylov_size=None, linear_tol=None, cpu_reference=False,
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
-        nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False):
+        nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
+        setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
+        release_postprocess_energy=False, defer_postprocessing=False):
     if direct_basis and basis != 'fp32':
         raise ValueError('Direct basis requires FP32 storage')
     if basis_prefetch and (basis != 'fp32' or not direct_basis or cpu_reference):
         raise ValueError('Basis prefetch requires direct FP32 CUDA')
+    if (setup_audit or port_setup_reuse) and (not native_complex_coarse or nsys_window is not None):
+        raise ValueError('Port setup audit/reuse requires native complex coarse without partial profiler')
+    if partial_initial_fields and not initial_fields:
+        raise ValueError('Partial initial fields requires an explicit verified source')
     if coax_sweep and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2)):
         raise ValueError('Coax sweep requires coax fields/L2 on a coax fixture')
     if coax_frequency is not None and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2) or coax_sweep):
@@ -590,6 +687,12 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
                                bool(initial_fields), linear_tol, cpu_reference, complex_coarse,
                                native_complex_coarse, coax_sweep, coax_frequency)
+    config = port_batch_config(config, both_ports, port_setup_reuse, excitation)
+    if release_postprocess_energy and (len(expected_field_files(config)) < 4 or config['Solver']['Driven'].get('Save')
+            or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0):
+        raise ValueError('Energy release requires multiple solves, fixed mesh and no visualization saves')
+    if defer_postprocessing:
+        validate_deferred_postprocessing(config, release_final_solver)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -603,7 +706,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     initial = None
     if initial_fields:
         initial = (reference if Path(initial_fields).resolve() == reference else
-                   verified_initial_fields(initial_fields, config, info, manifest))
+                   (verified_partial_initial_fields if partial_initial_fields else verified_initial_fields)(initial_fields, config, info, manifest))
     mesh = prepare(name)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -642,6 +745,14 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_GMRES_FP32_DIRECT'] = '1'
     if basis_prefetch:
         flags['PALACE_GMRES_BASIS_PREFETCH'] = '1'
+    if setup_audit or port_setup_reuse:
+        flags['PALACE_PORT_SETUP_AUDIT'] = '1'
+    if port_setup_reuse:
+        flags['PALACE_REUSE_PORT_SETUP'] = '1'
+    if release_postprocess_energy:
+        flags['PALACE_RELEASE_POSTPROCESS_ENERGY'] = '1'
+    if defer_postprocessing:
+        flags['PALACE_DEFER_POSTPROCESSING'] = '1'
     if allocation_trace:
         flags['PALACE_CUDA_ALLOC_TRACE'] = '1'
     if coax_l2:
@@ -653,6 +764,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_REFERENCE_FIELDS'] = '/reference-fields'
     if initial:
         flags['PALACE_INITIAL_FIELDS'] = '/initial-fields'
+        if partial_initial_fields:
+            excitations = sorted({p['Excitation'] for p in read(initial/'config.json')['Boundaries']['LumpedPort'] if p.get('Excitation')})
+            flags['PALACE_INITIAL_FIELDS_EXCITATIONS'] = ','+','.join(map(str,excitations))+','
     if profiler:
         profile = profiler.prepare(nsys_window, output)
         flags['PALACE_KRYLOV_PROFILE'] = nsys_window
@@ -664,6 +778,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_GMRES_FP32_BASIS', '--unsetenv', 'PALACE_GMRES_FP64_DISK_BASIS',
             '--unsetenv', 'PALACE_GMRES_FP32_DIRECT',
             '--unsetenv', 'PALACE_GMRES_BASIS_PREFETCH',
+            '--unsetenv', 'PALACE_PORT_SETUP_AUDIT', '--unsetenv', 'PALACE_REUSE_PORT_SETUP',
+            '--unsetenv', 'PALACE_RELEASE_POSTPROCESS_ENERGY',
+            '--unsetenv', 'PALACE_DEFER_POSTPROCESSING',
             '--unsetenv', 'PALACE_GMRES_FP32_DISK_BASIS', '--unsetenv', 'PALACE_CUDA_ALLOC_TRACE',
             '--unsetenv', 'PALACE_HYPRE_DEVICE_POOL_MIB',
             '--unsetenv', 'PALACE_MEMORY_MARKS', '--unsetenv', 'PALACE_RELEASE_GMRES_BASIS',
@@ -678,6 +795,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_COAX_TEM_LENGTH_M',
             '--unsetenv', 'PALACE_SAVE_FIELDS', '--unsetenv', 'PALACE_REFERENCE_FIELDS',
             '--unsetenv', 'PALACE_INITIAL_FIELDS',
+            '--unsetenv', 'PALACE_INITIAL_FIELDS_EXCITATIONS',
             '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
             '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
             '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
@@ -779,8 +897,20 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['scope'] = profile['scope']
         if native_complex_coarse:
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
-                (output/'palace.log').read_text(), status['expected_solves'])
+                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'])
             status['complete'] = status['complete'] and status['native_complex_coarse_applied']
+        if setup_audit or port_setup_reuse:
+            audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse)
+            write(output/'port-setup-audit.json',audit)
+            status['port_setup_audit_passed'] = audit['passed']
+            status['complete'] = status['complete'] and audit['passed']
+        if defer_postprocessing:
+            status['deferred_postprocessing_applied'] = deferred_postprocessing_applied(
+                (output/'palace.log').read_text(), config)
+            status['complete'] = status['complete'] and status['deferred_postprocessing_applied']
+        if release_postprocess_energy:
+            status['postprocess_energy_release_applied'] = postprocess_energy_release_applied((output/'palace.log').read_text(),config)
+            status['complete'] = status['complete'] and status['postprocess_energy_release_applied']
         if basis_prefetch and not profile:
             status['basis_prefetch_applied'] = basis_prefetch_applied(
                 (output/'palace.log').read_text(), status['expected_solves'])
@@ -792,7 +922,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                               .count('PALACE_LOG_BUFFERING: stdout=line\n') == 1)
         status['complete'] = status['complete'] and status['line_buffered_log_applied']
         if initial:
-            status['field_restart_applied'] = field_restart_applied((output/'palace.log').read_text(), config)
+            status['field_restart_applied'] = field_restart_applied((output/'palace.log').read_text(), config,
+                read(initial/'config.json') if partial_initial_fields else None)
             status['complete'] = status['complete'] and status['field_restart_applied']
         if memory_marks:
             phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
@@ -877,6 +1008,13 @@ def main():
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
     r.add_argument('--direct-basis', action='store_true', help='Experimental direct FP32 basis dot/axpy with FP64 arithmetic; requires --basis fp32')
     r.add_argument('--basis-prefetch', action='store_true', help='Experimental managed basis prefetch before Dot on CUDA stream 0; requires --direct-basis')
+    r.add_argument('--setup-audit', action='store_true', help='Log driver setup counts and native coarse CSR fingerprints/analysis/factor times')
+    r.add_argument('--port-setup-reuse', action='store_true', help='Opt-in one-frequency lumped-port setup reuse; includes setup audit')
+    r.add_argument('--both-ports', action='store_true', help='Excite both existing lumped ports separately, preserving geometry and terminations')
+    r.add_argument('--excitation', type=int, help='Solve only one existing lumped port index, preserving physical terminations')
+    r.add_argument('--partial-initial-fields', action='store_true', help='Allow verified initial snapshot for a subset of requested excitations; others start at zero')
+    r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
+    r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
     r.add_argument('--coax-sweep', action='store_true', help='Keep fixture frequencies with coax fields/L2 diagnostics instead of selecting 3.55 GHz only')
     r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
@@ -935,7 +1073,9 @@ def main():
         run(args.case, args.output, args.seconds, args.basis, args.coax_fields, args.pc_side,
             args.coax_l2, args.save_fields, args.field_reference, args.allocation_trace, args.ceed_qpool, args.hypre_pool_mib, args.memory_marks, args.release_gmres_basis,
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
-            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch)
+            args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
+            args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
+            args.release_postprocess_energy, args.defer_postprocessing)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

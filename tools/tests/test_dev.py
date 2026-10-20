@@ -12,6 +12,140 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_deferred_postprocess_requires_safe_two_port_single_frequency_batch(self):
+        _, _, config = dev.fixture('tshaped-medium')
+        config = dev.port_batch_config(config, True)
+        dev.validate_deferred_postprocessing(config, True)
+        for release in [False]:
+            with self.assertRaisesRegex(ValueError, 'Deferred'):
+                dev.validate_deferred_postprocessing(config, release)
+        changes = [lambda c: c['Solver']['Driven'].update(Restart=2),
+                   lambda c: c['Solver']['Driven'].update(Save=1),
+                   lambda c: c['Solver']['Driven']['Samples'][0]['Freq'].append(3.8),
+                   lambda c: c['Boundaries']['LumpedPort'][0].update(Excitation=False),
+                   lambda c: c['Boundaries'].update(WavePort=[{}]),
+                   lambda c: c['Model'].update(Refinement={'MaxIts': 1})]
+        for change in changes:
+            candidate = json.loads(json.dumps(config)); change(candidate)
+            with self.assertRaisesRegex(ValueError, 'Deferred'):
+                dev.validate_deferred_postprocessing(candidate, True)
+
+    def test_deferred_postprocess_requires_exact_order_after_solver_release(self):
+        _, _, config = dev.fixture('tshaped-medium')
+        config = dev.port_batch_config(config, True)
+        store = 'PALACE_DEFERRED_POSTPROCESS: action=store excitation=1 frequency_index=0 logical_bytes=123\n'
+        release = 'PALACE_FINAL_SOLVER_RELEASED: enabled=1\n'
+        first = 'PALACE_DEFERRED_POSTPROCESS: action=measure excitation=1 frequency_index=0\n'
+        second = 'PALACE_DEFERRED_POSTPROCESS: action=measure excitation=2 frequency_index=0\n'
+        self.assertTrue(dev.deferred_postprocessing_applied(store+release+first+second, config))
+        for log in ['', store+release, store+first+release+second,
+                    release+store+first+second, store+release+second+first,
+                    store+release+first+second+second]:
+            self.assertFalse(dev.deferred_postprocessing_applied(log, config))
+
+    def test_energy_workspace_release_requires_release_and_rebuild_for_every_transition(self):
+        _,_,config=dev.fixture('tshaped-medium');config=dev.port_batch_config(config,True)
+        release='PALACE_POSTPROCESS_ENERGY_RELEASED: excitation=1 frequency_index=0\n'
+        rebuild='PALACE_POSTPROCESS_ENERGY_REBUILT: excitation=2 frequency_index=0\n'
+        self.assertTrue(dev.postprocess_energy_release_applied(release+rebuild,config))
+        for log in ['',release,rebuild,release+release+rebuild,release+rebuild.replace('excitation=2','excitation=1')]:
+            self.assertFalse(dev.postprocess_energy_release_applied(log,config))
+
+    def test_partial_initial_fields_preserve_strict_reference_and_physics_checks(self):
+        _,info,target=dev.fixture('coax-tiny')
+        source=json.loads(json.dumps(target));source['Boundaries']['LumpedPort'][0]['Excitation']=False
+        build={'runtime_base_id':'runtime','builder_image_id':'builder'}
+        with tempfile.TemporaryDirectory(dir='/dev/shm') as temporary:
+            root=Path(temporary);(root/'fields').mkdir()
+            for name in dev.expected_field_files(source):
+                (root/'fields'/name).write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,1.,0.))
+            for name,value in [('config',source),('fixture',info),('build-manifest',build),('result',{'complete':True})]:
+                dev.write(root/(name+'.json'),value)
+            dev.write(root/'command.json',{'actual_config_sha256':dev.sha(root/'config.json')})
+            dev.write(root/'fields.json',{'identity':dev.field_identity(source,info,build),'complete':True,
+                'files':dev.field_inventory(root/'fields',dev.expected_field_files(source))})
+            self.assertEqual(dev.verified_partial_initial_fields(root,target,info,build),root)
+            with self.assertRaises(ValueError):dev.verified_field_reference(root,target,info,build)
+            with self.assertRaises(ValueError):dev.verified_initial_fields(root,target,info,build)
+            changed=json.loads(json.dumps(target));changed['Boundaries']['LumpedPort'][0]['R']=75.
+            with self.assertRaises(ValueError):dev.verified_partial_initial_fields(root,changed,info,build)
+            changed=json.loads(json.dumps(source));changed['Boundaries']['LumpedPort'][1]['Excitation']=False
+            with self.assertRaises(ValueError):dev.verified_partial_initial_fields(root,changed,info,build)
+            dev.write(root/'result.json',{'complete':False})
+            with self.assertRaises(ValueError):dev.verified_partial_initial_fields(root,target,info,build)
+            dev.write(root/'result.json',{'complete':True})
+            next((root/'fields').iterdir()).write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,2.,0.))
+            with self.assertRaisesRegex(ValueError,'bytes changed'):
+                dev.verified_partial_initial_fields(root,target,info,build)
+
+    def test_partial_seed_requires_explicit_zero_for_unseeded_rhs(self):
+        _,_,target=dev.fixture('coax-tiny');source=json.loads(json.dumps(target))
+        source['Boundaries']['LumpedPort'][0]['Excitation']=False
+        seeded=''.join(f'PALACE_FIELD_RESTART: excitation=2 frequency_index={f} norm_E=1.0e-2\n' for f in range(3))
+        zero=''.join(f'PALACE_FIELD_RESTART_ZERO: excitation=1 frequency_index={f}\n' for f in range(3))
+        self.assertTrue(dev.field_restart_applied(seeded+zero,target,source))
+        self.assertFalse(dev.field_restart_applied(seeded,target,source))
+        self.assertFalse(dev.field_restart_applied(seeded+zero+zero,target,source))
+        self.assertFalse(dev.field_restart_applied(seeded+zero,target))
+        with patch.object(dev,'require_host_memory') as host:
+            with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,partial_initial_fields=True)
+            host.assert_not_called()
+
+    def test_both_port_batch_changes_only_excitation_requests(self):
+        _,_,config=dev.fixture('tshaped-medium')
+        updated=dev.port_batch_config(config,both_ports=True,reuse=True)
+        self.assertFalse(config['Boundaries']['LumpedPort'][0]['Excitation'])
+        for old,new in zip(config['Boundaries']['LumpedPort'],updated['Boundaries']['LumpedPort']):
+            self.assertEqual({k:v for k,v in old.items() if k!='Excitation'},
+                             {k:v for k,v in new.items() if k!='Excitation'})
+            self.assertEqual(new['Excitation'],new['Index'])
+        self.assertEqual(config['Model'],updated['Model'])
+        self.assertEqual(config['Solver'],updated['Solver'])
+        self.assertEqual(dev.expected_field_files(updated),{
+            f's{e}-f0-{v}.bin' for e in [1,2] for v in ['E','B']})
+        selected=dev.port_batch_config(updated,excitation=2)
+        self.assertEqual(selected,config)
+        for value in [True,0,3,2.5]:
+            with self.assertRaises(ValueError):dev.port_batch_config(updated,excitation=value)
+        with self.assertRaises(ValueError):dev.port_batch_config(updated,both_ports=True,excitation=2)
+
+    def test_port_reuse_rejects_unqualified_operator_batches(self):
+        _,_,config=dev.fixture('tshaped-medium')
+        with self.assertRaises(ValueError):dev.port_batch_config(config,reuse=True)
+        good=dev.port_batch_config(config,both_ports=True,reuse=True)
+        for kind in ['frequency','wave','floquet','refinement','restart','sameexcitation','bool']:
+            bad=json.loads(json.dumps(good))
+            if kind=='frequency':bad['Solver']['Driven']['Samples'][0]['Freq'].append(3.8)
+            if kind=='wave':bad['Boundaries']['WavePort']=[{}]
+            if kind=='floquet':bad['Boundaries']['FloquetPort']=[{}]
+            if kind=='refinement':bad['Model']['Refinement']={'MaxIts':1}
+            if kind=='restart':bad['Solver']['Driven']['Restart']=2
+            if kind=='sameexcitation':bad['Boundaries']['LumpedPort'][1]['Excitation']=1
+            if kind=='bool':bad['Boundaries']['LumpedPort'][1]['Excitation']=True
+            with self.subTest(kind=kind),self.assertRaises(ValueError):dev.port_batch_config(bad,reuse=True)
+
+    def test_port_setup_audit_requires_actual_factorizations_and_rhs_coverage(self):
+        _,_,config=dev.fixture('tshaped-medium');config=dev.port_batch_config(config,True,True)
+        csr='PALACE_COARSE_CSR: algorithm=fnv1a64 structure=0123456789abcdef values=0123456789abcdef\n'
+        time='PALACE_COARSE_SETUP: analysis_s=1.0e-2 factor_s=1.1e-2\n'
+        build='PALACE_PORT_SETUP: action=build excitation=1 frequency_index=0\n'
+        reuse='PALACE_PORT_SETUP: action=reuse excitation=2 frequency_index=0\n'
+        log=csr+time+build+reuse
+        self.assertTrue(dev.port_setup_audit(log,config,True)['passed'])
+        self.assertFalse(dev.port_setup_audit(log,config,False)['passed'])
+        for bad in [log.replace(reuse,''),log.replace(csr,''),log.replace(time,''),log+csr,
+                    log.replace('factor_s=1.1e-2','factor_s=nan'),log.replace('excitation=2','excitation=3')]:
+            self.assertFalse(dev.port_setup_audit(bad,config,True)['passed'])
+        control=csr+time+build+csr+time+reuse.replace('action=reuse','action=build')
+        self.assertTrue(dev.port_setup_audit(control,config,False)['passed'])
+
+    def test_port_setup_flags_require_native_coarse_before_resource_allocation(self):
+        with patch.object(dev,'require_host_memory') as host:
+            for flags in [dict(setup_audit=True),dict(port_setup_reuse=True),
+                          dict(setup_audit=True,native_complex_coarse=True,nsys_window='0:2')]:
+                with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**flags)
+            host.assert_not_called()
+
     def test_prefetch_requires_direct_cuda_before_resource_allocation(self):
         with patch.object(dev, 'require_host_memory') as host:
             for flags in [dict(), dict(basis='fp64'), dict(direct_basis=True,cpu_reference=True)]:

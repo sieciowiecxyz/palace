@@ -148,4 +148,15 @@ obejmują wymaganie direct/CUDA, dodatnie markery per solve i profiler jako
 niekwalifikujący RF, capture markers, brak utraty zdarzeń i naturalny cleanup.
 ActualAPI CPU/CUDA relink currentnative PASS; prefetch jakościowo sprawdzony
 w tiny,3mediumcoaxshards/bothports i aktualnym W.3. [Wyniki/argv](basis-prefetch.md),
-[M4](milestones/M4.md) aktywny; upstreamfullsuite i W.4/W.5 nadal NOT RUN.
+[M4](milestones/M4.md) oceniony w EXP94; aktywny [M5](milestones/M5.md). Upstreamfullsuite i W.4/W.5 nadal NOT RUN.
+
+## M4 — reuse i kolejność pomiarów, EXP91–94
+
+Pinned suite124PASS, currentbuild tiny oraz medium3,30/3,55/3,80GHz/oba porty
+TEM/wholefields PASS. Pełna antena3,50GHz/bothports control/candidate PASS
+raw/S/VSWR/energy/power/wholefields; jedna para681,698→602,944s, nie M7median.
+`--defer-postprocessing` ma testy ograniczeń i kolejności store/solver-release/
+measure1/measure2; requires --release-final-solver, dokładnie2LP/1f/rank1/fixedmesh,
+bez visualization/wave/Floquet. `--port-setup-reuse` liczy faktyczne setupy i CSR.
+`--partial-initial-fields` nie rozluźnia rygoru accuracyreference; źródło jest
+zweryfikowanym seedem, brakujący port jawnie zerowany. [Dowody](milestones/M4.md).

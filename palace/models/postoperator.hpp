@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <type_traits>
+#include <utility>
 #include <vector>
 #include <mfem.hpp>
 #include "fem/boundary_derived_field_bundle.hpp"
@@ -500,6 +501,12 @@ public:
 
   // Reuse the existing positive physical mass operators for optional field diagnostics.
   const DomainPostOperator &GetDomainPostOperator() const { return dom_post_op; }
+  // Driver-controlled lifetime: call outside measurement/field diagnostics, rebuild
+  // before the next measurement. Primary fields and the measured CSV cache stay valid.
+  void ResetDomainEnergyOperators(DomainPostOperator replacement = {})
+  {
+    dom_post_op = std::move(replacement);
+  }
 
   // Access grid functions for field solutions. Note that these are NOT const functions. The
   // electrostatics / magnetostatics solver do measurements of the capacitance/ inductance

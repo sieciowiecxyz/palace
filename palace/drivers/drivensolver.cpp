@@ -104,12 +104,34 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   // Set up the linear solver.
   // The operators are constructed for each frequency step and used to initialize the ksp.
+  // Opt-in one-frequency RHS reuse owns operators longer than the referencing solver.
+  std::unique_ptr<ComplexOperator> retained_A2, retained_A, retained_P;
   auto ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
                                                &space_op.GetH1Spaces());
+  const bool reuse_port_setup = std::getenv("PALACE_REUSE_PORT_SETUP") != nullptr;
+  const bool setup_audit = reuse_port_setup || std::getenv("PALACE_PORT_SETUP_AUDIT");
+  const bool release_postprocess_energy = std::getenv("PALACE_RELEASE_POSTPROCESS_ENERGY") != nullptr;
+  bool energy_released = false;
+  MFEM_VERIFY(!release_postprocess_energy ||
+                  (iodata.model.refinement.max_it == 0 && !post_op.WillWriteFields()),
+              "Postprocess energy release requires fixed mesh without visualization writes!");
+  MFEM_VERIFY(!reuse_port_setup ||
+                  (omega_sample.size() == 1 && port_excitations.Size() > 1 && iodata.solver.driven.restart == 1 &&
+                   iodata.model.refinement.max_it == 0 && Mpi::Size(space_op.GetComm()) == 1 &&
+                   space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
+              "Port setup reuse requires one frequency, fixed mesh, one rank and multiple lumped excitations without wave/Floquet ports!");
   const char *release_env = std::getenv("PALACE_RELEASE_FINAL_SOLVER");
   const bool release_final_solver = release_env && std::string(release_env) == "1";
   MFEM_VERIFY(!release_final_solver || iodata.model.refinement.max_it == 0,
               "Final solver release requires fixed mesh (AMR disabled)!");
+
+  const bool defer_postprocessing = std::getenv("PALACE_DEFER_POSTPROCESSING") != nullptr;
+  MFEM_VERIFY(!defer_postprocessing ||
+                  (release_final_solver && omega_sample.size() == 1 &&
+                   port_excitations.Size() == 2 && iodata.solver.driven.restart == 1 &&
+                   Mpi::Size(space_op.GetComm()) == 1 && !post_op.WillWriteFields() &&
+                   space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
+              "Deferred postprocessing requires two lumped excitations, one frequency, one rank, final solver release and no visualization/wave/Floquet ports!");
 
   // Set up RHS vector for the incident field at port boundaries, and the vector for the
   // first frequency step.
@@ -164,6 +186,87 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         iodata.solver.linear.tol, iodata.solver.linear.max_it, 0);
   }
 
+  auto Postprocess = [&](ComplexVector &E, int excitation_idx,
+                         std::size_t excitation_counter, std::size_t omega_i,
+                         double omega, bool initialize_output, double rhs_norm)
+  {
+    MemoryMark("postprocess.begin");
+    if (energy_released)
+    {
+      MemoryMark("postprocess_energy_rebuild.begin");
+      post_op.ResetDomainEnergyOperators(DomainPostOperator(iodata.domains.postpro,
+          space_op.GetMaterialOp(), space_op.GetNDSpace(), space_op.GetCurlSpace()));
+      energy_released = false;
+      Mpi::Print("PALACE_POSTPROCESS_ENERGY_REBUILT: excitation={} frequency_index={}\n",
+                 excitation_idx, omega_i);
+      MemoryMark("postprocess_energy_rebuild.end");
+    }
+    // Start Post-processing.
+    BlockTimer bt0(Timer::POSTPRO);
+    Mpi::Print(" Sol. ||E|| = {:.6e} (||RHS|| = {:.6e})\n",
+               linalg::Norml2(space_op.GetComm(), E),
+               rhs_norm);
+
+    // Compute B = -1/(iω) ∇ x E on the true dofs.
+    Curl.Mult(E.Real(), B.Real());
+    Curl.Mult(E.Imag(), B.Imag());
+    B *= -1.0 / (1i * omega);
+    if (space_op.GetMaterialOp().HasWaveVector())
+    {
+      // Calculate B field correction for Floquet BCs: B += k_F(ω)/ω × E.
+      // With k₀ = k_F_ref/ω_ref stored, k_F(ω)/ω = k_F_ref/ω_ref = k₀, so scale = 1.
+      floquet_corr->AddMult(
+          E, B,
+          space_op.GetMaterialOp().HasFloquetFrequencyScaling() ? 1.0 : 1.0 / omega);
+    }
+
+    if (initialize_output)
+    {
+      // Switch ParaView subfolders once per excitation, after the first solve.
+      post_op.InitializeParaviewDataCollection(excitation_idx);
+    }
+    auto total_domain_energy =
+        post_op.MeasureAndPrintAll(excitation_idx, int(omega_i), E, B, omega);
+    if (std::getenv("PALACE_COAX_TEM_DIAGNOSTIC"))
+    {
+      const char *length = std::getenv("PALACE_COAX_TEM_LENGTH_M");
+      MFEM_VERIFY(length, "Coax diagnostic requires its validated fixture length!");
+      CheckCoaxTEM(post_op.GetEGridFunction(), post_op.GetBGridFunction(), iodata.units,
+                   omega, excitation_idx, std::stod(length));
+    }
+    const char *save_fields = std::getenv("PALACE_SAVE_FIELDS");
+    const char *reference_fields = std::getenv("PALACE_REFERENCE_FIELDS");
+    if (save_fields || reference_fields)
+    {
+      MemoryMark("field_diagnostics.begin");
+      std::vector<int> regions;
+      for (const auto &[idx, data] : iodata.domains.postpro.energy) regions.push_back(idx);
+      CompareFieldSnapshots(post_op.GetEGridFunction(), post_op.GetBGridFunction(),
+                            post_op.GetDomainPostOperator(), regions, excitation_idx,
+                            omega_i, save_fields, reference_fields);
+      MemoryMark("field_diagnostics.end");
+    }
+
+    // Calculate and record the error indicators.
+    Mpi::Print(" Updating solution error estimates\n");
+    AddEstimate(E, B, total_domain_energy, indicator);
+    MemoryMark("postprocess.end");
+    if (release_postprocess_energy &&
+        (excitation_counter < port_excitations.Size() || omega_i + 1 < omega_sample.size()))
+    {
+      MemoryMark("postprocess_energy_release.begin");
+      post_op.ResetDomainEnergyOperators();
+      energy_released = true;
+      Mpi::Print("PALACE_POSTPROCESS_ENERGY_RELEASED: excitation={} frequency_index={}\n",
+                 excitation_idx, omega_i);
+      MemoryMark("postprocess_energy_release.end");
+    }
+  };
+  // One extra true-DOF E field in RAM/VRAM; no disk-backed solver workspace.
+  std::unique_ptr<ComplexVector> deferred_E;
+  int deferred_excitation = 0;
+  double deferred_rhs_norm = 0.0;
+
   // Main excitation and frequency loop.
   auto t0 = Timer::Now();
   std::size_t excitation_counter = 0;
@@ -192,12 +295,26 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       // Assemble frequency dependent matrices and initialize operators in linear
       // solver.
       MemoryMark("preconditioner.begin");
-      auto A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
-      auto A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
+      std::unique_ptr<ComplexOperator> A2, A, P;
+      const bool reuse = reuse_port_setup && retained_A;
+      if (!reuse)
+      {
+        A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
+        A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
                                         K.get(), C.get(), M.get(), A2.get());
-      auto P = space_op.GetPreconditionerMatrix<ComplexOperator>(
+        P = space_op.GetPreconditionerMatrix<ComplexOperator>(
           1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, omega);
-      ksp->SetOperators(*A, *P);
+        ksp->SetOperators(*A, *P);
+        if (reuse_port_setup)
+        {
+          retained_A2 = std::move(A2); retained_A = std::move(A); retained_P = std::move(P);
+        }
+      }
+      if (setup_audit)
+      {
+        Mpi::Print("PALACE_PORT_SETUP: action={} excitation={} frequency_index={}\n",
+                   reuse ? "reuse" : "build", excitation_idx, omega_i);
+      }
       MemoryMark("preconditioner.end");
 
       Mpi::Print(
@@ -218,14 +335,24 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       {
         MFEM_VERIFY(Mpi::Size(space_op.GetComm()) == 1 && iodata.solver.linear.initial_guess,
                     "Field restart requires one rank and InitialGuess=true!");
-        GridFunction initial_E(space_op.GetNDSpace(), true);
-        const std::string stem = "s" + std::to_string(excitation_idx) + "-f" +
-                                 std::to_string(omega_i) + "-E.bin";
-        FieldSnapshot(std::filesystem::path(initial_fields) / stem, initial_E, false);
-        initial_E.Real().GetTrueDofs(E.Real());
-        initial_E.Imag().GetTrueDofs(E.Imag());
-        Mpi::Print("PALACE_FIELD_RESTART: excitation={} frequency_index={} norm_E={:.12e}\n",
-                   excitation_idx, omega_i, linalg::Norml2(space_op.GetComm(), E));
+        const char *mask = std::getenv("PALACE_INITIAL_FIELDS_EXCITATIONS");
+        const bool seeded = !mask || std::string(mask).find("," + std::to_string(excitation_idx) + ",") != std::string::npos;
+        if (seeded)
+        {
+          GridFunction initial_E(space_op.GetNDSpace(), true);
+          const std::string stem = "s" + std::to_string(excitation_idx) + "-f" +
+                                   std::to_string(omega_i) + "-E.bin";
+          FieldSnapshot(std::filesystem::path(initial_fields) / stem, initial_E, false);
+          initial_E.Real().GetTrueDofs(E.Real());
+          initial_E.Imag().GetTrueDofs(E.Imag());
+          Mpi::Print("PALACE_FIELD_RESTART: excitation={} frequency_index={} norm_E={:.12e}\n",
+                     excitation_idx, omega_i, linalg::Norml2(space_op.GetComm(), E));
+        }
+        else
+        {
+          E = 0.0;
+          Mpi::Print("PALACE_FIELD_RESTART_ZERO: excitation={} frequency_index={}\n", excitation_idx, omega_i);
+        }
       }
 
       Mpi::Print("\n");
@@ -244,6 +371,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         A.reset();
         P.reset();
         A2.reset();
+        retained_P.reset(); retained_A.reset(); retained_A2.reset();
         K.reset();
         C.reset();
         M.reset();
@@ -251,57 +379,33 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         MemoryMark("linear_workspace_release.end");
       }
 
-      MemoryMark("postprocess.begin");
-      // Start Post-processing.
-      BlockTimer bt0(Timer::POSTPRO);
-      Mpi::Print(" Sol. ||E|| = {:.6e} (||RHS|| = {:.6e})\n",
-                 linalg::Norml2(space_op.GetComm(), E),
-                 linalg::Norml2(space_op.GetComm(), RHS));
-
-      // Compute B = -1/(iω) ∇ x E on the true dofs.
-      Curl.Mult(E.Real(), B.Real());
-      Curl.Mult(E.Imag(), B.Imag());
-      B *= -1.0 / (1i * omega);
-      if (space_op.GetMaterialOp().HasWaveVector())
+      const double rhs_norm = linalg::Norml2(space_op.GetComm(), RHS);
+      if (defer_postprocessing && excitation_counter == 1)
       {
-        // Calculate B field correction for Floquet BCs: B += k_F(ω)/ω × E.
-        // With k₀ = k_F_ref/ω_ref stored, k_F(ω)/ω = k_F_ref/ω_ref = k₀, so scale = 1.
-        floquet_corr->AddMult(
-            E, B,
-            space_op.GetMaterialOp().HasFloquetFrequencyScaling() ? 1.0 : 1.0 / omega);
+        deferred_E = std::make_unique<ComplexVector>(E.Size());
+        deferred_E->UseDevice(true);
+        *deferred_E = E;
+        deferred_excitation = excitation_idx;
+        deferred_rhs_norm = rhs_norm;
+        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=store excitation={} frequency_index={} logical_bytes={}\n",
+                   excitation_idx, omega_i, 2LL * sizeof(double) * E.Size());
       }
-
-      if (omega_i == omega_start)
+      else
       {
-        // Switch ParaView subfolders once per excitation, after the first solve.
-        post_op.InitializeParaviewDataCollection(excitation_idx);
+        if (deferred_E)
+        {
+          MFEM_VERIFY(!ksp, "Deferred measurements must follow final solver destruction!");
+          Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index=0\n",
+                     deferred_excitation);
+          Postprocess(*deferred_E, deferred_excitation, 1, 0, omega, true, deferred_rhs_norm);
+          deferred_E.reset();
+        }
+        if (defer_postprocessing)
+          Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index={}\n",
+                     excitation_idx, omega_i);
+        Postprocess(E, excitation_idx, excitation_counter, omega_i, omega,
+                    omega_i == omega_start, rhs_norm);
       }
-      auto total_domain_energy =
-          post_op.MeasureAndPrintAll(excitation_idx, int(omega_i), E, B, omega);
-      if (std::getenv("PALACE_COAX_TEM_DIAGNOSTIC"))
-      {
-        const char *length = std::getenv("PALACE_COAX_TEM_LENGTH_M");
-        MFEM_VERIFY(length, "Coax diagnostic requires its validated fixture length!");
-        CheckCoaxTEM(post_op.GetEGridFunction(), post_op.GetBGridFunction(), iodata.units,
-                     omega, excitation_idx, std::stod(length));
-      }
-      const char *save_fields = std::getenv("PALACE_SAVE_FIELDS");
-      const char *reference_fields = std::getenv("PALACE_REFERENCE_FIELDS");
-      if (save_fields || reference_fields)
-      {
-        MemoryMark("field_diagnostics.begin");
-        std::vector<int> regions;
-        for (const auto &[idx, data] : iodata.domains.postpro.energy) regions.push_back(idx);
-        CompareFieldSnapshots(post_op.GetEGridFunction(), post_op.GetBGridFunction(),
-                              post_op.GetDomainPostOperator(), regions, excitation_idx,
-                              omega_i, save_fields, reference_fields);
-        MemoryMark("field_diagnostics.end");
-      }
-
-      // Calculate and record the error indicators.
-      Mpi::Print(" Updating solution error estimates\n");
-      AddEstimate(E, B, total_domain_energy, indicator);
-      MemoryMark("postprocess.end");
     }
 
     // Final postprocessing & printing.

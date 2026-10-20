@@ -46,3 +46,8 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 Środowisko zależności pochodzi z istniejącego, przypiętego obrazu lokalnego. Zwykły build nie pobiera ani nie buduje ponownie MFEM/libCEED/hypre. Przeniesienie środowiska wymaga eksportu/importu obrazów; nie ma jeszcze rejestru obrazów ani zweryfikowanego cold builda wszystkich zależności.
 
 Nowy eksport ma `numerically_validated=false`. Historyczna kwalifikacja dotyczy wskazanych starych binariów i przypadków. Runner sprawdza kompletność wykonania; osobna analiza sprawdza S, energię, residuum i pola. Obecny cel dotyczy jednej 5070 Ti. Obsługa podziału na 2 GPU pozostaje poza jego kryteriami i nie została zakwalifikowana.
+
+- M4 opt-in: `DrivenSolver::SweepUniform` zachowuje A2/A/P dla stałego f/port RHS,
+  a defer trzyma tylko pierwszy true-DOF E do pomiarów po `ksp.reset()`.
+  DomainPostOperator reset/rebuild nie kasuje pól/CSV. Runner audytuje coverage,
+  setup i kolejność; brak zmiany defaultów. Dowody/ograniczenia: docs/milestones/M4.md.

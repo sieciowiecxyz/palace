@@ -84,3 +84,14 @@ Pozostałe profile referencji są diagnostyczne i nie zmieniają domyślnego CUD
 ## Opcjonalny seed HYPRE i scope GPU
 
 `--hypre-pool-mib 256` ogranicza początkową rezerwację urządzenia, nie całą pamięć macierzy; [wyniki i walidacja](hypre-pool.md). Brak flagi zachowuje bazę. Telemetria ma dodatkowo sampled `gpu_process_memory_bytes` dla PID bezpośredniego single-rank entrypointu. N/A i brak procesu pozostają null; nie utożsamiać z globalnym GPU ani totalmanaged.
+
+## Opt-in M4: dwa RHS przed pomiarami
+
+Do standardowych FP32direct/nativecoarse/K64/pool256 można dodać
+`--setup-audit --both-ports --port-setup-reuse --defer-postprocessing
+--release-postprocess-energy --release-gmres-basis --release-final-solver`.
+Defer zachowuje tylko pierwszy wektor E w RAM/VRAM i wykonuje pomiary obu
+portów po zwolnieniu solvera. Wymaga dokładnie2LP/1f/rank1/fixedmesh/restart1,
+bez wizualizacji/wave/Floquet. Snapshoty kontrolne nadal normalnymi plikami.
+Każdy run zapisuje audyty, rawresidual i manifest; pełne argv w PROGRESS EXP94.
+To opcje runtime bez przebudowy; nie globalny default. [Zakres](milestones/M4.md).
