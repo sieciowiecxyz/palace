@@ -306,3 +306,14 @@ regression EXP142 passes14raw/28fieldrows plus TEM/setup/metadata/release.
 EXP141 antennaP2/3,7GHz is an expected diagnostic FAIL at coarse1e-3 gate,
 not a valid full solve. Do not relax thresholds or relabel partial results.
 Commands, provenance, I/O/timing limits and artifacts: [sweep report](milestones/sweeps.md).
+
+### EXP143–147: stała liczba korekcji mixed coarse
+
+163 Python tests PASS: flag2/3/4 wymaga mixed mode, odrzuca inne typy/counts,
+oba markery muszą potwierdzić wybraną liczbę, coarse1e-3 nadal egzekwowane.
+Native build12,050s z cache. Faktyczne runy fixed2/3 tiny i medium PASS dla
+TEM/raw/frozenK/pól; count4 nie wykonano. Antena singleP2/3,7 fixed3 execution
+PASS, brak fieldreference. Pełny3freq/2ports fixed3 FAIL/deadline1800s/5of6solve,
+28partialfieldrows nie są kwalifikacją całości. EXP147 default2 legacy7freq
+14raw/28fields/TEM/count/release PASS. Nie promować3IR ani projekcji z niepełnej
+antenny. Dokładne komendy/proweniencja i granice w raporcie sweepów.

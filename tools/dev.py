@@ -623,15 +623,19 @@ def native_coarse_builds(solves, reuse, profile, frequencies=1):
     return 1 if profile else frequencies if reuse else solves
 
 
-def validate_native_mixed(enabled, native, hybrid, cpu, profile, ams):
+def validate_native_mixed(enabled, native, hybrid, cpu, profile, ams, corrections=None):
     # A bounded profile is allowed, but remains incomplete as an RF solve.
     if enabled and (not native or hybrid is not None or cpu or ams is not None):
         raise ValueError('Native mixed requires native complex coarse without hybrid/CPU/AMS')
+    if corrections is not None and (not enabled or type(corrections) is not int or corrections not in (2,3,4)):
+        raise ValueError('Native mixed fixed corrections require mixed mode and integer 2, 3 or 4')
 
 
-def native_mixed_applied(log, builds):
-    summaries = re.findall(r'PALACE_NATIVE_MIXED_COARSE: solves=(\d+) corrections=2 max_relative_residual=(\S+) backend=cuda_fp64', log)
-    scales = re.findall(r'PALACE_NATIVE_MIXED_SCALE: min=(\S+) max=(\S+) corrections=2 original=complex_fp64', log)
+def native_mixed_applied(log, builds, corrections=2):
+    if type(corrections) is not int or corrections not in (2,3,4):
+        return False
+    summaries = re.findall(rf'PALACE_NATIVE_MIXED_COARSE: solves=(\d+) corrections={corrections} max_relative_residual=(\S+) backend=cuda_fp64', log)
+    scales = re.findall(rf'PALACE_NATIVE_MIXED_SCALE: min=(\S+) max=(\S+) corrections={corrections} original=complex_fp64', log)
     if (builds < 1 or len(summaries) != builds or len(scales) != builds
             or log.count('PALACE_NATIVE_MIXED_COARSE:') != builds
             or log.count('PALACE_NATIVE_MIXED_SCALE:') != builds):
@@ -918,7 +922,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None):
+        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None, native_coarse_corrections=None):
     invocation_started=time.monotonic()
     sweep_predictor=sweep_predictor_mode(sweep_predictor)
     if bool(initial_history)!=(history_frequencies is not None):
@@ -935,7 +939,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             or cpu_reference or nsys_window is not None or ceed_qpool or ams_cycles is not None or cudss_hybrid_mib is not None):
         raise ValueError('Mixed PC basis requires native coarse/right/release-final-solver without CPU/profiler/Qpool/AMS/hybrid')
     validate_native_mixed(native_coarse_fp32, native_complex_coarse, cudss_hybrid_mib,
-                          cpu_reference, nsys_window, ams_cycles)
+                          cpu_reference, nsys_window, ams_cycles, native_coarse_corrections)
     validate_ams(ams_cycles, native_complex_coarse, complex_coarse, cpu_reference, cudss_hybrid_mib,
                  ceed_qpool, setup_audit, port_setup_reuse)
     if direct_basis and basis != 'fp32':
@@ -1033,6 +1037,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
     if native_coarse_fp32:
         flags['PALACE_NATIVE_COARSE_FP32'] = '1'
+        flags['PALACE_NATIVE_COARSE_CORRECTIONS'] = str(native_coarse_corrections if native_coarse_corrections is not None else 2)
     if basis_audit:
         flags['PALACE_CEED_BASIS_AUDIT'] = '1'
     if pc_basis_fp32_forward:
@@ -1113,6 +1118,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_AMS_FIXED_GPU',
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_NATIVE_COARSE_FP32',
+            '--unsetenv', 'PALACE_NATIVE_COARSE_CORRECTIONS',
             '--unsetenv', 'PALACE_CEED_BASIS_AUDIT',
             '--unsetenv', 'PALACE_PC_BASIS_FP32_FORWARD',
             '--unsetenv', 'PALACE_PC_BASIS_COMPENSATED_FORWARD',
@@ -1167,6 +1173,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'release_final_solver': release_final_solver},
                                    'native_complex_coarse': native_complex_coarse,
                                    'native_coarse_fp32': native_coarse_fp32,
+                                   'native_coarse_corrections': (native_coarse_corrections if native_coarse_corrections is not None else 2) if native_coarse_fp32 else None,
                                    'basis_audit': basis_audit,
                                    'pc_basis_fp32_forward': pc_basis_fp32_forward,
                                    'pc_basis_compensated_forward': pc_basis_compensated_forward,
@@ -1245,7 +1252,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                 status['profile_complete'] = status['profile_complete'] and status['native_complex_coarse_applied']
         if native_coarse_fp32:
             status['native_mixed_applied'] = native_mixed_applied(
-                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile,frequency_count))
+                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile,frequency_count),
+                native_coarse_corrections if native_coarse_corrections is not None else 2)
             status['complete'] = status['complete'] and status['native_mixed_applied']
             if profile:
                 status['profile_complete'] = status['profile_complete'] and status['native_mixed_applied']
@@ -1436,7 +1444,8 @@ def main():
     r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
     r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex cuDSS coarse, FP64 default, without real 2N block; implies --complex-coarse')
-    r.add_argument('--native-coarse-fp32', action='store_true', help='Opt-in scaled complex FP32 LU with two original-FP64 CUDA corrections; requires native coarse, no hybrid/AMS')
+    r.add_argument('--native-coarse-fp32', action='store_true', help='Opt-in scaled complex FP32 LU with fixed original-FP64 CUDA corrections (default two); requires native coarse, no hybrid/AMS')
+    r.add_argument('--native-coarse-corrections', type=int, choices=[2,3,4], help='Experimental fixed mixed-coarse correction count; no adaptive stopping or relaxed residual gate')
     r.add_argument('--basis-audit', action='store_true', help='Opt-in host metadata audit of actual libCEED basis dimensions/calls; no vector copies or GPU synchronization')
     pc_basis=r.add_mutually_exclusive_group()
     pc_basis.add_argument('--pc-basis-fp32-forward',action='store_true',help='Experimental PC-only non-tensor forward basis FP32 registers; outer A/residual and transpose stay FP64')
@@ -1482,7 +1491,7 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies)
+            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies,args.native_coarse_corrections)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

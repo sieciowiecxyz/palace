@@ -483,3 +483,62 @@ cachedbuild9,386s,162Python regressions. Fallback
 `build/m6-history/pre-history-native` i `pre-history-manifest.json` zachowane.
 Następne: osobny opt-in fixed3IR przy niezmienionych progach, mały filtr przed
 anteną; żadne adaptive inner count/fallback wewnątrz zwykłego GMRES. M6/M7 otwarte.
+
+## EXP143–147 — fixed3IR: poprawny single-point, pełny sweep nieukończony
+
+`--native-coarse-corrections 2|3|4` wymaga `--native-coarse-fp32`, default2.
+Stały count na każde apply, brak adaptacyjnego early exit/fallback; nie zmienia
+coarse1e-3 ani outer1e-6. GeneralcomplexFP32LU, oryginalny FP64 residual i
+korekcje CUDA. Brak twierdzenia Tensor Cores. Count4 dopuszczony badawczo, NOTRUN.
+
+| Przypadek | Fixed2 → fixed3 | Jakość / zakres |
+| --- | --- | --- |
+| tiny3,8/oba porty, ta sama historia | 22→22iter; end-to-end10,590→9,477s | TEM/K/raw/4fields PASS |
+| medium3,8/oba porty, ta sama historia | 44→44iter; end-to-end26,488→26,220s | TEM/K/raw/4fields PASS |
+| W3P2/3,7/historia | fixed3:40iter/392,401s end-to-end | execution PASS, pola NOTRUN |
+| W3 3,5/3,6/3,7 oba porty, cold/projected | fixed3:1800s deadline | FAIL5/6solve, nie speedup |
+| legacytiny7freq/2ports | default2:16,704s end-to-end | 14raw/28fields/TEM PASS |
+
+Małe porównania: coarse residual tiny8,23e-7→2,76e-7, medium9,32e-5→2,46e-5.
+Medium ΔS≤4,920e-10/ΔVSWR≤5,039e-10/relativeenergy≤3,745e-10. Jedna para,
+różnice walltime małe, nie mediana ani speedup całej anteny.
+
+EXP145 singleP2 sourceEXP138control3,5/3,6 zweryfikowany w całości; target3,7.
+Raw7,959879e-7/coarse8,07e-4<1e-3, więc dodatkowa stała korekcja obsłużyła ten
+przypadek, który przy2IR nie przeszedł. Elapsed389,903+prep2,498=392,401s.
+Cgroup45,972GB, reportedGPU2GiB nie jest fizyczną rezydencją UVM. Nie było
+fieldreference; nie jest to pełna kwalifikacja RF.
+
+EXP146 firstdispatch NOTRUN z braku jawnego `--both-ports` (fixture defaultP2),
+bez uruchomienia solvera. Poprawna komenda poniżej wystartowała raz:
+
+```sh
+python3 tools/dev.py run tshaped-medium artifacts/m6-fixed-ir-antenna-sweep-20261021 \
+  --seconds 1800 --basis fp32 --direct-basis --pc-side right --krylov-size 64 \
+  --native-complex-coarse --native-coarse-fp32 --native-coarse-corrections 3 \
+  --hypre-pool-mib 256 --memory-marks --release-gmres-basis --release-final-solver \
+  --setup-audit --save-fields --both-ports --frequencies 3.5 3.6 3.7 \
+  --frequency-port-batch --port-setup-reuse --release-postprocess-energy \
+  --defer-postprocessing --sweep-predictor projected \
+  --field-reference artifacts/m6-projection-antenna-control-20261021
+```
+
+Wynik exit255/deadline/noOOM, completefalse, iteracje[44,43,41,40,41].
+Pięć końcowych raw≤9,802155e-7. First2freqs28fieldrows E/B≤5,794e-7/1,420e-7,
+ale brak kompletnych pól3,7GHz. Ostatni P2 nadal trwał; brak nowego komunikatu
+błędu coarse. Cgroup47,927GB; cleanup/setup/globalfieldcoverage pozostają FAIL.
+Nie dzielić czasu nieukończonego przez czas kontroli jako speedup. Stara kontrola
+ma inny build/background, nie izoluje kosztu samej trzeciej korekcji.
+**HOLD/REJECT promocji tego wariantu w budżecie1800s**, bez automaticcount4
+lub wydłużania limitu. Default2 i FP64fallback zachowane.
+
+Artefakty `artifacts/m6-fixed-ir-{tiny,medium}-{control,on}-20261021`,
+`artifacts/m6-fixed-ir-root-analysis.py tiny medium`,
+`artifacts/m6-fixed-ir-antenna-p2-20261021`,
+`artifacts/m6-fixed-ir-antenna-sweep-20261021`,
+`artifacts/m6-fixed-ir-antenna-assessment-20261021.json` i
+`artifacts/m6-fixed-ir-legacy-regression-20261021/root-analysis.json`.
+Build12,050s, sourceSHA4fc32f086badb3e4415f0944cc31d0deb99f0242999aed8992c48c18c5521ebc,
+163Python regressions. Fallback `build/m6-fixed-ir/pre-fixed-ir-native` /
+`pre-fixed-ir-manifest.json`. Manifest pozostaje numerically_validated=false;
+M6/M7 i pozostała ocena symbolic/recycling/PROM nadal otwarte.

@@ -29,7 +29,7 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
 - EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
 - EXP135–138 complex projection: math96/coax7freq PASS, lecz W3 mixed coarse2IR FAIL przyP2/3,7GHz (1,460e-3>1e-3). Tylko5/6solve, nie speedup/pełnaRFkwalifikacja; nowy wariant defaultOFF/HOLD.
-- EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. Następne: stałe3korekcje bez zmiany progów, symbolic/recycling/PROM/heldout. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. EXP143–147: fixed3 coax PASS/singleP2 executionPASS, pełny sweep deadlineFAIL5/6, niepromowany. Następne: symbolic/recycling/PROM/heldout i końcowa kwalifikacja. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -3257,3 +3257,72 @@ EXP139–142 closechunk:162Python+8shell+docscheck/diffPASS; sameLuna read-only
 docs-garden identifiedone stalefuture replaylineM6, rootfixedchronology.
 Verifiedcurrentnative/legacyTEM/raw28fields; localcommit only, no paidcompute.
 GoalactiveM6. Nextfixed3IRtiny/mediumgatebeforetargetedW3, originalfailpreserved.
+
+EXP143 prereg fixedIRopt-in: --native-coarse-corrections integer2..4 with
+--native-coarse-fp32 only, default2 unchanged. Native fixedcount perrun, no
+adaptiveearlyexit/fallback; coarse1e-3/outer1e-6 unchanged. Both precision
+markers and command/env count audited;163PythonPASS. Tiny3,8bothports verified
+source3,6/3,7 control2IR vs3IR, then mediumsame afterrootgate, currentbuildboth.
+Sameconfig/mesh/currentA, fields/TEM/K/raw;60stiny/180smedium, 60GiBnoSwap/6GiBguard.
+UseEXP139/140controls asfieldreferences, not historyasreference. Fixed3maycost
+more; no speedclaim from feweriterations or successclass alone. W3P2only3,7
+historysourceEXP138 aftercoaxPASS,600s planned forsetup~120s plusfulliterations;
+no repeatfirst4systems/no newfullsweepyet. Cachedbuildjobs2; fallback
+build/m6-fixed-ir/pre-fixed-ir-{native,manifest.json}. No depsrebuild/cloud.
+
+EXP143 tinyfixed2vs3PASS samecurrentbuild/config/historyf3,6/3,7→3,8bothports,
+22/22outeriterations,24/24coarsesolves. Coarserelativemax8,23e-7→2,76e-7,
+no loosenedgates. RootTEM/raw/K/fields/countauditPASS; onepairtime10,590→9,477s
+end-to-end notstatisticalspeedproof. Cachednative12,05s,163PythonPASS.
+EXP144 prereg samepairmedium180seach, fieldrefEXP140coldcontrol, rootgate
+beforeW3P2/3,7 singlefrequencyhistory600s. No extra hypotheses/defaultchanges.
+
+EXP144 mediumfixed2vs3PASS:44/44iterations,46coarsesolves, originalcoarse
+relative9,32e-5→2,46e-5. Raw/wholefields/TEM/frozenK/count/auditsPASS.
+End-to-end26,488→26,220s onepair/negligibledelta, notnetgainclaim.
+EXP145 prereg W3P2only3,7GHz fixed3 withsameverifiedhistoryasEXP141,600s
+limitsetup~120s+iterations, nofieldreference(no single-pointmatchingreferenceyet).
+Ifcomplete comparetargetfrequencyfields tocompleteEXP138control viaexplicit
+indexmap withinputphysics/hash checks; do notfakeconfigs/sourcecompletion.
+Ifcoarsegatefails preserveFAIL; no automaticcount4/tolerancechange.
+
+EXP145 executionPASS W3P2/3,7fixed3:40iter/raw7,959879e-7/coarse8,07e-4<1e-3.
+Elapsed389,903s+prep2,498s=end-to-end392,401s; cgroup45,972GB (reportedGPU2GiB
+notphysicalUVM). No fieldreference, so notyetwholefieldqualification orspeedup.
+EXP146 prereg fullthreefrequencies3,5/3,6/3,7bothports projectedfixed3, original
+EXP138controlcompleteasfieldreference, coldstart/noexternalhistory.1800s cap
+predeclared: sixsolves, oldcontrol1574s, per-fdeferredrelease+reuse/K64/Tol1e-6.
+Newfixed3mechanism already passedtiny/medium and failingP2diagnostic; thisis
+notblindoldretry. Requireall6raw/42fields/RFenergy/counts/scopePASS; no partial
+speedclaim or tolerancechange. ExistingEXP138partialFAIL retained. Compare
+accuracytooldcontrol; crossbuildtime notisolatednewmechanisms, no netgainproof.
+Afterassessment closeM6fixedIRchunk/docs, evaluatebudgetforfinalqualification.
+
+EXP146 firstdispatch NOTRUN: runner rejected omitted --both-ports before
+solver/outputallocation (fixturedefaultP2). Explicit --both-ports corrects
+requestedtwo-excitation scope; no numericalretry or physics/tolerancechange.
+
+EXP146 fullsweepFAILdeadline1800s/exit255/noOOM,5of6solves/209iterations
+[44,43,41,40,41],5raw≤9,802155e-7,28fieldsatfirst2fonly.3,7P1completed,
+P2stillrunningatdeadline, no coarsefailuremessage; finalcleanup/countaudits
+falseexpected. Do notpromotefixed3/projectedantenna speedorfullquality.
+EXP145singleP2executionPASS≠wholefieldqualification. Keepfixed2default/FP64
+fallback; no blindcount4/deadlineextension. Rootassessment
+artifacts/m6-fixed-ir-antenna-assessment-20261021.json.
+EXP147 prereg currentnative legacytiny7freq2ports default2(noexplicitcount),
+nohistory/predictor, fieldreferenceEXP136control;60s, allTEM/raw/28fields.
+Then docs-garden/rootcommitfixedIRboundedassessment; M6/M7remainopen.
+
+EXP147 legacydefault2currentnativePASS:14raw≤9,919892e-7/28fields/TEM/energy/
+setup/deferred/count2/cleanupPASS, elapsed16,573/prep0,132/end-to-end16,704s.
+Actualartifact artifacts/m6-fixed-ir-legacy-regression-20261021 (Lunafinal
+linktypo namedoldhistorydirectory; rootverifiedactualnewartifactandmanifest).
+CurrentnativeSHA4fc32f086badb3e4415f0944cc31d0deb99f0242999aed8992c48c18c5521ebc.
+FixedIRassessment bounded/closedwithoutpromotion, default2andFP64fallbackkept.
+M6.6symbolic/recycling/PROMremainingbeforeM7; no wholegoalcompletion.
+
+EXP143–147 closechunk163Python+8shell+docscheck/diffPASS; sameLunaread-only
+garden finallyconfirmedcorrectEXP147folder/artifact (initialfalsealarmread
+oldEXP142folder, rootcrosscheckedbothsource/resultSHAs). No docsnumbercorrection
+needed. Localcommit only/no push; no livejobs. Default2/FP64fallbackretained,
+fixed3fullsweepFAIL andfieldlimitsstayvisible. GoalactiveM6.

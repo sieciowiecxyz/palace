@@ -12,6 +12,21 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_native_mixed_fixed_count_is_explicit_strict_and_audited(self):
+        for count in [2,3,4]:
+            dev.validate_native_mixed(True,True,None,False,None,None,count)
+            log=(f'PALACE_NATIVE_MIXED_SCALE: min=0.1 max=10 corrections={count} original=complex_fp64\n'
+                 f'PALACE_NATIVE_MIXED_COARSE: solves=20 corrections={count} max_relative_residual=1e-8 backend=cuda_fp64\n'
+                 'CUDSS_MEMORY: precision=fp32 managed=1 peak_bytes=100 live_bytes=0 allocations=2\n')
+            self.assertTrue(dev.native_mixed_applied(log,1,count))
+            self.assertFalse(dev.native_mixed_applied(log,1,3 if count==2 else 2))
+            self.assertFalse(dev.native_mixed_applied(log.replace('1e-8','1.01e-3'),1,count))
+            self.assertFalse(dev.native_mixed_applied(log.replace(f'corrections={count} original', 'corrections=1 original'),1,count))
+            with self.assertRaises(ValueError):dev.validate_native_mixed(False,True,None,False,None,None,count)
+        for count in [0,1,5,True,3.0,'3']:
+            with self.assertRaises(ValueError):dev.validate_native_mixed(True,True,None,False,None,None,count)
+            self.assertFalse(dev.native_mixed_applied('',1,count))
+
     def test_native_partial_profile_stops_in_first_solve_without_weakening_full_coverage(self):
         self.assertEqual(dev.native_coarse_builds(6, False, None),6)
         self.assertEqual(dev.native_coarse_builds(6, False, {'first':30,'count':2}),1)

@@ -46,6 +46,17 @@ bool Enabled(const char *name)
   return value && std::string_view(value) == "1";
 }
 
+int FixedCorrections(bool mixed)
+{
+  const char *value = std::getenv("PALACE_NATIVE_COARSE_CORRECTIONS");
+  if (!value) return 2;
+  MFEM_VERIFY(mixed, "Fixed coarse corrections require native mixed precision!");
+  const std::string_view count(value);
+  MFEM_VERIFY(count == "2" || count == "3" || count == "4",
+              "Fixed coarse corrections must be 2, 3 or 4!");
+  return value[0] - '0';
+}
+
 }  // namespace
 
 struct ComplexCuDSSSolver::Impl
@@ -59,6 +70,7 @@ struct ComplexCuDSSSolver::Impl
   mutable Vector rhs, solution;
   MPI_Comm comm;
   const bool mixed = Enabled("PALACE_NATIVE_COARSE_FP32");
+  const int corrections = FixedCorrections(mixed);
   Vector scale;
   mutable Vector residual;
   mfem::Array<cuComplex> float_values;
@@ -80,8 +92,8 @@ struct ComplexCuDSSSolver::Impl
   {
     if (handle) Sync();
     if (handle && mixed && solves)
-      Mpi::Print("PALACE_NATIVE_MIXED_COARSE: solves={} corrections=2 max_relative_residual={:.9e} backend=cuda_fp64\n",
-                 solves, max_residual);
+      Mpi::Print("PALACE_NATIVE_MIXED_COARSE: solves={} corrections={} max_relative_residual={:.9e} backend=cuda_fp64\n",
+                 solves, corrections, max_residual);
     if (data) Check(cudssDataDestroy(handle, data));
     if (matrix) Check(cudssMatrixDestroy(matrix));
     if (rhs_matrix) Check(cudssMatrixDestroy(rhs_matrix));
@@ -188,8 +200,8 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     impl->scale.SetSize(n);
     std::copy(scales.begin(), scales.end(), impl->scale.HostWrite());
     const auto range = std::minmax_element(scales.begin(), scales.end());
-    Mpi::Print("PALACE_NATIVE_MIXED_SCALE: min={:.9e} max={:.9e} corrections=2 original=complex_fp64\n",
-               *range.first, *range.second);
+    Mpi::Print("PALACE_NATIVE_MIXED_SCALE: min={:.9e} max={:.9e} corrections={} original=complex_fp64\n",
+               *range.first, *range.second, impl->corrections);
   }
   const bool audit = std::getenv("PALACE_PORT_SETUP_AUDIT") != nullptr;
   if (audit)
@@ -318,7 +330,8 @@ void ComplexCuDSSSolver::Mult(const ComplexVector &x, ComplexVector &y) const
   {
     const auto *b = reinterpret_cast<const cuDoubleComplex *>(impl->rhs.Read());
     auto *s = reinterpret_cast<cuDoubleComplex *>(impl->solution.Write());
-    for (int step = 0; step <= 2; ++step)
+    // Keep a fixed count for every apply: no residual-dependent PC changes in GMRES.
+    for (int step = 0; step <= impl->corrections; ++step)
     {
       auto *r = reinterpret_cast<cuDoubleComplex *>(impl->residual.Write());
       if (step) CheckCuda(mixedcoarse::Residual(width, 1, impl->offsets.Read(), impl->columns.Read(),
