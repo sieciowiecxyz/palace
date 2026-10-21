@@ -112,3 +112,12 @@ właściwy complexMaxwell i medium pozostają. Nie łączyć native/complexcoars
 hybrid/CPU/Qpool/setupaudit/reuse. Wymagana rzeczywista HYPREdevicepolicy.
 Przetestowano2 z parserowego zakresu1..4; W3FAIL, więc brak promocji. Zwykły
 nativeFP64fallback zachowany. [Ocena i ograniczenia](ams-assessment.md).
+
+## Audyt baz — M6.1
+
+`--basis-audit` włącza host metadata w istniejącym adapterze; wymaga aktualnego
+cached buildu z tools/adapter/ceed_audit.cpp i nagłówkami libCEED. Nie przebudowuje
+MFEM/libCEED/hypre. Zmiana git revision może przebudować main.cpp z osadzonym
+git_describe. Po buildzie samo włączenie/wyłączenie flagi nie wymaga kompilacji.
+AuditJSON i agregaty logu małe; bez field copies/sync/dyskowego workspace.
+[Metoda, argv i kwalifikacja](ceed-basis-audit.md).

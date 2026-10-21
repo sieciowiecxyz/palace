@@ -186,3 +186,12 @@ niezmienionej fizyki/outertol, jawnych2cycles/tol0/devicepolicy i brakuCuDSS.
 Tinyprofile0:2 actualHYPRE/cuSPARSE CUDA wcoarsephase/strictPASS, umyślniepartial.
 AntenaW3P2deadline900sFAIL; nie ma końcowego residuum ani porównania pól.
 Nie podnosić deadline/Tol, by zmienić status. [Dane](ams-assessment.md).
+
+
+## M6.1 — actual basis metadata, EXP105–106
+
+142 pinned tests PASS. Parser regressions cover coverage/footer/counts/enums,
+FP64ABI, transpose/add/weight lengths, malformed records and oversized workspace
+vs required logical action bytes. Tiny samebuild control/audit and full W.3P2
+with audit passed raw/wholefields/S/VSWR/energy/power; this is metadata validation,
+not a new performance promotion. [Proofs and exact argv](ceed-basis-audit.md).

@@ -18,7 +18,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP98–101 scaled native complexFP32/dwie FP64 CUDA korekcje: API/W.2 trzyfreq/oba porty i W.3P2 PASS. Jedna para W.3 339,362→273,843s (−19,31%),35/35iter; cgroup56,027→45,376GB (−19,01%). Pola/S/VSWR/energia/raw PASS; opt-in bez nowego defaultu. Raport docs/milestones/mixed-coarse-plan.md; build18,615s, fallback build/m5-mixed/pre-mixed-native.
 - EXP102 M5.5 strict late30:2 profile PASS: UVM251,125→186,635GB (−25,68%) w dwóch iteracjach; okno12,944→10,530s. To nie pełny migrationtotal ani nowy RFsolve; docs/mixed-coarse-profile.md.
 - EXP104: actual exportSHA powiązany z mesh audit; PCBbbox72mm, wybrany PCB/feedsubset91,676×72×47,750mm. SingleHSG0,1mm wymaga36,144GBbase. Publicnesting odrzucony; directportgprMaxREJECT bez nowego sprzęgania/subcell. SolverNOTRUN po resource/API gate, nie blanketFDTDrejection. Audyt M5.1–M5.6 w docs/milestones/M5.md.
-- Następne M6.1: actual P/Q/N/q_comp dla MAGMA basis/apply; sourcecustombranch≤40 zweryfikowana z pinem, samecuBLASmathmode nie obejmie tych kerneli. M6.6 sweep3,3–3,9GHz/M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode; M6/M7/W.4/W.5/3powtórzenia nadal otwarte.
+- EXP105–106 M6.1 PASS: host audit tiny i pełny W.3,108grup/14627calls/zeroerrors; raw/pola/S/energy PASS. W.3 272,718s/35iter (kontrola audytu, nie nowy speedup). Actual Hcurl P20/Q14/qcomp3/N1601320; wymagane bytes osobno od długości workspace. docs/ceed-basis-audit.md.
+- Następne M6.2: mały biblioteczny FP32/TF32 basis prototype z rzeczywistymi kształtami, FP64 reference, konwersjami/packing/transpose/add i workspace. Prosty convert→GEMM→convert może podwoić logiczny ruch; mierzyć całość. M6.6 sweep/M7.5 geometria NOT RUN; M6/M7/W.4/W.5/3powtórzenia nadal otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2474,3 +2475,49 @@ Root rechecked current W2/W3/profile/source receipts +unchangednative manifest.
 SameLuna read-only criticaldocs-garden PASS includingconditionalM5.6benchmark
 gate andlimitations. No runtime/performanceclaim fromsourceaudit. M6.1actual
 dimensionaudit isnext; fullgoal/W4/W5/M7 remainOPEN.
+
+EXP105 preregistration M6.1: opt-in --basis-audit via existing UVM/cuDSS adapter,
+new host-only TU intercepts CeedBasisApply/ApplyAdd but always callsoriginal.
+After successful call queryCPUmetadata(P/Q/elements/components/qcomp/space/topo,
+eval/transpose/add/vectorlength), aggregate<=2048groups/counts. No field copies,
+CUDA calls/sync, vector/workspace allocation or arithmetic replacement. Disabled
+path only forwards; enabled counters areprocess-lifetimehostbookkeeping. Parser
+requires exactsinglefooter/totalcalls/zeroqueryerrors/zerooverflow, FP64ABI,
+validenums/bufferlengths. CountsAPIcalls, NOTGPUtime/uniqueallocations orPCrole.
+Cachedbuildjobs2 shouldcompileonlyadapter(noPalace/depsTUs); snapshot
+build/m6-basis-audit/pre-audit-native +manifest. Firstcoax-tiny3.55GHz/bothports
+samebuild controlOFF vs auditON60s each, mixedcoarse/directbasis/reuse/deferred
+sameflags andqualifiedfieldsref m5-mixed-tiny-on-20261021. Frozenqualityunchanged.
+Root checksallactuals beforeW3partialaudit. No paidcompute/appsclosing/swap.
+
+EXP105 root review: tiny bothports control/audit complete,40/42iterations each,
+16.526/16.606s diagnosticpair. Independent CSV maxdeltaS3.340e-10,
+VSWR6.483e-10,relativeenergy7.206e-10,portpower6.531e-10; wholefields PASS.
+46groups/18882calls/zeroerrors/overflow; auditJSON24075B,47taglines9844B.
+Cachedbuild8.455s recompiledmain.cpp+link plusadapter, no dependencies rebuilt;
+expectedadapter-only statement above was prediction, notactual. No speedclaim.
+
+EXP106 prereg: one full W3 tshaped-medium3.50GHz/P2 --basis-audit,900s hardlimit,
+60GiB/no swap/hostguard, same native mixed/directFP32 K64/right/seed asEXP101.
+Reference m5-mixed-antenna-p2-control-20261021 independentFP64coarse, frozenK.
+Aim actual basis P/Q/N/qcomp/transpose/add dimensions across setup/solve/postproc;
+no attribution ofAPIcounts toGPUtime orPC-onlyrole. Output m6-basis-audit-antenna-p2-20261021.
+One run (expected~274s), not multiband/benchmarkmedian. No physicschange/paidcompute.
+
+EXP106 completed272.718s/35iter,rawRHS8.357105e-7,wholefields7regionsPASS;
+rootCSV deltaS7.029e-10/VSWR2.486e-9/energy3.548e-10/power3.113e-10.
+Audit108groups/14627calls/errors0/overflow0,JSON55809B/taglines22789B.
+Source a217334ae31f5df0a51953bc9e78bbc42cd4f3abab42121c95d0ecc59e4203ae.
+Actual frequenttetHcurl20/14/qcomp3/N1601320; helpers/triangle/Q6 included.
+Parser separateslengthvsrequiredbytes: workspace1.973GB notactioninput256.211MB.
+Denseaction2.690GFLOP/logicalminimum794.255MB; simpleFP64→FP32→GEMM→FP64
+idealtraffic1.589GB+397.127MBfloatworkspace, notphysicalmeasuredtraffic/runtime.
+Rootreceipt artifacts/m6-basis-audit-antenna-root-analysis-20261021.json.
+M6.1qualifiedcurrentfixture; M6.2next actualbasis/libraryprototype seconds-first,
+conversion/transpose/add included, noTCclaim/globaloperatorprecisionchange.
+
+EXP105–106 checkpoint:142pinnedtests/8shell/docschecker/diffcheck PASS.
+SameLuna read-only docs-garden PASS; minor table/derivedreceipt wording clarified.
+Root reviewed code/logs/CSVs/fieldhashes and honest auditlimits; no newnative
+rebuild needed forPythonparser/docs. M6.1 PASScurrentfixture, M6.2 next;
+M6/M7/sweeps/W4/W5/median/generalization remainOPEN. No paidcompute/swap/appsclosing.

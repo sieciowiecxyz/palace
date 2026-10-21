@@ -11,6 +11,7 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 - `palace/`, `cmake/`, `test/`: źródła i testy upstream. Zaimportowane rozszerzenia są w zwykłym kodzie C++, nie stosowane ponownie jako patche.
 - `tools/dev.py`: lokalny przyrostowy build, manifesty, rozpakowanie fixtures, ograniczony runner i pakowanie. Python stdlib, Podman, zstd; Linux x86-64.
 - `tools/adapter/`: dotychczasowy adapter CUDA UVM/cuDSS; FP32 faktory są opcjonalne, runner domyślnie używa faktorów FP64.
+- `tools/adapter/ceed_audit.cpp` i `tools/ceed_basis_audit.py`: opt-in `--basis-audit`, oryginalne apply bez zmian, host metadata/call counts; wymagane logical bytes osobno od długości wektorów. Zero query errors/overflow i ścisły parser wymagane do kompletności; nie profiler/rezydencja/PC-role. docs/ceed-basis-audit.md.
 - `palace/linalg/complexcudss.cpp`/`mixedcoarse.hpp`: native FP64 domyślnie, opt-in `--native-coarse-fp32` to GENERAL complex FP32 LU +scaling i dwie oryginalne FP64 CUDA korekcje. Odrębne od realnego shima; runner sprawdza dtype/cleanup/coarse residual. W.2/W.3 zakres i ograniczenia w docs/milestones/mixed-coarse-plan.md.
 - `tools/runtime.json`: przypięte lokalne obrazy zależności i wersje; `tools/import.json`: pochodzenie zaimportowanych źródeł i zasad vibecoding.
 - `tools/containers/`: cienka warstwa ccache na gotowym builderze i runtime z binariami forka.

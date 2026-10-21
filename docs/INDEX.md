@@ -34,6 +34,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M6: kernele CUDA i sweepy](milestones/M6.md)
   - Czytaj gdy: wznawiasz aktywny etap kernel/batching/TF32 oraz planujesz rzeczywiste wymiary operatorów
   - Opis: Aktualny profil i source MAGMA custom branch≤40, kolejność pomiarów P/Q/N i W.1→W.3; brak deklaracji TC lub nowego speedupu.
+- [M6.1: audyt baz libCEED](ceed-basis-audit.md)
+  - Czytaj gdy: wybierasz kształty prototypu FP32/TF32 lub oceniasz długości workspace
+  - Opis: EXP105–106 host metadata tiny/W.3, frozen quality PASS, logiczne bytes osobno od długości buforów; brak deklaracji TC/speedupu.
 - [M5: hybrid cuDSS](native-hybrid-memory.md)
   - Czytaj gdy: oceniasz actual hybrid memory lub wracasz do odrzuconego budżetu GPU
   - Opis: API i W.3P2 poprawne, ale4/6GiB bez net speedup; coarse2× szybciej, reszta PC wolniej. UVM fallback, actualminimum i granice pomiarów.

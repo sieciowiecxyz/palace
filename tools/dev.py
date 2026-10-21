@@ -133,7 +133,8 @@ def build(jobs):
                     command(['podman', 'exec', name, '/usr/local/cuda/bin/nvcc', '-std=c++17',
                              '-arch=sm_' + settings['architecture'], '-shared', '-Xcompiler=-fPIC',
                              '/src/palace/tools/adapter/cudss_fp32.cu',
-                             '/src/palace/tools/adapter/cuda_memory.cpp', '-I/opt/cudss/include',
+                             '/src/palace/tools/adapter/cuda_memory.cpp',
+                             '/src/palace/tools/adapter/ceed_audit.cpp', '-I/opt/cudss/include', '-I/opt/view/include',
                              '--cudart=shared', '-ldl', '-o', '/tmp/palace-adapter.so'],
                             stdout=log, stderr=subprocess.STDOUT, timeout=180)
                     command(['podman', 'cp', name + ':/tmp/palace-adapter.so', adapter], stdout=log)
@@ -723,7 +724,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False):
+        native_coarse_fp32=False, basis_audit=False):
     validate_native_mixed(native_coarse_fp32, native_complex_coarse, cudss_hybrid_mib,
                           cpu_reference, nsys_window, ams_cycles)
     validate_ams(ams_cycles, native_complex_coarse, complex_coarse, cpu_reference, cudss_hybrid_mib,
@@ -811,6 +812,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
     if native_coarse_fp32:
         flags['PALACE_NATIVE_COARSE_FP32'] = '1'
+    if basis_audit:
+        flags['PALACE_CEED_BASIS_AUDIT'] = '1'
     if cudss_hybrid_mib is not None:
         flags['PALACE_CUDSS_HYBRID_MIB'] = str(cudss_hybrid_mib)
     if ams_cycles is not None:
@@ -876,6 +879,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_AMS_FIXED_GPU',
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_NATIVE_COARSE_FP32',
+            '--unsetenv', 'PALACE_CEED_BASIS_AUDIT',
             '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_KRYLOV_PROFILE',
             '--unsetenv', 'PALACE_PROFILE_CAPTURE_RANGE',
@@ -923,6 +927,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'release_final_solver': release_final_solver},
                                    'native_complex_coarse': native_complex_coarse,
                                    'native_coarse_fp32': native_coarse_fp32,
+                                   'basis_audit': basis_audit,
                                    'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
@@ -997,6 +1002,17 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['complete'] = status['complete'] and status['native_mixed_applied']
             if profile:
                 status['profile_complete'] = status['profile_complete'] and status['native_mixed_applied']
+        if basis_audit:
+            import ceed_basis_audit
+            try:
+                audit = ceed_basis_audit.analyze((output/'palace.log').read_text())
+            except (ValueError, TypeError, KeyError) as error:
+                audit = dict(passed=False,error=str(error),scope='Basis metadata audit failed; no dimension qualification')
+            write(output/'basis-audit.json',audit)
+            status['basis_audit_passed'] = audit['passed']
+            status['complete'] = status['complete'] and audit['passed']
+            if profile:
+                status['profile_complete'] = status['profile_complete'] and audit['passed']
         if setup_audit or port_setup_reuse:
             audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse)
             write(output/'port-setup-audit.json',audit)
@@ -1146,6 +1162,7 @@ def main():
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
     r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex cuDSS coarse, FP64 default, without real 2N block; implies --complex-coarse')
     r.add_argument('--native-coarse-fp32', action='store_true', help='Opt-in scaled complex FP32 LU with two original-FP64 CUDA corrections; requires native coarse, no hybrid/AMS')
+    r.add_argument('--basis-audit', action='store_true', help='Opt-in host metadata audit of actual libCEED basis dimensions/calls; no vector copies or GPU synchronization')
     r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Partial CUDA trace with calibrated host phases; FIRST=0..32, COUNT=2..8; no RF qualification')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
@@ -1187,7 +1204,7 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32)
+            args.native_coarse_fp32, args.basis_audit)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),
