@@ -29,7 +29,7 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
 - EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
 - EXP135–138 complex projection: math96/coax7freq PASS, lecz W3 mixed coarse2IR FAIL przyP2/3,7GHz (1,460e-3>1e-3). Tylko5/6solve, nie speedup/pełnaRFkwalifikacja; nowy wariant defaultOFF/HOLD.
-- EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. EXP143–147: fixed3 coax PASS/singleP2 executionPASS, pełny sweep deadlineFAIL5/6, niepromowany. Następne: symbolic/recycling/PROM/heldout i końcowa kwalifikacja. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. EXP143–147: fixed3 coax PASS/singleP2 executionPASS, pełny sweep deadlineFAIL5/6, niepromowany. EXP148–152: PROM4 held-outPASS, lecz +19,77%czasu/+11,77%cgroup vsbestuniform; REJECT promocji. Symbolic upperbound~2,2%, full recycling niepromowany. Następne: pełny7f anteny wbounded chunks, potem końcowa kwalifikacja. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -3326,3 +3326,78 @@ garden finallyconfirmedcorrectEXP147folder/artifact (initialfalsealarmread
 oldEXP142folder, rootcrosscheckedbothsource/resultSHAs). No docsnumbercorrection
 needed. Localcommit only/no push; no livejobs. Default2/FP64fallbackretained,
 fixed3fullsweepFAIL andfieldlimitsstayvisible. GoalactiveM6.
+
+EXP148 source/budget/prereg: symbolicreuse currentW3complete3fanalysis
+17,136+17,331+17,273=51,740s of1574,144s. Ideal skip2lateranalyses saves
+34,604s(~2,20%) upperboundbeforecachecost, notmeasuredspeedup. NVIDIAcuDSS
+Tipsandtricks docs confirm analysisreuse/refactorization forunchangedpattern;
+currentSetOperatorClear and per-f deferred release destroycontext. Retaining
+LU throughpostprocess mayviolate existingpeakbenefit; no blindnumericfactorreuse.
+Fullrecyclingrequires retaineddirectionsandcurrentAimages;4+4complexE adds
+1,436GB (179499584B each), orthogonalization/update/Aactions extra. Existing
+GMRES<64iter so restartdeflationbenefit not demonstrated; no blanketimpossibility.
+Priorityremainingfilter existingPROMwithheldoutoriginalraw, notnewFEMengine.
+New isolatedtools/experiments/prom_sweep.py copiesverifiedcompletedcoax7f
+reference; onlyAdaptiveTol.01/AdaptiveMaxSamples2 changed. FourHDMsolves
+(twoendpointsperport),14online originalfullA residuals,10heldout; no fallback
+orloweredtol. NativeOriginalRelativeResidualbuildsfullA/b, rawgate1e-6;
+separatefieldenergycomparisonsallsamples; failedqualitynotcomplete. Readonly
+reference, measuredordinaryIO, nohotdiskworkspace;165PythonPASS. Native
+flags defaultOFF, adaptive skipestimator respects existingexplicitenvoptin.
+First tiny60s then medium180sonlyafterrootassessment; neitherantennaqualification
+norautomaticpromotion. Cachejobs2/fallbackbuild/m6-prom/pre-prom-native.
+
+EXP148 tinyPROM2endpointsperport: executionPASS4HDM/14online/10heldout/28fields
+PASS, but originalrawFAIL max2,286513e-6>1e-6; also trainingmax1,052263e-6
+vsHDMraw≤9,6714e-7. Completefalse kept. E/B≤3,8722e-7/9,8918e-7; TEMsamples
+≤0,449754%. Elapsed12,609/end-to-end12,684s, noqualifiedspeedupfromfailedquality.
+BuildfirstattemptcompileFAIL(noSpaceOperator.Initialize), rootremovedinvalid
+call andrestrictedresidualhelperlumpedports; cachedcorrectbuild19,360s.
+EXP149 prereg tinyPROM3samples/port withexplicitHDMTol1e-8 (tighter than
+source1e-6, originalonlinegateunchanged1e-6),60s. Addressesbothinterpolation
+spanandtrainingerrorfloor; no isolatedcauseattribution. Newoptionrejects
+loosertolerance/NaN/types,165testsPASS. No rebuildneeded(Pythononly).
+Mediumonlyafterquality/TEM/KrootPASS; no antenna run aftertinyFAIL.
+
+EXP149 tinyPROM3/offlineTol1e-8PASS:6HDM/14online/10heldout, dimension12,
+rawmax3,09e-8/offline≤9,14e-9. Wholefields28rows/TEM/frozenRFenergyrootPASS,
+receipt/replayartifacts/m6-prom-root-analysis.py tiny.14,793elapsed/14,872
+end-to-end,cgroup607113216B. Differentbuild/policyvsoldreference, noisolated
+speedup/antenna/medianclaim.
+EXP150 prereg samePROM3tightmedium7freq180s, sourceEXP137mediumuniformcontrol;
+all14originalraw/28fields/TEM/RFenergy, no newnativebuild/noantennauntilgate.
+
+EXP150 mediumPROM3tight executionPASS6HDM/14online/dim12, but rawFAIL
+max2,2231e-6 despiteoffline≤7,2605e-9; fields28rowsPASS.74,683elapsed/75,112
+end-to-end,cgroup3,158GB. Notantenna/globalquality orspeedpass.
+EXP151 prereg lastboundedPROM4/offline1e-8 medium180s,8HDMvs14full; projection
+span hypothesis notloosening. Estimatedcost~90–100s vsoldbest7f~75s, so even
+qualityPASSwouldnotalonejustifyantenna/netpromotion. Freezealgorithm/sample
+budget here; ifnofrozenquality+usefulnetcost stopcurrentPROMimplementation
+assessment, noautomatic5/6samplesorantenna. Currentnativeunchanged.
+
+EXP151 PROM4mediumPASS rawmax2,5762e-8/offline≤7,3037e-9,8HDM/dim16/14online.
+Heldout10 (actualadditionalgreedysamplesareoffgrid); Lunareportcount8training/
+6heldoutwasincorrect, rootverifiednativeflags/provenance and auditheld_out10. All28fieldrows/TEM/RFenergyPASS, rootreceipt
+artifacts/m6-prom-medium-four-root-analysis-20261021.json. Elapsed90,480/
+end-to-end90,729s/cgroup2,807GB; nofastclaim fromfewerfullsolves.
+EXP152 prereg currentbuildbestuniformmedium7f(defaultmixed2IR/reuse/deferred),
+180s, fieldreferenceEXP137control; sametargetphysics/raw/fields/TEM/RFenergy.
+ThiscontrolswholechosenstrategyvsPROM4, notisolatedPROMorcoarseprecision.
+OnlyonepairnotM7median; decidePROMpromotionassessmentscopebeforeantenna.
+
+EXP152 currentbuildbestuniformPASS14raw/28fields/TEM/energy,509iter,
+elapsed75,455/end-to-end75,752s/cgroup2,512GB. SamebuildPROM4 90,729s/
+2,807GB means+19,77%time/+11,77%cgroup, onepairnotmedian/causeproof.
+Wholechosenstrategy comparison: PROMFP64coarse+HDM1e-8 vsuniformmixed2IR/
+reuse/deferred; do notattributealldeltatoPROMalone. REJECTpromotioncurrentPROM
+for7f; no antennarun/new5samples. SourceSHAa6ec732f11cc7fe920365ba2aae354b68fe97e81f732d5afd4659ed5187c3338.
+Rootreceiptartifacts/m6-prom-strategy-comparison-20261021.json; sourcecode
+researchprobeandnegative/positiveaudits preserved. Full7factualantenna plus
+W4/W5/medians/newgeometry/package remainnotdone; goalM6active.
+
+EXP148–152 closechunk:165Python+8shell/check/diffPASS; sameLunaread-only
+garden agrees source/actualofflinevsheldout/limits. Rootverifiedcurrentbuild
+normalpathEXP152 too. No depsrebuild/cloud/swap/appsclosing. Localcommitonly,
+M6active, no liveGPUjobs. Next actualsevenfreqantenna qualification with
+explicitboundedchunksandaggregatecost; no fakeglobalpromotion fromcoax.

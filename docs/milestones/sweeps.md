@@ -542,3 +542,92 @@ Build12,050s, sourceSHA4fc32f086badb3e4415f0944cc31d0deb99f0242999aed8992c48c18c
 163Python regressions. Fallback `build/m6-fixed-ir/pre-fixed-ir-native` /
 `pre-fixed-ir-manifest.json`. Manifest pozostaje numerically_validated=false;
 M6/M7 i pozostała ocena symbolic/recycling/PROM nadal otwarte.
+
+## EXP148–152 — symbolic/recycling budget i rzeczywisty existing-PROM filter
+
+### Symbolic reuse
+
+W kompletnym EXP138control analiza3f trwa17,136+17,331+17,273=51,740s z1574,144s.
+Idealnie darmowe pominięcie dwóch późniejszych analiz oszczędzi34,604s≈2,20%.
+To upperbound obecnego3f, nie benchmark zaimplementowanego cache. NVIDIA
+[cuDSS tips](https://docs.nvidia.com/cuda/cudss/latest/tips_and_tricks.html)
+potwierdza reuse analysis/refactorization przy niezmienionym CSR oraz możliwość
+ekstrakcji ordering. Lokalny `ComplexCuDSSSolver::SetOperator` nadal robi Clear;
+per-f deferred release celowo niszczy context przed postprocessingiem. Zatrzymanie
+całego context/LU (~13,3GB w ostatnim mixed runie) może podnieść peak; wariant
+ordering-only wymaga osobnego pomiaru. Nie promowany/nie zaimplementowany, nie
+niemożliwy. Nie przenosić numeric LU między różnymi f.
+
+### Recycling
+
+Obecny GMRES zwykle kończy przed64iter, więc restart deflation nie ma wykazanego
+zysku z samego faktu istnienia, a pełny recycling między różnymi A(f) musi
+aktualizować obrazy directions. Cztery retainedcomplexE i cztery currentAimages
+to8×179499584=1,436GB plus dot/orthogonalization i A actions. To dodatkowy
+UVM working set, nie automatyczna oszczędność. Dotychczasowy ograniczony
+two-history/rank1 predictor poprawiał initialresidual bez netgain anteny.
+Nie dowodzi to niemożliwości większego recycling; nie integrujemy go jako
+promowanego wariantu bez osobnego dowodu. Reference implementation do dalszej
+oceny: [PETSc DGMRES](https://petsc.org/main/manualpages/KSP/KSPDGMRES/).
+
+### PROM: wykonany ograniczony test, nie samo czytanie źródeł
+
+`tools/experiments/prom_sweep.py` jest oddzielnym filtrem coax-tiny/medium,
+nie nową ścieżką domyślnego `dev.py run`. Weryfikuje oryginalną ukończoną
+referencję, inventory/physics/dependencies i meshSHA; kopiuje konfigurację,
+zmienia tylko `AdaptiveTol=.01`, `AdaptiveMaxSamples=2..4` i jawnie ciaśniejszy
+HDM Tol, jeśli podano. Żadnych edycji źródłowej referencji lub udawanych wyników.
+Native `PALACE_PROM_VALIDATE` (defaultOFF) zapisuje rzeczywiste frequencies
+sampli i dla wszystkich onlinef buduje pełne oryginalne A/b; loguje normę
+||Au-b||/||b|| z FP64 action, nie residuum modelu zredukowanego. Każdy onlinef
+ma E/B energy-norm comparison do pełnego solve, także punkty held-out.
+Brak fallbacku; duży raw daje `execution_complete=true`, `complete=false`.
+Próg końcowy zawsze1e-6, pola1%, RF/energy frozenK niezmienione.
+
+| Test | HDM / wymiar | max online raw | End-to-end | Decyzja |
+| --- | --- | --- | --- | --- |
+| tiny2/HDM1e-6 | 4 / 8 | 2,2865e-6 | 12,684s | rawFAIL mimo fieldsPASS |
+| tiny3/HDM1e-8 | 6 / 12 | 3,09e-8 | 14,872s | raw/fields/TEM/RFenergy PASS |
+| medium3/HDM1e-8 | 6 / 12 | 2,2231e-6 | 75,112s | held-out rawFAIL |
+| medium4/HDM1e-8 | 8 / 16 | 2,5762e-8 | 90,729s | jakośćPASS, koszt REJECT |
+| medium bestuniform/mixed2 | 14 full / niePROM | ≤1e-6 | 75,752s | jakośćPASS |
+
+Medium3 trainingraw≤1,795e-8, błąd dotyczy held-out, nie wyłącznie niedokładnych
+HDM samples. Medium4 offlinepunkty perport3,3/3,9/3,6087906/3,4311492GHz.
+Dwa dodatkowe są off-grid, więc online jest4training+10held-out (nie8+6).
+Wszystkie28regionfieldrows przechodzą. Root maxΔS8,630e-9/ΔVSWR2,357e-9/
+relativeenergy1,304e-8/E4,667e-8/B1,002e-7 i analityczny TEM PASS.
+
+EXP151PROM4 i EXP152bestuniform mają ten sam nativebuild oraz physics/mesh/freq,
+ale różne wybrane strategie: PROMFP64coarse+HDM1e-8 vsuniformmixed2IR/reuse/
+deferred. PROM4 **+19,77% czasu i +11,77%cgroup** (2,807vs2,512GB) w jednej
+parze; nie mediana i nie izolowany efekt samego PROM/coarseprecision. FewerHDM
+nie oznacza szybszego zadania. **REJECT promocji obecnej strategii PROM na7f**;
+bez kosztownej anteny po tym filtrze i bez automatycznego zwiększania do5/6sampli.
+Nie jest to dowód przeciwko każdemu PROM lub dłuższym zestawom częstotliwości.
+
+Odtworzenie (każdy output nowy):
+
+```sh
+python3 tools/experiments/prom_sweep.py \
+  --reference artifacts/m6-projection-medium-control-20261021 \
+  --output artifacts/NEW-prom-medium-four \
+  --samples-per-port 4 --hdm-tol 1e-8 --seconds 180
+```
+
+Read-only source, zwykłe outputy; input/caching i E/B są w RAM/VRAM podczas pracy.
+Native adaptive honoruje jawne `PALACE_SKIP_ESTIMATOR` jak uniform, przy braku
+flagi zachowuje istniejące estymatory. Standardowy runner jawnie unsetuje
+`PALACE_PROM_VALIDATE`. Probe ograniczony300s/60GiBnoSwap/6GiBguard; końcowy
+cleanup usuwa kontener. Nie publikuje snapshotów jako kwalifikowanej referencji.
+Zapisano~49,5MB tiny i~466,4MB medium na run, jednorazowe pliki walidacyjne,
+nie hot disk workspace.
+
+165Pythonregressions; build19,360s po poprawieniu błędu kompilacji w nowym
+helperze (nieistniejące SpaceOperator.Initialize usunięte, jawny lumped-onlyguard).
+SourceSHAa6ec732f11cc7fe920365ba2aae354b68fe97e81f732d5afd4659ed5187c3338.
+Fallback `build/m6-prom/pre-prom-native` / `pre-prom-manifest.json`.
+Artefakty `artifacts/m6-prom-{tiny-two,tiny-three-tight,medium-three-tight,medium-four-tight,medium-uniform-control}-20261021`;
+root replay `artifacts/m6-prom-root-analysis.py tiny medium-four`,
+`artifacts/m6-prom-strategy-comparison-20261021.json`.
+Full7factualantenna/M7 pozostają otwarte; assessment nie jest globalną promocją.

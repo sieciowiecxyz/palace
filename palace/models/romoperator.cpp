@@ -734,6 +734,30 @@ void RomOperator::SolveHDM(int excitation_idx, double omega, ComplexVector &u)
   ksp->Mult(r, u);
 }
 
+double RomOperator::OriginalRelativeResidual(int excitation_idx, double omega,
+                                             const ComplexVector &u)
+{
+  MFEM_VERIFY(space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0,
+              "Original PROM residual diagnostic currently supports lumped ports only!");
+  SetExcitationIndex(excitation_idx);
+  auto extra = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
+  auto A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
+                                    K.get(), C.get(), M.get(), extra.get());
+  ComplexVector rhs(u.Size()), residual(u.Size());
+  rhs.UseDevice(true);
+  residual.UseDevice(true);
+  rhs = 0.0;
+  space_op.GetExcitationVector2(excitation_idx, omega, rhs);
+  if (has_RHS1) rhs.Add(1i * omega, RHS1);
+  A->Mult(u, residual);
+  residual -= rhs;
+  const double bn = linalg::Norml2(space_op.GetComm(), rhs);
+  const double rn = linalg::Norml2(space_op.GetComm(), residual);
+  MFEM_VERIFY(std::isfinite(bn) && bn > 0.0 && std::isfinite(rn),
+              "Invalid full-system PROM residual norm!");
+  return rn / bn;
+}
+
 std::size_t RomOperator::NumSynthesisPortModes() const
 {
   // Each lumped port included in synthesis contributes exactly one real basis vector

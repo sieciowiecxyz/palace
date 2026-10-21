@@ -1119,6 +1119,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
             '--unsetenv', 'PALACE_NATIVE_COARSE_FP32',
             '--unsetenv', 'PALACE_NATIVE_COARSE_CORRECTIONS',
+            '--unsetenv', 'PALACE_PROM_VALIDATE',
             '--unsetenv', 'PALACE_CEED_BASIS_AUDIT',
             '--unsetenv', 'PALACE_PC_BASIS_FP32_FORWARD',
             '--unsetenv', 'PALACE_PC_BASIS_COMPENSATED_FORWARD',

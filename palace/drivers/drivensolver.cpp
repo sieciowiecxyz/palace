@@ -645,6 +645,11 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
 {
   const auto &port_excitations = space_op.GetPortExcitations();
   const auto &omega_sample = iodata.solver.driven.sample_f;
+  const bool validate_prom = std::getenv("PALACE_PROM_VALIDATE") != nullptr;
+  MFEM_VERIFY(!validate_prom || (Mpi::Size(space_op.GetComm()) == 1 &&
+                  iodata.model.refinement.max_it == 0 && iodata.solver.driven.save_indices.empty() &&
+                  space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
+              "PROM validation requires a rank1 fixed-mesh lumped sweep without visualization!");
 
   // Initialize postprocessing for measurement and printers.
   // Initialize write directory with default path; will be changed for multi-excitations.
@@ -674,14 +679,15 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
   const bool is_2d = (space_op.GetNDSpace().Dimension() < 3);
   std::unique_ptr<TimeDependentFluxErrorEstimator<ComplexVector>> estimator_3d;
   std::unique_ptr<BoundaryModeFluxErrorEstimator<ComplexVector>> estimator_2d;
-  if (is_2d)
+  const bool skip_estimator = std::getenv("PALACE_SKIP_ESTIMATOR") != nullptr;
+  if (!skip_estimator && is_2d)
   {
     estimator_2d = std::make_unique<BoundaryModeFluxErrorEstimator<ComplexVector>>(
         space_op.GetMaterialOp(), space_op.GetNDSpaces(), space_op.GetRTSpaces(),
         space_op.GetCurlSpace(), space_op.GetH1Spaces(), iodata.solver.linear.estimator_tol,
         iodata.solver.linear.estimator_max_it, 0, iodata.solver.linear.estimator_mg);
   }
-  else
+  else if (!skip_estimator)
   {
     estimator_3d = std::make_unique<TimeDependentFluxErrorEstimator<ComplexVector>>(
         space_op.GetMaterialOp(), space_op.GetNDSpaces(), space_op.GetRTSpaces(),
@@ -691,6 +697,7 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
   auto AddEstimate =
       [&](const ComplexVector &E, const ComplexVector &B, double Et, ErrorIndicator &ind)
   {
+    if (skip_estimator) return;
     if (is_2d)
       estimator_2d->AddErrorIndicator(E, B, Et, ind);
     else
@@ -742,6 +749,9 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
     // Add the HDM solution to the PROM reduced basis.
     prom_op.UpdatePROM(E, fmt::format("sample_e{:d}_s{:d}", excitation_idx, sample_idx));
     prom_op.UpdateMRI(excitation_idx, omega, E);
+    if (validate_prom)
+      Mpi::Print("PALACE_PROM_SAMPLE: excitation={} frequency_ghz={:.17e}\n",
+                 excitation_idx, omega * unit_GHz);
 
     // Compute B = -1/(iω) ∇ x E on the true dofs, and set the internal GridFunctions in
     // PostOperator for energy postprocessing and error estimation.
@@ -866,6 +876,16 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
 
       // Assemble and solve the PROM linear system.
       prom_op.SolvePROM(excitation_idx, omega, E);
+      if (validate_prom)
+      {
+        const double relative = prom_op.OriginalRelativeResidual(excitation_idx, omega, E);
+        const auto &samples = prom_op.GetSamplePoints(excitation_idx);
+        const bool training = std::any_of(samples.begin(), samples.end(), [omega](double f)
+        { return std::abs(f - omega) <= 1e-12 * std::abs(omega); });
+        Mpi::Print("PALACE_PROM_RAW: excitation={} frequency_index={} training={} "
+                   "dimension={} relative={:.12e}\n",
+                   excitation_idx, omega_i, int(training), prom_op.GetReducedDimension(), relative);
+      }
       Mpi::Print("\n");
 
       // Start Post-processing.
@@ -890,6 +910,15 @@ ErrorIndicator DrivenSolver::SweepAdaptive(SpaceOperator &space_op) const
         post_op.InitializeParaviewDataCollection(excitation_idx);
       }
       post_op.MeasureAndPrintAll(excitation_idx, int(omega_i), E, B, omega);
+      if (validate_prom)
+      {
+        std::vector<int> regions;
+        for (const auto &[idx, data] : iodata.domains.postpro.energy) regions.push_back(idx);
+        CompareFieldSnapshots(post_op.GetEGridFunction(), post_op.GetBGridFunction(),
+                              post_op.GetDomainPostOperator(), regions, excitation_idx,
+                              omega_i, std::getenv("PALACE_SAVE_FIELDS"),
+                              std::getenv("PALACE_REFERENCE_FIELDS"));
+      }
     }
 
     // Final postprocessing & printing: no change to indicator since these are in PROM.

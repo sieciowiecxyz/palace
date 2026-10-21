@@ -317,3 +317,16 @@ PASS, brak fieldreference. Pełny3freq/2ports fixed3 FAIL/deadline1800s/5of6solv
 28partialfieldrows nie są kwalifikacją całości. EXP147 default2 legacy7freq
 14raw/28fields/TEM/count/release PASS. Nie promować3IR ani projekcji z niepełnej
 antenny. Dokładne komendy/proweniencja i granice w raporcie sweepów.
+
+### EXP148–152: istniejący PROM, held-out i pełne residuum
+
+165Python tests: probe zmienia tylko jawne adaptive controls/tighter HDM Tol,
+nie akceptuje luźniejszego Tol, NaN/type/coverage/duplicate/training-map errors.
+Oryginalny A/b residual sprawdzany przy każdym online f, także held-out; nie
+reduced residual. PROM2 tiny i PROM3 medium rawFAIL mimo fieldsPASS; wynik
+pozostaje completefalse. PROM3tight tiny oraz PROM4tight medium przechodzą
+raw/TEM/frozenRF/energy/28fields; 10 prawdziwych held-out points. PROM4 jest
+wolniejszy i większy niż same-build bestuniform EXP152, więc niepromowany.
+Native build19,360s po poprawieniu błędu kompilacji; normalna ścieżka EXP152
+14raw/28fields/metadata/release/count PASS. Brak kwalifikacji anteny z coax.
+Komendy i dokładne ograniczenia: raport sweepów.

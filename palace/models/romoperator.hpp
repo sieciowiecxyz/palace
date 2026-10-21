@@ -523,6 +523,10 @@ public:
   // into the high-dimensional space.
   void SolvePROM(int excitation_idx, double omega, ComplexVector &u);
 
+  // Diagnostic only: recompute the full original-system residual, not a reduced residual.
+  double OriginalRelativeResidual(int excitation_idx, double omega,
+                                  const ComplexVector &u);
+
   // Compute the location(s) of the maximum error in the range of the previously sampled
   // parameter points.
   std::vector<double> FindMaxError(int excitation_idx, std::size_t N = 1) const
