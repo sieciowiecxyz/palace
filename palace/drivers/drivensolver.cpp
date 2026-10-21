@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 #include <complex>
+#include <cmath>
 #include <cstdlib>
 #include <cstddef>
 #include <iostream>
@@ -58,7 +59,8 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
 
   bool adaptive = (iodata.solver.driven.adaptive_tol > 0.0);
   MFEM_VERIFY(!(std::getenv("PALACE_REUSE_PORT_SETUP") ||
-                std::getenv("PALACE_FREQUENCY_PORT_BATCH")) || !adaptive,
+                std::getenv("PALACE_FREQUENCY_PORT_BATCH") ||
+                std::getenv("PALACE_SWEEP_PREDICTOR")) || !adaptive,
               "Frequency/port batching requires a uniform sweep!");
   if (adaptive && omega_sample.size() <= iodata.solver.driven.prom_indices.size() &&
       !iodata.solver.driven.adaptive_circuit_synthesis)
@@ -121,6 +123,10 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   const bool frequency_batch = (reuse_port_setup || explicit_frequency_batch) && omega_sample.size() > 1;
   MFEM_VERIFY(!explicit_frequency_batch || omega_sample.size() > 1,
               "Explicit frequency batching requires more than one frequency!");
+  const bool sweep_predictor = std::getenv("PALACE_SWEEP_PREDICTOR") != nullptr;
+  MFEM_VERIFY(!sweep_predictor ||
+                  (frequency_batch && omega_sample.size() >= 3 && iodata.solver.linear.initial_guess),
+              "Sweep predictor requires frequency-major batching, >=3 frequencies and InitialGuess=true!");
   const bool setup_audit = reuse_port_setup || explicit_frequency_batch || std::getenv("PALACE_PORT_SETUP_AUDIT");
   const bool release_postprocess_energy = std::getenv("PALACE_RELEASE_POSTPROCESS_ENERGY") != nullptr;
   bool energy_released = false;
@@ -300,7 +306,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   if (frequency_batch)
     std::stable_sort(samples.begin(), samples.end(), [](const auto &a, const auto &b)
                      { return a.frequency < b.frequency; });
-  std::map<int, std::unique_ptr<ComplexVector>> sweep_history;
+  std::map<int, std::unique_ptr<ComplexVector>> sweep_history, sweep_older;
   std::size_t retained_frequency = omega_sample.size();
   int completed_mult = 0, completed_iterations = 0;
   auto t0 = Timer::Now();
@@ -391,6 +397,37 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
     }
 
+    if (sweep_predictor && omega_i >= 2)
+    {
+      // Only the initial approximation changes. Compare both starts against the current
+      // original FP64 A(f), not the preconditioner, before releasing temporary workspace.
+      MemoryMark("sweep_predictor.begin");
+      {
+        const auto &previous = *sweep_history.at(excitation_idx);
+        const auto &older = *sweep_older.at(excitation_idx);
+        const double ratio = (omega_sample[omega_i] - omega_sample[omega_i - 1]) /
+                             (omega_sample[omega_i - 1] - omega_sample[omega_i - 2]);
+        MFEM_VERIFY(std::isfinite(ratio) && ratio > 0.0,
+                    "Sweep predictor requires increasing distinct frequencies!");
+        const auto &original_A = *(reuse_port_setup ? retained_A : A);
+        ComplexVector residual(E.Size());
+        residual.UseDevice(true);
+        original_A.Mult(E, residual);
+        residual.AXPBY(1.0, RHS, -1.0);
+        const double baseline = linalg::Norml2(space_op.GetComm(), residual);
+        E.AXPBY(-ratio, older, 1.0 + ratio);
+        original_A.Mult(E, residual);
+        residual.AXPBY(1.0, RHS, -1.0);
+        const double predicted = linalg::Norml2(space_op.GetComm(), residual);
+        const bool accept = std::isfinite(predicted) && predicted < baseline;
+        if (!accept) E = previous;
+        Mpi::Print("PALACE_SWEEP_PREDICTOR: action={} excitation={} frequency_index={} ratio={:.17e} baseline_residual={:.17e} candidate_residual={:.17e}\n",
+                   accept ? "accept" : "fallback", excitation_idx, omega_i, ratio,
+                   baseline, predicted);
+      }
+      MemoryMark("sweep_predictor.end");
+    }
+
     Mpi::Print("\n");
     MemoryMark("gmres.begin");
     ksp->Mult(RHS, E);
@@ -405,6 +442,18 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
           previous = std::make_unique<ComplexVector>(E.Size());
           previous->UseDevice(true);
         }
+        if (sweep_predictor && omega_i > 0)
+        {
+          auto &older = sweep_older[excitation_idx];
+          if (!older)
+          {
+            older = std::make_unique<ComplexVector>(E.Size());
+            older->UseDevice(true);
+          }
+          *older = *previous;
+          Mpi::Print("PALACE_SWEEP_OLDER: action=store excitation={} frequency_index={} logical_bytes={}\n",
+                     excitation_idx, omega_i, 2LL * sizeof(double) * E.Size());
+        }
         *previous = E;
         Mpi::Print("PALACE_SWEEP_SEED: action=store excitation={} frequency_index={} logical_bytes={}\n",
                    excitation_idx, omega_i, 2LL * sizeof(double) * E.Size());
@@ -412,6 +461,12 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       else
       {
         sweep_history.erase(excitation_idx);
+        if (sweep_predictor)
+        {
+          MFEM_VERIFY(sweep_older.erase(excitation_idx) == 1, "Missing older sweep history!");
+          Mpi::Print("PALACE_SWEEP_OLDER: action=release excitation={} frequency_index={}\n",
+                     excitation_idx, omega_i);
+        }
         Mpi::Print("PALACE_SWEEP_SEED: action=release excitation={} frequency_index={}\n",
                    excitation_idx, omega_i);
       }
@@ -485,7 +540,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                   omega_i == omega_start, rhs_norm);
     }
   }
-  MFEM_VERIFY(sweep_history.empty(), "Unreleased frequency-sweep history!");
+  MFEM_VERIFY(sweep_history.empty() && sweep_older.empty(), "Unreleased frequency-sweep history!");
   if (ksp) SaveMetadata(*ksp);
   post_op.MeasureFinalize(indicator);
   return indicator;

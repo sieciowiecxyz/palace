@@ -250,15 +250,103 @@ Dowody: `artifacts/m6-batch-antenna-{control,on}-20261021`, replay
 `artifacts/m6-batch-antenna-root-analysis.py` i receipt
 `artifacts/m6-batch-antenna-root-analysis-20261021.json`.
 
+## Ekstrapolacja dwóch poprzednich pól, EXP131–134
+
+Hipoteza: jako początek kolejnego pełnego solve użyć
+`x0 = (1+r) E(f[k-1]) - r E(f[k-2])`, gdzie
+`r = (f[k]-f[k-1])/(f[k-1]-f[k-2])`, osobno dla każdego portu.
+Opt-in `--sweep-predictor`, tylko batch z >=3 częstotliwościami i InitialGuess.
+Dwa dodatkowe wywołania oryginalnego FP64 A(f) porównują normy `b-A*x0` i
+`b-A*E_previous`. Akceptacja wyłącznie przy mniejszym residuum; inaczej poprzedni
+start. RHS i końcowe kryterium GMRES pozostają oryginalne. Każdy punkt nadal
+liczy pełne HDM, bez interpolacji wyników lub pomijania częstotliwości.
+
+Dwie dodatkowe starsze historie E są niezależne od liczby częstotliwości;
+na W3 358,999 MB pojemności. Jeden tymczasowy residual E179,500 MB niszczony
+przed GMRES. Brak historii/workspace na SSD. Native sprawdza batch/uniform/rank1/
+fixed mesh/no external seed; ścisłe audyty decyzji, ratio, kolejności/lifetime,
+liczników i faz. 159 testów Pythona PASS. To nie dowód skuteczności predyktora.
+
+| Jedna para | Czas kontrola → predictor | Suma iteracji | Cgroup peak |
+| --- | ---: | ---: | ---: |
+| EXP131 coax tiny7freq |15,593→14,587 s|412→266|0,640→0,666 GB|
+| EXP132 coax medium7freq |75,139→67,970 s|510→406|2,508→2,576 GB|
+| EXP133 W3 medium3freq |1312,606→1317,834 s|253→252|48,876→49,035 GB|
+
+Coax: wszystkie 10 prób zaakceptowane; normy startowego residuum około0,0088×
+(tiny) /0,085× (medium) starego startu. Wszystkie TEM/raw/wholefield/frozenK
+PASS, ale peak pamięci wzrósł. Medium maks. ΔS1,549e-8/VSWR2,987e-9,
+E/B≤3,957e-8/1,317e-7. Same okna sprawdzania prognoz0,012/0,096s.
+
+**Antena: REJECT jako przyspieszenie.** Obie prognozy dla3,7GHz odrzucone:
+P1 residuum1,54363→2,14561; P2 1,57244→2,11370. Native fallback zachował
+poprzednie E. To rzeczywisty test fallbacku; testy syntetycznych logów same nie
+byłyby jego dowodem. Jedna iteracja różnicy wystąpiła wcześniej, przy3,6GHz,
+przed pierwszym zastosowaniem predyktora; nie przypisujemy jej predyktorowi.
+Czas +5,228s/+0,398%, dodatkowe checki0,856s; reszta różnicy nieprzypisana.
+Prosta liniowa prognoza nie sprawdziła się na tym odcinku odpowiedzi anteny.
+To nie dowód odrzucający wszystkie metody projekcji/recycling/PROM.
+
+Jakość W3 PASS: wszystkie6 oryginalnych raw≤9,994e-7;42 porównania regionów
+E/B≤4,438e-7/1,327e-7. ΔS2,905e-8/VSWR5,006e-8/relativeenergy5,238e-8/
+portpower6,940e-9. Oba warianty3,5/3,6/3,7GHz × P1/P2, te same mesh/build/config,
+3 faktoryzacje. Pierwsze2freq CSV vs EXP130 ΔS1,933e-8/VSWR2,506e-8;
+nie niezależna tight referencja pól nowego3,7GHz. Wyjścia2,858GB/run jako zwykłe
+snapshoty, bez SSD workspace. Managed phase peak43,166→43,525GB, nie rezydencja.
+
+Odtworzenie: poprzednia komenda z `--frequencies 3.5 3.6 3.7` i
+`--port-setup-reuse` dla obu wariantów; kandydat dodaje `--sweep-predictor`
+i field-reference kontroli. Limity/cap bez zmian. Nie używać tej opcji jako
+zalecanego wariantu anteny; default pozostaje OFF.
+
+Native SHA danych EXP131–133:
+`dc4ba1b2128b1b7959d17ba65e86fe106ad6827b1d1bc2ccc08a9dbd222ff69f`,
+build8,627s. Późniejszy EXP134 uszczelnia tylko odrzucenie adaptive przy samym
+env predyktora (bez env batch); nowe dane starego SHA nie są przepisywane.
+EXP134 build8,545s, source
+`168bba06865626427102829030b38afc77fa3ee0700302c73b7ac06c59b7b651`;
+tiny7freq regression14,591s/266iter,14raw/wholefield/TEM PASS,10accept/0fallback.
+Artifact `artifacts/m6-predictor-guard-regression-20261021`. To nie nowy W3 proof
+aktualnej binarki; pełne dane W3 pozostają przypisane do SHA powyżej.
+Fallback `build/m6-sweep-predictor/pre-predictor-{native,manifest.json}`.
+Dowody: `artifacts/m6-predictor-{tiny,medium,antenna}-{control,on}-20261021`,
+replays `artifacts/m6-predictor-root-analysis.py` (tiny/medium) i
+`artifacts/m6-predictor-antenna-root-analysis.py`, odpowiadające JSON receipts.
+
+### Wniosek matematyczny i następna tania hipoteza
+
+Stałe rzeczywiste `r` zakłada lokalnie liniową zmianę całego zespolonego pola.
+Następna hipoteza: dobrać **zespolony** współczynnik z aktualnego A(f):
+
+```text
+r0 = b - A(f) E_previous
+d  = A(f) (E_previous - E_older)
+alpha = (dᴴ r0) / (dᴴ d)
+x0 = E_previous + alpha (E_previous - E_older)
+```
+
+To minimum normy residuum w jednej linii afinicznej w arytmetyce dokładnej,
+jeśli d≠0. Nie gwarantuje mniejszej liczby iteracji ani czasu. Potrzebne guardy
+rangi/finite i ponowny pomiar oryginalnego residuum/fallback, niezależny test
+sprzężenia zespolonego, koszt workspace i whole run. Ewentualna pełna projekcja
+na dwa pola również wymaga kontroli zależności liniowej; nie odwracać naiwnie
+źle uwarunkowanej macierzy Grama.
+
+Punkt odniesienia researchu (2026-10-21): [PETSc KSPGUESSFISCHER](https://petsc.org/release/manualpages/KSP/KSPGUESSFISCHER/)
+i [źródło Fischer](https://petsc.org/release/src/ksp/ksp/guess/impls/fischer/fischer.c.html),
+strona oznaczona3.26.0. Zachowuje oryginalny RHS i niezerowy start. Model2
+wymaga positive definite, więc nie przenosić go bezpośrednio do zespolonego
+Maxwella. Inspiracja algorytmiczna, bez kopiowania kodu lub dodania zależności;
+nie jest to obecna implementacja Fischera/PETSc. Przy zmianie f trzeba obliczać
+obrazy starych wektorów **aktualnym** A(f), bez stale images/faktorów. Istniejący
+Palace RomOperator pozostaje do oceny dla bounded PROM/held-out.
+
 ### Następne bramki
 
-1. Tani filtr dalszych algorytmów sweep: symbolic reuse/recycling lub istniejący
-   adaptive/PROM z oryginalnym residual, fallback i held-out point. Obecny reuse
-   nie zalicza tych hipotez. Iteracje nadal dominują cały koszt; sam analysis
-   reuse może oszczędzić około17s na dodatkowym f, nie setki sekund solve.
-2. Ocenić bounded predictor per-port na małym sweepie przed pełną anteną;
-   dwie poprzednie historie zamiast jednej kosztowałyby dodatkowo~359MB W3.
-   Nie wdrażać bez pomiaru total time/quality. Kolejne drogie runy dopiero po zysku.
+1. Niezależny mały test residual-minimizing complex projection; tani runtime
+   przed nową anteną. Nie ponawiać nieudanego predyktora liniowego na W3.
+2. Ocena symbolic reuse/recycling lub istniejącego adaptive/PROM z oryginalnym
+   residual, fallback i held-out. Obecny reuse nie zalicza tych hipotez.
 3. Antena7freq/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
 
 M6.6, M6 i goal nadal otwarte. Brak globalnej promocji na podstawie jednej pary.

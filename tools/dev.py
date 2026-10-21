@@ -508,7 +508,7 @@ def process_gpu_memory(pid):
         return None
 
 
-def memory_phase_report(log, solves, fields=False, release=False, release_final=False,frequency_releases=0):
+def memory_phase_report(log, solves, fields=False, release=False, release_final=False,frequency_releases=0,predictor_checks=0):
     events, errors = [], []
     decoder = json.JSONDecoder()
     for line in log.splitlines():
@@ -544,6 +544,8 @@ def memory_phase_report(log, solves, fields=False, release=False, release_final=
     if frequency_releases:
         required.update({'frequency_workspace_release.begin': frequency_releases,
                          'frequency_workspace_release.end': frequency_releases})
+    if predictor_checks:
+        required.update({'sweep_predictor.begin': predictor_checks, 'sweep_predictor.end': predictor_checks})
     coverage = {label: sum(e['to'] == label for e in events) for label in required}
     complete = not errors and coverage == required
     return dict(complete=complete, events=events, required=required, coverage=coverage, errors=errors,
@@ -762,6 +764,53 @@ def deferred_postprocessing_applied(log, config,frequency_major=False):
             and matches[0].start() < released < matches[1].start())
 
 
+def validate_sweep_predictor(config, frequency_major, initial_fields=None):
+    frequencies=[f for s in config['Solver']['Driven']['Samples'] for f in s['Freq']]
+    if (not frequency_major or len(frequencies)<3 or initial_fields
+            or not config['Solver']['Linear'].get('InitialGuess',True)):
+        raise ValueError('Sweep predictor requires frequency-major batching, >=3 frequencies and InitialGuess=true without external seed')
+
+
+def sweep_predictor_audit(log, config):
+    frequencies=[f for s in config['Solver']['Driven']['Samples'] for f in s['Freq']]
+    excitations=sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
+    matches=list(re.finditer(r'PALACE_SWEEP_PREDICTOR: action=(accept|fallback) excitation=(\d+) frequency_index=(\d+) ratio=([\deE+.-]+) baseline_residual=([\deE+.-]+) candidate_residual=([\deE+.-]+)',log))
+    expected=[(e,f) for f in range(2,len(frequencies)) for e in excitations]
+    passed=(len(excitations)==2 and len(frequencies)>=3 and len(matches)==len(expected)
+            and log.count('PALACE_SWEEP_PREDICTOR:')==len(expected))
+    checks=[]
+    for m,(e,f) in zip(matches,expected):
+        action,port,index,ratio,baseline,predicted=m.groups()
+        ratio,baseline,predicted=map(float,[ratio,baseline,predicted])
+        target=(frequencies[f]-frequencies[f-1])/(frequencies[f-1]-frequencies[f-2])
+        valid=(port==str(e) and index==str(f) and all(math.isfinite(x) for x in [ratio,baseline,predicted])
+               and ratio>0 and baseline>=0 and predicted>=0 and math.isclose(ratio,target,rel_tol=1e-10)
+               and (predicted<baseline if action=='accept' else predicted>=baseline))
+        checks.append(dict(excitation=e,frequency_index=f,action=action,ratio=ratio,
+                           baseline_residual=baseline,candidate_residual=predicted,passed=valid))
+        passed=passed and valid
+    older=list(re.finditer(r'PALACE_SWEEP_OLDER: action=(store|release) excitation=(\d+) frequency_index=(\d+)(?: logical_bytes=(\d+))?',log))
+    expected_older=[('store' if f+1<len(frequencies) else 'release',str(e),str(f))
+                    for f in range(1,len(frequencies)) for e in excitations]
+    passed=passed and [m.groups()[:3] for m in older]==expected_older and log.count('PALACE_SWEEP_OLDER:')==len(expected_older)
+    sizes=[int(m[4]) for m in older if m[1]=='store' and m[4] is not None]
+    normal_sizes=[int(b) for b in re.findall(r'PALACE_SWEEP_SEED: action=store excitation=\d+ frequency_index=\d+ logical_bytes=(\d+)',log)]
+    passed=passed and len(sizes)==len(excitations)*(len(frequencies)-2) and bool(sizes) and min(sizes)>0 and len(set(sizes+normal_sizes))==1
+    # Every prediction follows this port's prior older store and current restore,
+    # and precedes its converged solve/current store or release.
+    for m,check in zip(matches,checks):
+        e,f=check['excitation'],check['frequency_index']
+        before=f'PALACE_SWEEP_SEED: action=restore excitation={e} frequency_index={f}'
+        after=f'PALACE_SWEEP_SEED: action={"store" if f+1<len(frequencies) else "release"} excitation={e} frequency_index={f}'
+        previous=f'PALACE_SWEEP_OLDER: action=store excitation={e} frequency_index={f-1}'
+        start,end=log.find(before),log.find(after)
+        passed=passed and 0<=log.find(previous)<start<m.start()<end and 'GMRES solver converged in' in log[m.end():end]
+    return dict(passed=bool(passed),checks=checks,accepted=sum(c['action']=='accept' for c in checks),
+                fallback=sum(c['action']=='fallback' for c in checks),
+                logical_older_capacity_bytes=len(excitations)*sizes[0] if sizes else 0,
+                scope='Initial-guess selection only; two original FP64 A applies/temporary residual per check. Not field/PROM/physical residency qualification')
+
+
 def postprocess_energy_release_applied(log, config,frequency_major=False):
     excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
     frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
@@ -779,7 +828,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None):
+        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False):
+    if sweep_predictor and (not (port_setup_reuse or frequency_port_batch) or initial_fields
+            or not native_complex_coarse or cpu_reference or nsys_window is not None):
+        raise ValueError('Sweep predictor requires native CUDA coarse and frequency batching/reuse, without external seed or partial profiler')
     if pc_basis_fp32_forward and pc_basis_compensated_forward:
         raise ValueError('Choose exactly one experimental PC basis arithmetic')
     pc_basis_mixed=pc_basis_fp32_forward or pc_basis_compensated_forward
@@ -836,6 +888,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     config = port_batch_config(config, both_ports, port_setup_reuse, excitation, frequency_port_batch)
     frequency_count=sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
     frequency_major=(port_setup_reuse or frequency_port_batch) and frequency_count>1
+    if sweep_predictor:
+        validate_sweep_predictor(config,frequency_major,initial_fields)
     if frequency_major and initial_fields:
         raise ValueError('Frequency-major batching uses per-port RAM/VRAM history, not external field seeds')
     if release_postprocess_energy and (len(expected_field_files(config)) < 4 or config['Solver']['Driven'].get('Save')
@@ -909,6 +963,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_GMRES_BASIS_PREFETCH'] = '1'
     if setup_audit or port_setup_reuse or frequency_port_batch:
         flags['PALACE_PORT_SETUP_AUDIT'] = '1'
+    if sweep_predictor:
+        flags['PALACE_SWEEP_PREDICTOR'] = '1'
     if frequency_port_batch:
         flags['PALACE_FREQUENCY_PORT_BATCH'] = '1'
     if port_setup_reuse:
@@ -1010,6 +1066,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                    'frequency_major_reuse': frequency_major and port_setup_reuse,
                                    'frequency_major_batch': frequency_major,
                                    'frequency_override_ghz': frequencies,
+                                   'sweep_predictor': sweep_predictor,
                                    'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
@@ -1129,6 +1186,11 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                 and counters.get('TotalIts')==sum(status['iterations']))
             status['complete'] = status['complete'] and status['solver_metadata_counts_passed']
             status['complete'] = status['complete'] and status['deferred_postprocessing_applied']
+        if sweep_predictor:
+            prediction=sweep_predictor_audit((output/'palace.log').read_text(),config)
+            write(output/'sweep-predictor-audit.json',prediction)
+            status['sweep_predictor_passed']=prediction['passed']
+            status['complete']=status['complete'] and prediction['passed']
         if release_postprocess_energy:
             status['postprocess_energy_release_applied'] = postprocess_energy_release_applied((output/'palace.log').read_text(),config,frequency_major)
             status['complete'] = status['complete'] and status['postprocess_energy_release_applied']
@@ -1149,7 +1211,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         if memory_marks:
             phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
                                          bool(save_fields or reference), release_gmres_basis,
-                                         release_final_solver,frequency_count if frequency_major and defer_postprocessing else 0)
+                                         release_final_solver,frequency_count if frequency_major and defer_postprocessing else 0,
+                                         2*(frequency_count-2) if sweep_predictor else 0)
             write(output/'memory-phases.json', phases)
             status['memory_marks_passed'] = phases['complete']
             status['complete'] = status['complete'] and phases['complete']
@@ -1239,6 +1302,7 @@ def main():
     r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
     r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
     r.add_argument('--coax-sweep',nargs='?',const='fixture',default=False,choices=['fixture','n78'],help='Keep fixture frequencies or explicitly select n78 preset 3.3..3.9GHz/0.1GHz with coax field diagnostics')
+    r.add_argument('--sweep-predictor',action='store_true',help='Experimental two-history per-port extrapolation; accept only if original FP64 initial residual improves')
     r.add_argument('--frequency-port-batch', action='store_true', help='Two-port frequency-major schedule with per-port history, independent of optional setup reuse')
     r.add_argument('--frequencies',nargs='+',type=float,help='Explicit sorted GHz point sweep; preserves frozen fixture mesh/materials/Tol, conflicts with coax presets')
     r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
@@ -1306,7 +1370,7 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies)
+            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

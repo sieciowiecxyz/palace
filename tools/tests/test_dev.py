@@ -324,6 +324,47 @@ class ToolRegressionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**flags)
             host.assert_not_called()
 
+    def test_sweep_predictor_guard_and_strict_residual_lifetime_audit(self):
+        _,_,base=dev.fixture('coax-tiny');config=dev.port_batch_config(base,reuse=True)
+        dev.validate_sweep_predictor(config,True)
+        for cfg,major,initial in [(config,False,None),(config,True,'seed'),
+            (dev.point_sweep_config(config,[3.3,3.8]),True,None)]:
+            with self.assertRaises(ValueError):dev.validate_sweep_predictor(cfg,major,initial)
+        cold=json.loads(json.dumps(config));cold['Solver']['Linear']['InitialGuess']=False
+        with self.assertRaises(ValueError):dev.validate_sweep_predictor(cold,True)
+        with patch.object(dev,'require_host_memory') as host:
+            for kwargs in [dict(sweep_predictor=True),dict(sweep_predictor=True,port_setup_reuse=True),
+                dict(sweep_predictor=True,port_setup_reuse=True,native_complex_coarse=True,initial_fields='seed')]:
+                with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**kwargs)
+            host.assert_not_called()
+        text=''
+        for f in range(3):
+            for e in [1,2]:
+                text+=f'PALACE_SWEEP_SEED: action={"zero" if f==0 else "restore"} excitation={e} frequency_index={f}\n'
+                if f==2:
+                    action='accept' if e==1 else 'fallback'
+                    norm=0.1 if e==1 else 2.0
+                    text+=f'PALACE_SWEEP_PREDICTOR: action={action} excitation={e} frequency_index=2 ratio=1.0 baseline_residual=1.0 candidate_residual={norm}\n'
+                text+='GMRES solver converged in 10 iterations\n'
+                if f>0:text+=f'PALACE_SWEEP_OLDER: action={"store" if f<2 else "release"} excitation={e} frequency_index={f}'+(' logical_bytes=1024' if f<2 else '')+'\n'
+                text+=f'PALACE_SWEEP_SEED: action={"store" if f<2 else "release"} excitation={e} frequency_index={f}'+(' logical_bytes=1024' if f<2 else '')+'\n'
+        audit=dev.sweep_predictor_audit(text,config)
+        self.assertTrue(audit['passed']);self.assertEqual((audit['accepted'],audit['fallback']),(1,1))
+        self.assertEqual(audit['logical_older_capacity_bytes'],2048)
+        for bad in [text.replace('ratio=1.0','ratio=2.0',1),
+                    text.replace('candidate_residual=0.1','candidate_residual=1.1'),
+                    text.replace('candidate_residual=2.0','candidate_residual=0.5'),
+                    text.replace('baseline_residual=1.0','baseline_residual=nan',1),
+                    text.replace('candidate_residual=0.1','candidate_residual=1e999'),
+                    text.replace('logical_bytes=1024','logical_bytes=0',1),
+                    text.replace('PALACE_SWEEP_OLDER: action=release','PALACE_SWEEP_OLDER: action=store',1),
+                    text.replace('PALACE_SWEEP_OLDER: action=store excitation=1 frequency_index=1 logical_bytes=1024\n',''),
+                    text.replace('GMRES solver converged in 10 iterations\n',''),
+                    text+'PALACE_SWEEP_PREDICTOR: malformed\n']:
+            self.assertFalse(dev.sweep_predictor_audit(bad,config)['passed'])
+        irregular=dev.point_sweep_config(config,[3.3,3.4,3.8])
+        self.assertTrue(dev.sweep_predictor_audit(text.replace('ratio=1.0','ratio=4.0'),irregular)['passed'])
+
     def test_explicit_point_sweep_changes_only_samples(self):
         _,_,base=dev.fixture('tshaped-medium')
         changed=dev.point_sweep_config(base,[3.5,3.6])
@@ -563,7 +604,7 @@ class ToolRegressionTests(unittest.TestCase):
         post = ['postprocess.begin', 'postprocess.end']
         labels += solve + post + solve + ['linear_workspace_release.begin',
                                          'linear_workspace_release.end'] + post + ['driven.end']
-        def report(names,frequency_releases=0):
+        def report(names,frequency_releases=0,predictor_checks=0):
             previous = 'unmarked'
             events = []
             for i, label in enumerate(names):
@@ -572,7 +613,7 @@ class ToolRegressionTests(unittest.TestCase):
                     managed_live_bytes=10, managed_interval_peak_bytes=20,
                     managed_process_peak_bytes=30, cudss_live_bytes=5)))
                 previous = label
-            return dev.memory_phase_report('\n'.join(events), 2, release_final=True,frequency_releases=frequency_releases)
+            return dev.memory_phase_report('\n'.join(events), 2, release_final=True,frequency_releases=frequency_releases,predictor_checks=predictor_checks)
         self.assertTrue(report(labels)['complete'])
         self.assertFalse(report(labels[:-1])['complete'])
         doubled = labels[:-1] + ['linear_workspace_release.begin',
@@ -582,6 +623,10 @@ class ToolRegressionTests(unittest.TestCase):
         self.assertTrue(report(per_frequency,1)['complete'])
         self.assertFalse(report(labels,1)['complete'])
         self.assertFalse(report(per_frequency,2)['complete'])
+        with_predictor=labels[:-1]+['sweep_predictor.begin','sweep_predictor.end','driven.end']
+        self.assertTrue(report(with_predictor,predictor_checks=1)['complete'])
+        self.assertFalse(report(labels,predictor_checks=1)['complete'])
+        self.assertFalse(report(with_predictor,predictor_checks=2)['complete'])
 
     def test_process_gpu_memory_uses_only_own_pid_and_real_units(self):
         query = type('Query', (), dict(returncode=0, stdout='9, 4000\n42, 256\n'))()

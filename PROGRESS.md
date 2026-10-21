@@ -27,7 +27,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP120–122 M6.6 sourceaudit+frequency-major2portreuse/per-portRAMhistory: tiny12,544→11,501s i medium53,570→45,344s/6→3factorbuilds, frozenRF/raw/wholefields/TEMPASS. Jedna para, nie antena/mediana/promocja. Cgroupmedium2,255→2,304GB, nie oszczędnośćpamięci. Singlefreqreuse/deferred regressionPASS. docs/milestones/sweeps.md.
 - EXP123–127: per-f deferred release i skumulowane metadata PASS; 7freq coax medium 93,540→75,664s (jedna para −19,1%), wszystkie14 pól/raw/K PASS. Cgroup2,515→2,535GB: bez oszczędności RAM całego runu. Stary singlefreq regression9,473sPASS.
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
-- Następne: tani filtr symbolic/recycling/PROM/heldout, bez kolejnego dużego runu przed dowodem korzyści. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
+- Następne: tani niezależny filtr residual-minimizing complex projection z aktualnym A(f), potem symbolic/recycling/PROM/heldout; bez kolejnej drogiej próby predyktora liniowego. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -3005,3 +3006,90 @@ docs-gardenPASS after rootnumericalreview. Native sourcehash/currentartifact
 manifests match; no newnativebuildaftertests. Preserve source/config/fallback,
 commitlocal only, no pushingupstream. CurrentM6goalactive; nextactioncheap
 sweepalgorithmassessment, notanotherfullrunorclosure. No jobsleftscheduled.
+
+EXP131 prereg: bounded per-port linear extrapolation of previous two E solutions:
+x0=(1+r)E(f1)-rE(f0), r=(f2-f1)/(f1-f0). Onlyinitialguesschanges, originalFP64
+A(f)rawresidualcomparestwo candidates; acceptifnewnorm<oldnorm, elsefallbackto
+previousE. No interpolation/frequencyomission/Tolchange. Two Aapplies+norms each
+portfromthirdf measuredinwholecost; mayloseevenwithfeweriterations.
+Extraolderhistory2E~359MBW3plusone transientresidualE~179.5MBbeforeGMRES;
+constantNF, noSSDworkspace. Explicit>=3f/batch2ports/InitialGuesstrue/fixed/
+uniform/rank1/noexternalseed; exactolderlifetime/checkcounts/residualdecisionaudit.
+Firsttiny7freqcontrolvsopt-in predictor60seach, savedfields+TEM/K/rawgate,
+controlrefEXP125on; onlycheapPASS+netgainallowmedium180s, W3laterrootgate.
+Fallbackbuild/m6-sweep-predictor/pre-predictor-{native,manifest.json}. Cachedjobs2,
+no dependencyrebuild/paidcompute/swap/appsclosing. Defaultunchanged.
+EXP131 implementation159PythonregressionsPASS: residualdecision/ratio/nonfinite/
+missinghistory/invalidlifetime/malformedmarkers andphasecounts negativecontrols.
+Nativepredictor hasoneephemeralresidual releasedbeforeGMRES, olderhistoriesfreed
+atlastf. Strictaudit andoriginalfield/rawgatesrequiredforcompletion. Readybuild
+thenexacttiny7pair; nochangesourcewhilerunning.
+
+EXP131 tiny7freqPASS15,593→14,587s (−6,45%,onepair), sumiter412→266;
+first4solves40/40/28/28unchanged, last10solves~27–28→13each.10predictoraccept/
+0fallback, fullHDMall14/raw/fields/strictscopePASS. RootCPU TEM/Kpass:
+ΔS2.286e-09/VSWR9.329e-10, olderhistory2,851MB;
+cgroup640,315→665,866MB (+25.6MB, no netmemorysaving). Noantenna/generalpromotion.
+EXP132 prereg: medium7freq samebuildcontrol vsonepredictorflag180seach,
+referencequalifiedEXP126on thenfreshsamebuildcontrol. Exactall14fields/TEM/raw/K,
+metadata/factor7/10checks/scope/constantmemory, rootgatebeforeanyfullantenna.
+No native/depsbuild/paidcompute/swap/appsclosing/retry.
+
+EXP132 medium7freq PASS75,139→67,970s (−9,54%onepair), sumiter510→406;
+thirdf onward35/34→24each, all10checksaccept, originalinitialresidual~0.084–0.085×
+previous-start. ExtraA/normchecks0,0962shostwindowtotal. RootTEM/K/fields/rawPASS
+ΔS1,549e-8/VSWR2,987e-9/energy1,241e-8/power2,901e-8,E/B≤3,957e-8/1,317e-7.
+Cgroup2,508→2,576GB (+68.1MB), olderhistory26.526MBlogical; notmemorysaving.
+Native sourceSHA dc4ba1b2128b1b7959d17ba65e86fe106ad6827b1d1bc2ccc08a9dbd222ff69f.
+EXP133 prereg rootgate actualW3 medium3.5/3.6/3.7GHzbothports, coldfirstf,
+K64/Tol1e-6/right/directFP32basis/M5mixed/reuse/per-fdeferredrelease identical.
+Onlypredictorflagchanged; controlnoexternalaccuracyref (new3.7), saveall6fields,
+rootcrosscheckfirst2freqCSVvsEXP130 thencandidatewholefieldenergycomparison.
+6fullHDMsolves/run,1800seach and60GiB/noswap/6GiBguard. Projectioncostestimate
+prior2freq916s×1.5~1374s/run (notguarantee); memory48GBprior+~0.54GBpredictor
+history/temporary, hostavailable~80GiB, noappclosing/paidcompute. Saveoutputs
+~3GB/run ordinarysnapshots, no repeatedSSDworkspace. Controlfirst, rootgate
+beforecandidate; no automaticexpensivepair/retry. Nativefallbackexecutionnotyet
+observed(0of20checks); syntheticauditnegativesnotnativefallbackproof. No global
+promotion/7freqantenna/median/newgeometry fromcheapfilters.
+
+EXP133 controlPASS1312,606s/44,44,41,41,42,41iter,6rawfinal≤9,932e-7,
+3builds+3reuse,6metadata/253iterations,12snapshotfiles. Cgroup48,876GB,
+managedphasepeak43,166GB notphysicalVRAM; processcounter2,150GBnotresidency.
+Rootfirst2freqCSVvsEXP130reuse ΔS1.933e-08/VSWR2.505e-08PASS;
+new3.7independentwholefieldreferenceNOTRUN. Candidate rootgate1800s,
+sameconfig/native/6fullHDM; onlypredictorflag+accuracyreferencechanges,
+frozenK/power-energy/S/VSWR andall42regionfieldrowsrequired. No retry/appsclosing.
+
+EXP133 predictorantenna assessmentREJECT/netgain:1312,606→1317,834s (+0,398%),
+sumiter253→252; boththirdfchecksFALLBACK becauseinitialresidualP1 1,54363→2,14561,
+P2 1,57244→2,11370. ActualnativefallbackthereforetestedandkeptpreviousE.
+Predictorcheckwindow0,8559s; totaldelta5,228s notentirelyattributed. Cgroup
+48,876→49,035GB (+159MB); managedphasepeak43,166→43,525GB; notphysicalUVM.
+QualityPASS42regionrows E/B≤4,438e-7/1,327e-7, finalraw≤9,994e-7,
+ΔS2,905e-8/VSWR5,006e-8/energy5,238e-8/power6,940e-9. Fullall6HDMsolve,
+nofrequencyomission. Outputs2,858GB/run normaloutputs, nothotSSDworkspace.
+Replay artifacts/m6-predictor-antenna-root-analysis.py, receipt...20261021.json.
+No extrapolationpromotionfromcoax; defaultOFF, baselineM5/reusepreserved.
+Followupnotnewlargerun: residual-minimizingcomplexprojectionofhistoricalfields
+underCURRENT A(f), insteadoffixedfrequencyratio; originalRHS/stoppingtolerance
+unchanged, recomputeimagesafterfchange. Needcheapindependentmathfilter+runtime
+beforeW3. No promiseofiterationgainfromsmallinitialrawnorm. ExistingPROM source
+andPETSc Fischerinitialguess reviewedasreference, no dependency/codeimport.
+PostEXP133 guard-onlyfix includespredictorenv in nativeadaptive rejection even
+withoutbatchenv; numericalpathunchanged. Newcachedbuild+tiny7regressionrequired;
+fullW3dataremainexplicitlySHA dc4ba1b2..., no falselyrelabeledcurrentbinary.
+EXP134 guard-only cachedbuild8.545s, source168bba06865626427102829030b38afc77fa3ee0700302c73b7ac06c59b7b651.
+No numericalkernelchange; priorW3proofs remainoldSHA. Tiny7predictor regression
+60s fields vsEXP131candidate, all14raw/K/10checks/metadata/history required.
+159Python+8shell/check/diffPASS. SameLuna runthenread-onlydocs-gardenbeforecommit.
+
+EXP134 tiny7guardregressionPASS14,591s/266iter,14raw/fields/TEM/checks/metadata
+PASS;10accept0fallback. Rootactualbuildmanifestidentityverified, allfreqTEM
+energy/RMSPASS, no fullW3relabeling. No livejobs.159Python/8shell/docscheck/diff
+PASS; requiredsameLuna read-onlygardenbeforelocalcommit. Goal/M6active.
+
+EXP131–134 read-onlysameLunagardenPASS, rootreview source/receipts/guards done;
+no materialdiscrepancies.159Python+8shell/check/diffPASS, localcommitno upstream
+push. Deferred/reuse baseline preserved; nextcheapmathematicalprojectionfilter,
+notrepeatfailedlinearW3. GoalactiveM6, no live/scheduledGPUjobs.

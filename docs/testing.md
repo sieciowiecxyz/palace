@@ -275,3 +275,12 @@ konflikt z coax presets. Actual tiny/medium3freq oraz W3medium3,5/3,6GHz oba
 porty PASS; replay RF/28wholefields/raw i granice w milestones/sweeps.md.
 W3 jedna para996,519→915,924s, nie mediana M7; tight independent3,6reference
 nadal NOT RUN. Guard i tolerancje bez poluzowania, defaulty bez zmian.
+
+### EXP131–134: predyktor startu i rzeczywisty fallback
+
+159Python regresji: guardy flag/InitialGuess/liczby częstotliwości; dokładne ratio,
+finite/strictresidualdecision, count/order/history/free i fazy. Nie zastępują
+native testu fallback. EXP131–132 coax7freq wszystkie20 prób accept; EXP133 W3
+3freq oba porty2 rzeczywiste fallbacki,42 wholefield i raw/K PASS. Brak zysku
+anteny: niepromowany/defaultOFF. Źródła SHA i odrębny guard-only EXP134 w raporcie
+sweepów; nie kwalifikować całego aktualnego buildu samą kompilacją/testem parsera.
