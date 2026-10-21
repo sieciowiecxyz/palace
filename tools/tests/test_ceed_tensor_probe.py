@@ -53,6 +53,31 @@ def compensated_case(bits=False):
 
 
 class TensorProbeTests(unittest.TestCase):
+    def test_lt_checked_plan_and_unsupported_coverage(self):
+        data=case();data['lt']=True
+        data['rows']=[r for r in data['rows'] if r['family']==0 and r['Q']==14 and r['components']==1]
+        for row in data['rows']:
+            candidate=dict(rank=0,id=23,impl_flags=3,heuristic_state=0,check_status=0,
+                           check_state=0,workspace_bytes=1024,eligible=True)
+            plan=dict(heuristic_status=0,returned=1,candidates=[candidate],tensor_op_mask=1,tf32_input_mask=2,
+                      alignment_bytes=[32,8,8,8],selected_rank=0,selected_id=23,selected_impl_flags=3,selected_workspace_bytes=1024)
+            method=copy.deepcopy(row['methods'][2]);method.update(precision='TF32_Lt',supported=True,
+                workspace_limit_bytes=64*1024*1024,plan_ms=2.,plans=[copy.deepcopy(plan) for _ in range(row['q_components'])],
+                extra_fp32_workspace_bytes=(row['N']*(row['Q']*row['q_components']+row['P'])+row['P']*row['Q']*row['q_components'])*4)
+            row['methods'].append(method)
+        self.assertEqual(len(data['rows']),12);self.assertTrue(probe.validate_case(data))
+        for key,value in [('impl_flags',0),('check_state',1),('workspace_bytes',65*1024*1024)]:
+            bad=copy.deepcopy(data);bad['rows'][0]['methods'][-1]['plans'][0]['candidates'][0][key]=value
+            with self.assertRaises(ValueError):probe.validate_case(bad)
+        bad=copy.deepcopy(data);bad['rows'][0]['methods'][-1]['plans'][0]['selected_id']=24
+        with self.assertRaises(ValueError):probe.validate_case(bad)
+        method=data['rows'][0]['methods'][-1];method.update(supported=False)
+        del method['accuracy'];del method['timing']
+        plan=method['plans'][0];plan.update(returned=0,candidates=[])
+        self.assertTrue(probe.validate_case(data))
+        method['supported']=True
+        with self.assertRaises(ValueError):probe.validate_case(data)
+
     def test_compensated_precision_and_linearity_coverage(self):
         data=compensated_case()
         self.assertTrue(probe.validate_case(data))

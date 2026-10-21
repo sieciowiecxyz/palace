@@ -12,12 +12,12 @@ import dev
 
 BASE=dev.ROOT/'build/m6-ceed-tensor'
 HERE=Path(__file__).resolve().parent
-SOURCES=[HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',dev.ROOT/'tools/adapter/ceed_compensated.cuh',dev.ROOT/'tools/adapter/ceed_fused.cuh']
+SOURCES=[HERE/'ceed_lt_probe.hpp',HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',dev.ROOT/'tools/adapter/ceed_compensated.cuh',dev.ROOT/'tools/adapter/ceed_fused.cuh']
 PROGRAM=BASE/'ceed-tensor-probe'
 FLAGS=['-std=c++17','-O2','-I/src/palace/palace','-I/opt/view/include',
        '-I/usr/local/cuda/include','-I/opt/cudss/include']
 LINK=['-L/src/palace/build/sm120/native','-lpalace','-L/opt/view/lib','-lmfem','-lHYPRE','-lfmt','-lceed',
-      '-L/usr/local/cuda/lib64','-lcublas','-lcudart',
+      '-L/usr/local/cuda/lib64','-lcublas','-lcublasLt','-lcudart',
       '-L/usr/local/cuda/lib64/stubs','-Wl,--no-as-needed','-lcuda','-Wl,--as-needed',
       '-Wl,-rpath,/native:/opt/view/lib:/opt/view/lib64:/opt/cudss/lib:/usr/local/cuda/lib64']
 
@@ -67,7 +67,9 @@ def build():
 
 
 def validate_case(case):
+    lt=case.get('lt',False)
     compensated=case.get('compensated',False)
+    if not isinstance(lt,bool) or lt and compensated:raise ValueError('Invalid Lt experiment scope')
     bits=case.get('compensated_bits',False)
     if bits and (not compensated or case.get('tiny_error_controls') is not True):
         raise ValueError('Missing compensated/tiny-error controls')
@@ -75,12 +77,12 @@ def validate_case(case):
     suite=case.get('suite','screen')
     if suite not in ['screen','scale']:raise ValueError('Unknown basis suite')
     scale=suite=='scale'
-    if case.get('complete') is not True or len(case.get('rows',[]))!=(42 if scale else 96):
+    if case.get('complete') is not True or len(case.get('rows',[]))!=(42 if scale else 12 if lt else 96):
         raise ValueError('Missing basis action coverage')
     expected=set()
-    for family in ([0] if scale else range(4)):
-        for q in ([14] if scale else [6] if family==3 else [6,14]):
-            for comp in ([1,2] if not scale and family==0 and q==14 else [1]):
+    for family in ([0] if scale or lt else range(4)):
+        for q in ([14] if scale or lt else [6] if family==3 else [6,14]):
+            for comp in ([1,2] if not (scale or lt) and family==0 and q==14 else [1]):
                 for mode in [1,[8,4,2,8][family]]:
                     for elements in ([257,1023,4099,16383,65537,131071,1601320] if scale else [257,131071]):
                         for trans,add in [(False,False),(True,False),(True,True)]:
@@ -120,10 +122,47 @@ def validate_case(case):
                 raise ValueError('Original vs independent reference failed')
         if compensated and row['elements']==257 and not row['transpose']:
             linearity(row['original_linearity'],1e-11,True)
-        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else []):
+        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else [])+(['TF32_Lt'] if lt else []):
             raise ValueError('Missing precision comparison')
         for method in row['methods']:
-            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'FP32_fused':2e-6,'mixed_compensated':1e-11,'mixed_compensated_bits':1e-11}[method['precision']]
+            if method['precision']=='TF32_Lt':
+                if method.get('workspace_limit_bytes')!=64*1024*1024 or len(method.get('plans',[]))!=row['q_components']:
+                    raise ValueError('Invalid Lt workspace/plan coverage')
+                expected_workspace=(row['N']*((row['Q']*row['q_components']+row['P']))+row['P']*row['Q']*row['q_components'])*4
+                if method.get('extra_fp32_workspace_bytes')!=expected_workspace:
+                    raise ValueError('Invalid Lt conversion workspace')
+                plan_ms=method.get('plan_ms')
+                if not isinstance(plan_ms,(float,int)) or not math.isfinite(plan_ms) or plan_ms<0:
+                    raise ValueError('Invalid Lt setup time')
+                supported=[]
+                for plan in method['plans']:
+                    candidates=plan['candidates'];count=plan['returned']
+                    if not isinstance(count,int) or not 0<=count<=8 or len(candidates)!=count:
+                        raise ValueError('Invalid Lt heuristic coverage')
+                    masks=[plan['tensor_op_mask'],plan['tf32_input_mask']]
+                    if any(not isinstance(v,int) or v<=0 for v in masks):raise ValueError('Invalid Lt implementation masks')
+                    if len(plan['alignment_bytes'])!=4 or any(v not in [1,2,4,8,16,32,64,128,256] for v in plan['alignment_bytes']):
+                        raise ValueError('Invalid Lt alignment constraints')
+                    eligible=[]
+                    for rank,item in enumerate(candidates):
+                        flags=item['impl_flags'];workspace=item['workspace_bytes']
+                        if item['rank']!=rank or not isinstance(flags,int) or flags<0 or not isinstance(workspace,int) or workspace<0:
+                            raise ValueError('Invalid Lt candidate metadata')
+                        usable=all(item[k]==0 for k in ['heuristic_state','check_status','check_state']) and workspace<=method['workspace_limit_bytes'] and all(flags&m for m in masks)
+                        if item['eligible'] is not bool(usable):raise ValueError('Invalid Lt candidate eligibility')
+                        if usable:eligible.append(item)
+                    if plan['heuristic_status'] not in [0,15] or candidates and plan['heuristic_status']!=0:
+                        raise ValueError('Failed Lt heuristic with candidates')
+                    supported.append(bool(eligible))
+                    if eligible:
+                        first=eligible[0]
+                        for key in ['rank','id','impl_flags','workspace_bytes']:
+                            if plan['selected_'+key]!=first[key]:raise ValueError('Lt selection differs from checked first heuristic')
+                if method.get('supported') is not all(supported):raise ValueError('Invalid Lt supported claim')
+                if not method['supported']:
+                    if 'accuracy' in method or 'timing' in method:raise ValueError('Unsupported Lt plan has fabricated execution')
+                    continue
+            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'TF32_Lt':2e-3,'FP32_fused':2e-6,'mixed_compensated':1e-11,'mixed_compensated_bits':1e-11}[method['precision']]
             accuracy(method['accuracy'],tol)
             if row['elements']==257:
                 accuracy(method['accuracy']['independent_cpu'],tol)
@@ -148,7 +187,8 @@ def validate_case(case):
     return True
 
 
-def run(output,seconds,scale=False,fused=False,compensated=False):
+def run(output,seconds,scale=False,fused=False,compensated=False,lt=False):
+    if lt and compensated:raise ValueError('Lt and compensated are separate experiments')
     if compensated and not fused:raise ValueError('Compensated screen requires --fused comparator')
     if not 30<=seconds<=120:raise ValueError('Probe requires30..120s deadline')
     dev.require_host_memory();manifest=verified();settings=dev.read(dev.SETTINGS)
@@ -156,7 +196,7 @@ def run(output,seconds,scale=False,fused=False,compensated=False):
     if len(gpu.splitlines())!=1 or int(gpu.rsplit(',',1)[1].strip())<2048:
         raise ValueError('Single GPU with >=2048MiB free required')
     output=Path(output).resolve();output.mkdir(parents=True,exist_ok=False)
-    name='palace-ceed-tensor-'+dev.sha(SOURCES[0])[:10]
+    name='palace-ceed-tensor-'+dev.sha(HERE/'ceed_tensor_probe.cpp')[:10]
     if subprocess.run(['podman','container','exists',name]).returncode==0:
         raise ValueError('Prior probe exists; inspect terminal state before retry')
     args=['podman','run','--name',name,'--network=none','--read-only','--timeout',str(seconds),
@@ -171,6 +211,7 @@ def run(output,seconds,scale=False,fused=False,compensated=False):
     if scale:args.append('scale')
     if fused:args.append('fused')
     if compensated:args.append('compensated')
+    if lt:args.append('lt')
     dev.write(output/'command.json',dict(argv=args,manifest=manifest,gpu_before=gpu,runner_sha256=dev.sha(Path(__file__))))
     started=time.monotonic();code=None
     try:
@@ -199,8 +240,9 @@ if __name__=='__main__':
     parser.add_argument('--scale',action='store_true',help='ND2/Q14 size ladder through actual N1601320, bounded GPU-resident action probe')
     parser.add_argument('--fused',action='store_true',help='Also screen fused FP32-register action without intermediate vector buffers')
     parser.add_argument('--compensated',action='store_true',help='Forward compensated mixed-register dot and small basis linearity controls; requires --fused')
+    parser.add_argument('--lt',action='store_true',help='ND2/Q14 only: checked cuBLASLt TF32 tensor-op heuristic, <=64MiB workspace')
     parser.add_argument('--seconds',type=int,default=120);args=parser.parse_args()
     if args.action=='build':build()
     elif args.action=='check':print('CEED tensor probe verified' if verified() else 'invalid')
     elif args.output is None:parser.error('run requires new output directory')
-    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated)
+    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated,args.lt)

@@ -40,6 +40,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M6.2: biblioteczny FP32/TF32 basis probe](ceed-tensor-probe.md)
   - Czytaj gdy: oceniasz net koszt konwersji/TC albo planujesz FP32 basis w PC
   - Opis: EXP107–116 biblioteka, fused FP32 i compensated bit-split, actual N/linearity/range/crossover; mikrooperacje bez promocji RF/UVM/TC.
+- [M6.3: cuBLASLt i dowód Tensor Cores](cublaslt-assessment.md)
+  - Czytaj gdy: wznawiasz EXP167 po zwolnieniu GPU albo oceniasz metadata kontra wykonane instrukcje
+  - Opis: Cached opt-in Lt/64MiB/alignment, research i rachunek intensywności; build PASS, GPU execution NOT RUN po odmowie preflight.
 - [M6.4: eksperymentalny PC-only mixed forward](pc-basis-fp32.md)
   - Czytaj gdy: oceniasz scope/cache albo wpływ niższej precyzji PC na GMRES i raw residual
   - Opis: EXP112–119 FP32 i compensated tiny/medium3,55PASS jakościowo; compensated zachowałiteracje, nadal brak netgain/HOLD przedW3, cachecleanup i rawchecks.

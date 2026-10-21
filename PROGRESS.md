@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-21. Mode: goal, Active: M6 (cuBLASLt/TC-proof; M6.6 assessment complete). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-21. Mode: goal, Active: M6 (EXP167 cuBLASLt built; GPU preflight declined, user will signal availability; TC-proof open; M6.6 assessment complete). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -3557,3 +3557,39 @@ swap/appsclosing. No liveGPUjobsleft. M6.6 assessedcomplete, ActiveM6.3/
 cuBLASLtresearch; nextchecklibraryprimarydocs/version/license andbounded
 TCinstruction/counterpathwithoutglobaldriverpermissionchanges, thenM7.
 Goalnotcomplete: W4/W5/threepairedmedians/newgeometry/package stillrequired.
+
+## EXP167 prereg — cuBLASLt checked TF32 heuristic, isolated basis only
+
+Previous goal turn was status-only/no progress; current work resumes the remaining
+M6.3 requirement. Optional `--lt` in the cached two-TU probe, no native Palace
+change/rebuild. ND2 P20/Q14, INTERP/CURL, forward/transpose/add, N257 and131071
+first; if execution/independent CPU/layout/canary controls pass, identical seven-size
+ladder through actualN1601320. Up to8 cuBLASLt heuristics, first checked algorithm
+with tensor-op and TF32 input metadata, actual pointer alignments, shared64MiB
+workspace ceiling; plan setup recorded separately, pack/GEMM/unpack included in
+per-apply timing. Unsupported algorithms remain explicit negative results; no
+TF32 precision promotion, full-antenna run or TC execution claim from metadata.
+Bound120s/run,6GiB cgroup/no swap/local only. Root prepares; sameLuna babysits.
+Primary source: CUDA12.9.1 cuBLAS docs (`cublasLtMatmulAlgoGetHeuristic`,
+AlgoCheck, numerical implementation flags and alignment preferences),
+https://docs.nvidia.com/cuda/archive/12.9.1/cublas/index.html . Existing runtime
+library, no new dependency or CUTLASS; NVIDIA CUDA Toolkit proprietary license,
+existing pinned12.9.1 image. Execution/instruction profiling remains separate.
+
+EXP167 preflight NOT RUN: sameLuna exact screen command refused before
+artifact creation due freeVRAM<2048MiB. Root read-only nvidia-smi observed
+1120MiB free/98% GPU use, user strata process12330MiB; hostavailable8.7GiB,
+swap0. No process killed, no retry/guard reduction. User explicitly will
+signal when GPU freed. Cached probe build PASS9.656s after argument guard;
+native solver/dependencies unchanged. Root source/metadata validator tests
+cover incorrect algorithm flags/check/workspace/selection and unsupported
+execution. Await GPU for numerical/runtime evidence; no TC/speedup claim.
+Research and exact resumption commands: docs/cublaslt-assessment.md.
+
+EXP167 checkpoint: final cached probe build4.606s/binarySHA
+1ae0ebd71d1cb3eb4de600451adbb0924aa74d1df8f9d8a55ccb730d61f98398; check verifies recipe/native identity.
+171Python tests/8shell/docschecker/diff PASS. SameLuna read-only docs-garden
+PASS, root reviewed diff and first-success heuristic state guard. Local commit
+contains experimental probe/research only; numerical execution/instruction
+proof remain NOT RUN. Await explicit user signal before GPU test; no active
+GPU simulation handle or paid resource. Goal remains M6, not complete.
