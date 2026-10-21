@@ -313,10 +313,10 @@ Dowody: `artifacts/m6-predictor-{tiny,medium,antenna}-{control,on}-20261021`,
 replays `artifacts/m6-predictor-root-analysis.py` (tiny/medium) i
 `artifacts/m6-predictor-antenna-root-analysis.py`, odpowiadające JSON receipts.
 
-### Wniosek matematyczny i następna tania hipoteza
+### Hipoteza po EXP133, następnie zbadana w EXP135–138
 
 Stałe rzeczywiste `r` zakłada lokalnie liniową zmianę całego zespolonego pola.
-Następna hipoteza: dobrać **zespolony** współczynnik z aktualnego A(f):
+Hipoteza do sprawdzenia w EXP135–138: dobrać **zespolony** współczynnik z aktualnego A(f):
 
 ```text
 r0 = b - A(f) E_previous
@@ -341,12 +341,98 @@ nie jest to obecna implementacja Fischera/PETSc. Przy zmianie f trzeba obliczać
 obrazy starych wektorów **aktualnym** A(f), bez stale images/faktorów. Istniejący
 Palace RomOperator pozostaje do oceny dla bounded PROM/held-out.
 
+## Projekcja zespolona, EXP135–138
+
+**Status: math/coax PASS; aktualna antena z M5 mixed/2IR FAIL/HOLD. Niepromowany.**
+
+EXP135: niezależny host screen96 niesymetrycznych zespolonych układów8×8,
+skale1e-120/1/1e120. Oracle long-double: max błąd alpha7,448e-16,
+ortogonalność residuum4,959e-16. Wszystkie96 złych sprzężeń i96 stale-image
+controls wykryte. Testy zero/nonfinite/overflow/cap; to nie GPU/RF ani speed proof.
+Kod `palace/utils/sweepprojection.hpp` i `tools/experiments/sweep_projection_probe.cpp`.
+
+```sh
+c++ -std=c++17 -O2 -I . tools/experiments/sweep_projection_probe.cpp -o build/m6-projection/math-probe
+build/m6-projection/math-probe
+```
+
+Nowy opt-in `--sweep-predictor projected`; stary bare argument lub `linear`
+zachowuje prognozę liniową. Alpha liczona jako `(unit_dᴴ r0)/||d||`, bez
+kwadratu normy. Guardy finite, norm>0, finite odwrotność i |alpha|≤1e6; inaczej
+poprzedni start. Natywny `Dot(x,y)=yᴴx`, sprawdzona kolejność argumentów.
+Po wyznaczeniu alpha ponowny oryginalny A(f) mierzy realne residuum kandydata;
+akceptacja tylko jeśli mniejsze. Oryginalne RHS, raw końcowe i Tol bez zmian.
+Trzy dodatkowe A applies i do2 tymczasowych E na próbę (przy guard fallback2 A),
+starsza historia jak wcześniej. Tymczasowy image zwalniany przed trial/GMRES.
+Tryb i scalar audit nie zastępują pełnej kwalifikacji pól.
+
+160 regresji Pythona PASS: jawny mode/defaulty/nieznane wartości, współczynnik,
+sprzężenie, brak/stale/malformed projection markers, zła liczba A applies,
+niefinite/zero/cap i istniejący strict history/lifetime/phase/fieldgate.
+Build8,718s, source SHA
+`e4b8abe0bc41372551079d149c4b2794183f11bb80168fcefb35bdf017146a1d`.
+Fallback `build/m6-projection/pre-projection-{native,manifest.json}`.
+
+| Jedna para | Czas kontrola → projected | Suma iteracji | Ocena |
+| --- | ---: | ---: | --- |
+| EXP136 tiny7freq |16,604→14,682s|412→253|quality/TEM PASS|
+| EXP137 medium7freq |75,124→66,858s|509→386|quality/TEM PASS|
+| EXP138 W3 3freq |1574,144s → **nieukończony**|253→211 w5/6 solve|FAIL/HOLD|
+
+Coax10/10 accept; check windows0,020/0,148s. Medium maxΔS9,520e-9,
+VSWR2,772e-9, E/B≤4,246e-8/1,251e-7; wszystkie14 raw/metadata/fields/TEM PASS.
+Cgroup2,514→2,565GB, brak memorysaving i brak mediana/antenna promotion.
+Czasy nie porównywane bezpośrednio z innym buildem/różną konfiguracją.
+
+### EXP138: rozdzielić projekcję od błędu wewnętrznego coarse solve
+
+Kontrola wszystkie6 solve i42 field rows PASS, iteracje44/44/41/41/42/41.
+Current wholefields vs EXP133 PASS; CSV maxΔS3,586e-8/VSWR5,508e-8.
+Jednak ta sama liczba iteracji trwała1574,144s wobec1312,606s wcześniej;
+GMRES intervals wzrosły1085,682→1328,601s. Przyczyna niepotwierdzona.
+Nie przypisywać całej różnicy kodowi lub reference I/O; M7 wymaga powtórzeń.
+
+Kandydat przy3,7GHz poprawił początkowe pełne residuum:
+- P1:1,54363→0,56863 (alpha≈0,25970−0,61501i);
+- P2:1,57244→0,55657 (alpha≈0,28138−0,62833i).
+
+P1 ukończył41 zamiast42 iteracji. P2 zatrzymał się na **pierwszym wywołaniu
+mixed coarse preconditionera**: relative residual względem oryginalnej FP64
+macierzy **coarse** wyniósł1,459992e-3 >1e-3
+(`ComplexCuDSSSolver::Mult`, fixed FP32 LU +2 korekcje FP64).
+To nie jest limit1e-6 oryginalnego pełnego FEM. Progu nie poluzowano.
+Projekcja startowa może być poprawna, a wewnętrzny PC nie spełnić własnej bramki.
+Przyczyna/różnica CSR wartości nie zostały ilościowo ustalone; nie dowodzono,
+że winna jest wyłącznie projekcja lub wyłącznie roundoff.
+
+Exit1/OOMKilled=false po1159,172s, `complete=false`. Pięć zaakceptowanych outer
+raw≤1e-6, ale tylko pierwsze4 solve mają28 porównań pól. Brak przetworzonych
+pól3,7GHz (deferred czeka na P2). `field-comparison.complete=false/passed=false`
+pozostaje bez zmian. **Częściowy czas nie jest przyspieszeniem.** Cgroup49,082GB
+partial peak nie kwalifikuje oszczędności ani pełnego bilansu pamięci.
+Nie włączać projected do zalecanego wariantu anteny; default OFF.
+
+Dowody: `artifacts/m6-projection-{tiny,medium,antenna}-{control,on}-20261021`,
+`artifacts/m6-projection-root-analysis.py` +tiny/medium receipts;
+`artifacts/m6-projection-antenna-assessment.py` +`...assessment-20261021.json`.
+Math receipt zawiera SHA header/probe/binary. Brak nowych zależności i przebudowy
+cache/dependencies. Nie wykonywano kolejnego pełnego retry ani płatnego compute.
+
 ### Następne bramki
 
-1. Niezależny mały test residual-minimizing complex projection; tani runtime
-   przed nową anteną. Nie ponawiać nieudanego predyktora liniowego na W3.
-2. Ocena symbolic reuse/recycling lub istniejącego adaptive/PROM z oryginalnym
-   residual, fallback i held-out. Obecny reuse nie zalicza tych hipotez.
-3. Antena7freq/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
+1. **Skrócić odtwarzanie problemu:** jawne read-only źródło historii/frequency
+   subset z ukończonego runu, pełne sprawdzenie mesh/materials/ports/dependencies,
+   mapowania źródłowych częstotliwości i bajtów. Odtworzyć P2 przy3,7GHz z
+   zapisanych pól3,5/3,6 i aktualnego A(f), bez ponownego solve pierwszych4 układów.
+   Nie fabrykować ukończonych wyników/reference. Ewentualny zrzut RHS/CSR tylko
+   raz jako wynik diagnostyczny, bez dyskowego workspace.
+2. Dopiero po tanim reproducerze ocenić stałe3 korekcje kontra2/FP64 bez zmiany
+   coarse/outer progów. Adaptacyjna liczba korekt lub zmiana PC w środku solve
+   wymaga osobnej kontroli stationarity/FGMRES; nie wprowadzać po cichu do GMRES.
+3. Ocena symbolic reuse/recycling/istniejącego adaptive-PROM z oryginalnym
+   residual i held-out pozostaje otwarta; nie powtarzać45-minutowej pary bez
+   nowej informacji z małego testu/replay.
+4. Antena7freq/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
 
-M6.6, M6 i goal nadal otwarte. Brak globalnej promocji na podstawie jednej pary.
+M6.6, M6 i goal nadal otwarte. Zachowany działający wariant M5/reuse bez predyktora
+w jego dotychczasowym zakresie. Nowa ścieżka nie jest globalnie zakwalifikowana.

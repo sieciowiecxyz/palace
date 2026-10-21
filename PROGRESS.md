@@ -28,7 +28,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP123–127: per-f deferred release i skumulowane metadata PASS; 7freq coax medium 93,540→75,664s (jedna para −19,1%), wszystkie14 pól/raw/K PASS. Cgroup2,515→2,535GB: bez oszczędności RAM całego runu. Stary singlefreq regression9,473sPASS.
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
 - EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
-- Następne: tani niezależny filtr residual-minimizing complex projection z aktualnym A(f), potem symbolic/recycling/PROM/heldout; bez kolejnej drogiej próby predyktora liniowego. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP135–138 complex projection: math96/coax7freq PASS, lecz W3 mixed coarse2IR FAIL przyP2/3,7GHz (1,460e-3>1e-3). Tylko5/6solve, nie speedup/pełnaRFkwalifikacja; nowy wariant defaultOFF/HOLD.
+- Następne: tani verified history/current-f replay pierwszego PC apply bez rozwiązywania pierwszych4 układów; dopiero stabilność fixed refinement i symbolic/recycling/PROM/heldout. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -3093,3 +3094,93 @@ EXP131–134 read-onlysameLunagardenPASS, rootreview source/receipts/guards done
 no materialdiscrepancies.159Python+8shell/check/diffPASS, localcommitno upstream
 push. Deferred/reuse baseline preserved; nextcheapmathematicalprojectionfilter,
 notrepeatfailedlinearW3. GoalactiveM6, no live/scheduledGPUjobs.
+
+EXP135 independentmathscreenPASS beforeintegration:96 nonsymmetriccomplex8×8
+systems, scales1e-120/1/1e120, long-doubleoraclealphaerror≤7.448e-16,
+stationarity≤4.959e-16.96wrongconjugation+96staleimagecontrolsdetected;
+zero/nonfinite/overflow/|alpha|>1e6 guards, squarednormoverflowavoidedviaunitd.
+Files palace/utils/sweepprojection.hpp +tools/experiments/sweep_projection_probe.cpp;
+hostcompile+run0.36s, artifacts/m6-projection-math-20261021.json. ThisisnotGPU/
+RF/warmstartspeedproof. No PETSc codeimport/dependency.
+EXP136 prereg: --sweep-predictor projected opt-in, oldbareflag=>linear.
+Compute r0=b-Aprev,d=A(prev-older) atCURRENTf, alpha=(unitd^H r0)/||d||,
+finite/norm/capguard, fulloriginalAtrialresidual<baseline elsefallback.
+3Aapplies/2temporaryE maxpercheck vs2/1linear; persistentolderhistorysame2E.
+OriginalRHS/precision/Tol/fullsolveunchanged. Strictmode/alpha/conjugation-scalar/
+operatorcount/actualdecisionaudit, cheap7freqtinycontrolvsprojected60seach,
+thenmedium180s onlyrootPASS/netgain. No largeantennauntilqualifyleft2cheapgates.
+Fallbackbuild/m6-projection/pre-projection-{native,manifest.json}. Cachedjobs2,
+no paidcompute/swap/appsclosing/dependenciesrebuild. Need actualmeasurement,
+smallrawstartnormaloneisnotguaranteediterationgain.
+
+EXP136 tiny7freqPASS16.604→14.682s,
+sumiter412→253,10projectedaccept/0fallback,
+3actualAappliespercheck/strictalpha+history/raw/fields/TEMPASS. RootfrozenK
+ΔS7.880e-10/VSWR4.009e-10, E/B≤1.663e-07/4.377e-07; projectioncheckwall0.0201s.
+Onepairnotmedian/antenna; memorycounterwhole cgroup636.236→639.820MB.
+EXP137 prereg medium7freqcontrol vsoneprojectedflag180seach, fieldsreference
+priorEXP132control thenfreshsamebuildcontrol. All14originalraw/wholefields/TEM/K,
+mode/alpha/3Achecks/lifetime/metadata, rootgatebeforeantenna. No newnativebuild/
+paidcompute/swap/appsclosing/retry. Mathexperimentonlyprovescoefficientlogic,
+notfield/iterationgain; need actualEMtest.
+
+EXP137 medium7freqPASS75.124→66.858s,
+sumiter509→386; rootparsedJSONcorrectssummary
+arithmetic, not476/360.10projectedaccept/0fallback, originalraw/fields/TEMPASS.
+ΔS9.520e-09/VSWR2.772e-09, E/B≤4.246e-08/1.251e-07; checkwall0.1479s.
+Cgroup2,514→2,565GB; no netmemorysaving. OnepairnotM7median/antenna.
+EXP138 prereg: actualW3same3.5/3.6/3.7GHzbothports, coldstart, K64/Tol1e-6/
+M5mixed/reuse/deferred identical. ControlfullfieldsreferenceEXP133control,
+thenrootgatecandidatecomplexprojectionvsfreshsamebuildcontrol; no changes
+sourceafterbuildSHAe4b8abe0bc41372551079d149c4b2794183f11bb80168fcefb35bdf017146a1d.
+6fullHDMsolve/run1800s,60GiBcap/noSwap/6GiBguard. Expectedpriorcontrol1313s,
+no extrapolatedpromiseofgain. Priorpeak49GB+extra temporaryE~179.5MB belowcap,
+currenthost~80GiBavailable. Saveordinaryoutputs~2.86GB/run, referenceI/Oonce
+permeasurement, nothotdiskworkspace. No paidcompute/appsclosing/autoretry.
+Originalraw/all42fieldrows/frozenK andcomplexalpha+rankcap+3Aauditrequired.
+
+EXP138 controlPASS1574,144s/253iter (44/44/41/41/42/41), all42fields/raw/
+metadata6/3factors/historyPASS; cgroup48,463GB. RootCSV3freqvsEXP133control
+ΔS3.586e-08/VSWR5.508e-08PASS. Sameiterationsbutpriorcontrol1312,606s;
+GMRESbegin intervals1085,682→1328,601s explain~243s of~262s delta, not
+fieldreferenceI/O(mainfielddiagnostic15.6s). Causeunproven: do notattributeall
+walltimedifferences toalgorithm, recordmedians/profilegateM7. CurrentGPUidle
+counter2420MiB vs~1442MiBbefore; no appclosing, no physicalUVMresidencyclaim.
+Candidate rootgate: samebuild/config/fielddiagnostics; onlyprojectedflag,
+6fullHDM/originalraw/candidatealpha+finite/cap/3A/currentimageauditsrequired.
+1800s cap60GiB/6GiBguard, no retry/paidcompute/appsclosing.
+
+EXP138 candidateFAIL after1159,172s/5of6outer solves/211iterations;notaspeedup.
+First4solves fields28rows, P13.7outerraw7,480e-7acceptedbutnotpostprocessed
+(deferredwaitsP2). FirstP2coarseapplyat3.7 failed mixedcoarseFP64original
+residual1,459992e-3 >1e-3. ThisisCOARSE-PCgate, notoriginalfullFEM1e-6rawgate.
+OOMKilledfalse; cgroup49,082GBpartialpeaknotqualifiedmemorycomparison.
+InitialprojectedrawactuallyimprovedP1 1,54363→0,56863 /P2 1,57244→0,55657
+(ratios0,3684/0,3540). Complexalpha0,25970−0,61501i /0,28138−0,62833i;
+strictmath/3Achecksvalid, butdoesnotqualifyfinishedRF/solverperformance.
+P13.7only42→41iter; no evidenceenoughnetgain. Scalarprojectionitselfnotglobally
+rejected, currentM5mixed2corrections+projectedantennaHOLD/FAIL/defaultOFF.
+SourceMatrixCSRstructuresmatchbutvaluesfingerprintsacrossrunsdiffer; no
+quantifiedCSRnorm/solecausattribution. NeedtargetedRHSreplaybeforeretry.
+Rootstructuredfailureassessment artifacts/m6-projection-antenna-assessment.py
+andJSON...20261021; preserve complete=false and fieldcomparisoncomplete=false.
+No tolerancechange/noautoretry/no livejobs.
+Nextresearchworkflowoptimizationbeforemorelargejobs: read-onlyfrequency-select
+verifiedhistoryinput(singlecurrentf), preservephysicalmesh/material/port/deps
+identityexceptexplicitSamplesselection, sourcefreqindexmap/provenance/bytes,
+no fake completedresults oraccuracyreference. CanrecreateP2initialdirection
+fromsaved3.5/3.6fieldsandactual3.7operator withoutre-solvingfirst4systems.
+Referencefrequency-subsetverificationmustretainoriginalsourcecompletionand
+fullinventory; subsetisview/provenance, notfabricatedsimulation. Dumpfailed
+coarseRHS/CSRonlyifneededonceasdiagnosticresult, nohotdiskworkspace.
+Thenconsiderfixed3IRvs2/FP64 atcheaprepro(originalgateunchanged); dynamic
+innerstopping/fallbackwouldneedstationarity/FGMRESassessment, notsilentlyswitch
+PCinsidecurrentGMRES. ExistingdefaultandqualifiedM5/reusecasespreserved.
+M6/M7open, nexttargetedreplay+PROM/symbolicassessment, notanother45minpair.
+
+EXP135–138 closechunk:160Python+8shell/check/diffPASS; root reviewed actual
+coarsefailure site/containerOOMKilledfalse/currentmanifest/source. SameLuna
+read-onlygarden foundonehistoricalnext-stepstale inM6checkpoint; rootcorrected
+chronologytoEXP135–138 andrerandocscheck. Newheader+hostprobeincludedinlocal
+commit, rawartifactsnotGit. No new paidcompute/swap/appsclosing/livejobs.
+GoalactiveM6; failure/incomplete remainexplicit, qualifiedbaselinepreserved.

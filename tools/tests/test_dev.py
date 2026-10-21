@@ -364,6 +364,35 @@ class ToolRegressionTests(unittest.TestCase):
             self.assertFalse(dev.sweep_predictor_audit(bad,config)['passed'])
         irregular=dev.point_sweep_config(config,[3.3,3.4,3.8])
         self.assertTrue(dev.sweep_predictor_audit(text.replace('ratio=1.0','ratio=4.0'),irregular)['passed'])
+        projected=text.replace('candidate_residual=2.0','candidate_residual=1.0')
+        for e,details in [(1,'image_norm=2.0 dot_real=2.0 dot_imag=1.0 alpha_real=1.0 alpha_imag=0.5 usable=1 operator_applies=3'),
+                          (2,'image_norm=0.0 dot_real=0.0 dot_imag=0.0 alpha_real=0.0 alpha_imag=0.0 usable=0 operator_applies=2')]:
+            key=f'PALACE_SWEEP_PREDICTOR: action={"accept" if e==1 else "fallback"} excitation={e}'
+            projected=projected.replace(key,f'PALACE_SWEEP_PROJECTION: excitation={e} frequency_index=2 {details}\n'+key)
+        a=dev.sweep_predictor_audit(projected,config,'projected')
+        self.assertTrue(a['passed']);self.assertEqual(len(a['projection_checks']),2)
+        self.assertFalse(dev.sweep_predictor_audit(projected,config,'linear')['passed'])
+        self.assertFalse(dev.sweep_predictor_audit(text,config,'projected')['passed'])
+        for bad in [projected.replace('alpha_imag=0.5','alpha_imag=-0.5'),
+                    projected.replace('image_norm=2.0','image_norm=4.0'),
+                    projected.replace('operator_applies=3','operator_applies=2'),
+                    projected.replace('usable=0','usable=1'),
+                    projected.replace('dot_real=2.0','dot_real=nan'),
+                    projected.replace('alpha_real=1.0','alpha_real=1e999'),
+                    projected+'PALACE_SWEEP_PROJECTION: malformed\n']:
+            self.assertFalse(dev.sweep_predictor_audit(bad,config,'projected')['passed'])
+        capped=projected.replace('image_norm=0.0 dot_real=0.0','image_norm=1.0 dot_real=2e6')
+        self.assertTrue(dev.sweep_predictor_audit(capped,config,'projected')['passed'])
+
+    def test_sweep_predictor_mode_is_explicit_and_old_bool_stays_linear(self):
+        for value,mode in [(False,False),(True,'linear'),('linear','linear'),('projected','projected')]:
+            self.assertEqual(dev.sweep_predictor_mode(value),mode)
+        for value in [None,0,1,'unknown',[],{}]:
+            with self.assertRaises(ValueError):dev.sweep_predictor_mode(value)
+        with patch.object(dev,'require_host_memory') as host:
+            with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,sweep_predictor='unknown')
+            host.assert_not_called()
+
 
     def test_explicit_point_sweep_changes_only_samples(self):
         _,_,base=dev.fixture('tshaped-medium')

@@ -284,3 +284,13 @@ native testu fallback. EXP131–132 coax7freq wszystkie20 prób accept; EXP133 W
 3freq oba porty2 rzeczywiste fallbacki,42 wholefield i raw/K PASS. Brak zysku
 anteny: niepromowany/defaultOFF. Źródła SHA i odrębny guard-only EXP134 w raporcie
 sweepów; nie kwalifikować całego aktualnego buildu samą kompilacją/testem parsera.
+
+### EXP135–138: complex residual projection
+
+Osobny host probe96 małych nonsymmetric complex systemów/long-doubleoracle,
+wrong-conjugation/stale-image controls i guards PASS; komenda w raporcie sweepów.
+160Python regresji, oba coax7freq raw/fields/TEM PASS. `--sweep-predictor` nadal
+linear, jawne `projected` ma oddzielny scalar/applies/mode audit. EXP138 kontrola
+całej anteny PASS, kandydat FAIL mixed coarse gate1e-3 przyP2/3,7GHz; nie outer
+raw gate1e-6 i nie OOM. 28 field rows/5outer zakończeń nie są pełną kwalifikacją.
+Nie przestawiać complete/passed ani liczyć speedupu z częściowego czasu.

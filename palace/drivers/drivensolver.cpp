@@ -36,6 +36,7 @@
 #include "utils/memorymark.hpp"
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
+#include "utils/sweepprojection.hpp"
 
 extern "C" void PalacePCBasisRelease() __attribute__((weak));
 
@@ -123,7 +124,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   const bool frequency_batch = (reuse_port_setup || explicit_frequency_batch) && omega_sample.size() > 1;
   MFEM_VERIFY(!explicit_frequency_batch || omega_sample.size() > 1,
               "Explicit frequency batching requires more than one frequency!");
-  const bool sweep_predictor = std::getenv("PALACE_SWEEP_PREDICTOR") != nullptr;
+  const char *predictor_env = std::getenv("PALACE_SWEEP_PREDICTOR");
+  const bool sweep_predictor = predictor_env != nullptr;
+  const bool project_sweep = predictor_env && std::string(predictor_env) == "projected";
+  MFEM_VERIFY(!sweep_predictor || project_sweep || std::string(predictor_env) == "1" ||
+                  std::string(predictor_env) == "linear", "Unknown sweep predictor mode!");
   MFEM_VERIFY(!sweep_predictor ||
                   (frequency_batch && omega_sample.size() >= 3 && iodata.solver.linear.initial_guess),
               "Sweep predictor requires frequency-major batching, >=3 frequencies and InitialGuess=true!");
@@ -415,10 +420,41 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         original_A.Mult(E, residual);
         residual.AXPBY(1.0, RHS, -1.0);
         const double baseline = linalg::Norml2(space_op.GetComm(), residual);
-        E.AXPBY(-ratio, older, 1.0 + ratio);
-        original_A.Mult(E, residual);
-        residual.AXPBY(1.0, RHS, -1.0);
-        const double predicted = linalg::Norml2(space_op.GetComm(), residual);
+        std::complex<double> coefficient = ratio;
+        bool coefficient_usable = true;
+        if (project_sweep)
+        {
+          ComplexVector image(E.Size());
+          image.UseDevice(true);
+          E -= older;
+          original_A.Mult(E, image);
+          const double image_norm = linalg::Norml2(space_op.GetComm(), image);
+          const bool normalizable = image_norm > 0.0 && std::isfinite(image_norm) &&
+                                    std::isfinite(1.0 / image_norm);
+          std::complex<double> dot = 0.0;
+          if (normalizable)
+          {
+            image *= 1.0 / image_norm;
+            // Palace Dot(x,y) = y^H x, so this is (d/||d||)^H r0.
+            dot = linalg::Dot(space_op.GetComm(), residual, image);
+          }
+          auto alpha = normalizable ? SweepProjectionCoefficient(dot, image_norm) : std::nullopt;
+          coefficient_usable = alpha.has_value();
+          coefficient = alpha.value_or(0.0);
+          E = previous;
+          Mpi::Print("PALACE_SWEEP_PROJECTION: excitation={} frequency_index={} image_norm={:.17e} dot_real={:.17e} dot_imag={:.17e} alpha_real={:.17e} alpha_imag={:.17e} usable={} operator_applies={}\n",
+                     excitation_idx, omega_i, image_norm, dot.real(), dot.imag(),
+                     coefficient.real(), coefficient.imag(), coefficient_usable ? 1 : 0,
+                     coefficient_usable ? 3 : 2);
+        }
+        double predicted = baseline;
+        if (coefficient_usable)
+        {
+          E.AXPBY(-coefficient, older, 1.0 + coefficient);
+          original_A.Mult(E, residual);
+          residual.AXPBY(1.0, RHS, -1.0);
+          predicted = linalg::Norml2(space_op.GetComm(), residual);
+        }
         const bool accept = std::isfinite(predicted) && predicted < baseline;
         if (!accept) E = previous;
         Mpi::Print("PALACE_SWEEP_PREDICTOR: action={} excitation={} frequency_index={} ratio={:.17e} baseline_residual={:.17e} candidate_residual={:.17e}\n",
