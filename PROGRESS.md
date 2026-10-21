@@ -16,7 +16,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 - M5/EXP95–96: hybrid cuDSS API/tiny/medium/W.3P2 PASS, ale REJECT jako net speedup: UVM350,371s vs4GiB363,872s/6GiB511,069s. Coarse około2× szybciej, pozostały PC wolniej; nowy profil potrzebny do dowodu przyczyny. DefaultUVM/fallback zachowane.
 - EXP97 AMS: tiny/mediumquality i CUDAprofilePASS, W3P2deadline900sFAIL (iter264/recurrence1,501e−3, brak rawfinal/pól); REJECT obecnegoC2. Partialcgroup29,32GB nie kwalifikuje oszczędności anteny.
 - EXP98–101 scaled native complexFP32/dwie FP64 CUDA korekcje: API/W.2 trzyfreq/oba porty i W.3P2 PASS. Jedna para W.3 339,362→273,843s (−19,31%),35/35iter; cgroup56,027→45,376GB (−19,01%). Pola/S/VSWR/energia/raw PASS; opt-in bez nowego defaultu. Raport docs/milestones/mixed-coarse-plan.md; build18,615s, fallback build/m5-mixed/pre-mixed-native.
-- Następne: M5.5 aktualne transfery i M5.6 ocena FDTD/CUDA. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
+- EXP102 M5.5 strict late30:2 profile PASS: UVM251,125→186,635GB (−25,68%) w dwóch iteracjach; okno12,944→10,530s. To nie pełny migrationtotal ani nowy RFsolve; docs/mixed-coarse-profile.md.
+- Następne: M5.6 ocena wielu ROI HSG po source-based EXP103. Uniform gprMax0,2mm wymaga162GB samych tablic; cienki subgrid nie obejmuje feedu. SolverNOTRUN, M5 nadalACTIVE. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
 
 ## Historyczny skrót M1/M2
 
@@ -2380,3 +2381,58 @@ PASS; root reviewed diff/receipts and verified current native manifest sourceSHA
 8692e80d926a58a74f38bff9c643b578810a94d35d4d534a2c027215fd11607f.
 Hardened dtype/scaling/cleanup parser rechecked against allfive actual native
 mixed artifacts PASS. Native default FP64 preserved; all jobs terminal/cleaned.
+
+EXP102 preregistration M5.5: compare measured CUDA/UVM for the qualified EXP100
+nativeFP64 vs mixedfixed2. Reuse existing pinned Nsight selectivecapture/affine
+hostclock; no native/dependency rebuild. Runner now permits mixed partialprofile
+and requires actual dtype +mixedsummary/cleanup for profile_complete; RF complete
+remains false. Frozen strictclock/warning/iterationcoverage gates unchanged.
+First coax-tiny mixed0:2,60s analytic profilefilter (no fieldqualification); only
+after PASS matched W3P2 latewindow30:2,600s each, samephysics/K64/initialseed,
+FP32directbasis. RAM-only profiler temp/SQLite, finalrep<=64MiB ordinary result,
+60GiB/noswap/hostguard6GiB; no fullprocesscapture/paidcompute/appsclosing.
+Compare selectedwindow bytes bydirection/migration cause and exclusivehostphase,
+not summed overlappingkernel/copytimes; no extrapolation to fulljobtotal.
+
+EXP102 firsttiny FAIL runnergate, preserved m5-mixed-profile-tiny-20261021:
+Nsightstrictsummary PASS (clock/coverage/cleanstop/no warnings), CUDAactualmixed
+markers/cleanup valid, but runner demanded6nativebuilds fromfullcoaxsweep after
+intentionalstop inside firstsolve. New regression distinguishes partial1build vs
+full6; no relaxation of strictprofile/RF gates. RFcomplete remainsfalse and full
+expectedcounts unchanged. V2 separateartifact, same argv/limits, no nativebuild.
+
+EXP102 tiny-v2 completefalse/profile_completetrue, actualdtype/mixedcleanup PASS,
+clock/coverage/cleanstop/no warnings strictPASS; runtime8.453s. Root inspected
+actualresult/summary. Full late30:2 matchedcommands prepared byroot in artifacts/
+m5-mixed-profile-commands-20261021.sh; two bounded600s jobs, no fieldqualification.
+
+EXP102 matched lateprofiles PASS: control329.345s/on263.181s includingprofile
+setup/cleanup; notnewRFspeedclaim. Strictclock/coverage/cleanstop/no warnings,
+actualdtype/cleanup PASS; RFcompletefalse. Root receipt m5-mixed-profile-root-
+analysis-20261021.json decodes embeddedNsightenums: UVM251,124,858,880→
+186,634,575,872B inselected2iterations (-25.68%); pagefault9.632→8.249GB,
+speculativeprefetch115.596→85.280GB, eviction125.897→93.105GB. Window12.944→
+10.530s, coarse4.450→2.279s, otherPC6.583→6.425s. GPUkernels5262→11420 due
+correctionsteps; Hcurl~1.918→1.914s unchanged. Overlap/partiallimits documented.
+M5.5 evaluated. FP64fallback/default and fullquality EXP100 unchanged.
+
+EXP103 source research/resource screen, no FDTD solverrun. gprMax master pinned
+d068a023265c1337982940efb41ef05a04f064a7 GPLv3; actualCUDA/HSG/portnormalization
+read, sourceonlycache561KB+extra files, no installeddeps. Bounds ofactualfixture
+299.943×299.953×300mm confirmedstream3.04s withmeshSHA. Read matching archived
+geometryparams:0.2mmgap,0.035mmcopper,0.762mmsubstrate,0.14351mmpinradius,
+coaxbodyz−40.303mm. ParameterSHA/source in m5-fdtd-budget-20261021.json.
+New tested tools/fdtd_budget.py computes field/IDtypes, CFL, HSGFP64/padding/
+parentalignment, optionalDFT cost and optimisticfields-onlystreaming at896GB/s.
+Uniform0.2mm needs162.324GBdevicebase;0.5mm10.420GB butgap<onecell. HSG0.1mm
+55cube20.622GB; thinslab55×55×2mm4.904GB yetdoesn'tresolveoutsidecoax;0.05mm
+slab25.734GB. 100nsassumed/nonmeasureddecay; bothports, allfreqinoneportwindow,
+20/100/200nssensitivity and Qdecayformula documented. No false runtime/accuracy
+claim or blanketFDTDrejection. M5.6 OPEN: sourcecheck multiROI contact/nesting,
+continuouscoaxgeometry/feasibleconvergence beforeactualsmallCUDA/TEMbenchmark.
+
+EXP102–103 checkpoint:139pinnedtests/8shell/docscheck/gitdiffcheck PASS. SameLuna
+read-only docs-garden PASS; root reviewed actualprofiles/enums/receipts and source
+math, native verified unchanged sourceSHA8692e80d926a58a74f38bff9c643b578810a94d35d4d534a2c027215fd11607f.
+No native/dependency rebuild needed, no paidcompute or runningjob. M5 ACTIVE,
+M5.5 evaluated; M5.6 remains OPEN with explicit nextHSG feasibility action.

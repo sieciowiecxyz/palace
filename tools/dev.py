@@ -568,9 +568,16 @@ def native_complex_coarse_applied(log, solves, dtype='complex_fp64'):
             and all(int(n) > 0 and int(nnz) > 0 and actual == dtype for n, nnz, actual in markers))
 
 
+def native_coarse_builds(solves, reuse, profile):
+    # The controlled profiling stop occurs inside the FIRST solve, even if the
+    # input requests more frequencies/ports. Full-run coverage is unchanged.
+    return 1 if reuse or profile else solves
+
+
 def validate_native_mixed(enabled, native, hybrid, cpu, profile, ams):
-    if enabled and (not native or hybrid is not None or cpu or profile is not None or ams is not None):
-        raise ValueError('Native mixed requires native complex coarse without hybrid/CPU/profile/AMS')
+    # A bounded profile is allowed, but remains incomplete as an RF solve.
+    if enabled and (not native or hybrid is not None or cpu or ams is not None):
+        raise ValueError('Native mixed requires native complex coarse without hybrid/CPU/AMS')
 
 
 def native_mixed_applied(log, builds):
@@ -979,13 +986,17 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['scope'] = profile['scope']
         if native_complex_coarse:
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
-                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'],
+                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile),
                 'complex_fp32' if native_coarse_fp32 else 'complex_fp64')
             status['complete'] = status['complete'] and status['native_complex_coarse_applied']
+            if profile:
+                status['profile_complete'] = status['profile_complete'] and status['native_complex_coarse_applied']
         if native_coarse_fp32:
             status['native_mixed_applied'] = native_mixed_applied(
-                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'])
+                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile))
             status['complete'] = status['complete'] and status['native_mixed_applied']
+            if profile:
+                status['profile_complete'] = status['profile_complete'] and status['native_mixed_applied']
         if setup_audit or port_setup_reuse:
             audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse)
             write(output/'port-setup-audit.json',audit)

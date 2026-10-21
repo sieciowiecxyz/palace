@@ -46,6 +46,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
   - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
   - Opis: Ocena kosztu siatki/CFL i wielu częstotliwości przed benchmarkiem; tylko przyspieszanie obliczeń, bez Rust/GUI/CAD.
+- [M5.5: UVM po mixed coarse](mixed-coarse-profile.md)
+  - Czytaj gdy: sprawdzasz zmierzony ruch pamięci po FP32 faktorach lub planujesz następny kernel
+  - Opis: EXP102 strict late profile PASS, −25,68% UVM w dwóch iteracjach; osobno pełny koszt EXP100 i granice wnioskowania.
+- [M5.6: budżet FDTD](fdtd-budget.md)
+  - Czytaj gdy: oceniasz zasoby gprMax CUDA/HSG przed budowaniem nowego modelu
+  - Opis: EXP103 source pin, rzeczywisty bbox, tablice/CFL/czas/porty; uniform niekwalifikowany, HSG i mały solver test nadal otwarte.
 - [M3: actual API i walidacja medium](mixed-basis-validation.md)
   - Czytaj gdy: oceniasz aktualny wariant FP32direct lub planujesz politykę migracji
   - Opis: EXP80–85 W.1/W.2/W.3 PASS,−2,87GB cgroup na T-Shaped; bez speedup/defaultpromotion, W.4/W.5 otwarte.

@@ -73,7 +73,9 @@ testy true residual nie przeszły, dopiero poprawione rozwiązania spełniły pr
 Nie ukryto tych zdarzeń. Zmienna liczba korekt/adaptacyjny fallback wymaga
 osobnej oceny FGMRES i kosztu dodatkowych wektorów Z.
 
-Runner odrzuca mixed bez native oraz z hybrid/CPU/AMS/profile. Sprawdza actual
+Runner odrzuca mixed bez native oraz z hybrid/CPU/AMS. EXP102 dopuścił kontrolowany
+partial profile, który zawsze ma RFcomplete=false; [pomiar](../mixed-coarse-profile.md).
+Sprawdza actual
 dtype, podsumowanie korekcji, skalę i cleanup. Adapter raportuje prawdziwe FP32
 faktory; stary realny shim jest wyłączony. Dodatkowe CSR FP32, oryginalny CSR FP64,
 skala i wektory korekcji są uwzględnione w pomiarach całego procesu.
@@ -156,5 +158,5 @@ nie commitowane; pakiet przenośny i odtwarzanie referencji należą do M7.
 
 **Decyzja:** zachować obiecujący opt-in. W.4/W.5, trzy powtórzenia/mediana,
 drugi port pełnej anteny, nowa geometria i M6 sweep/TC nadal NOT RUN.
-M5.5 (aktualne transfery) i M5.6 FDTD nadal otwarte; M5 nie jest zakończony.
+M5.5 zmierzone później w EXP102; M5.6 FDTD nadal otwarte, M5 nie jest zakończony.
 Bufory RAM/VRAM, bez swap/SSD workspace; limity i cache zachowane.

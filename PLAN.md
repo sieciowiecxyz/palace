@@ -111,8 +111,9 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 - [x] AMS na realnym shifted pomocniczym PC, actualCUDAtracePASS; tiny/mediumqualityPASS, W3deadlineFAIL. Ocena EXP97, bez promocji.
 - [x] EXP98–101: native complex FP32/scaling/dwie FP64 CUDA korekcje, fail-closed i FP64 fallback; API/W.2/W.3 PASS. Jedna para W.3 −19,31% czasu/−19,01% cgroup, bez globalnej promocji; docs/milestones/mixed-coarse-plan.md. Zmienna liczba korekt/FGMRES pozostaje osobną hipotezą.
 
-- [ ] Rozdzielić koszt PC na analizę, faktoryzację, apply, migracje i zmianę liczby iteracji; oszacować limit zysku pełnego zadania przed kolejnym prototypem.
+- [x] EXP100/102: pełne wyłączne timery + strict late CUDA/UVM profile;251,125→186,635GB w dwóch iteracjach, bez ekstrapolacji na całą symulację. Limit zysku coarse i zakres dowodów: docs/mixed-coarse-profile.md.
 - [ ] M5.6 — research jednego konkurenta FDTD/CUDA (najpierw gprMax): koszt siatki/CFL/zaniku, porty i kilka częstotliwości z jednego przebiegu; mały test tylko po pozytywnej ocenie zasobów.
+  - EXP103: pinned gprMax CUDA/HSG, rzeczywisty bbox/feed i odtwarzalny budżet; uniform wymaga zbyt wiele pamięci przy małych szczelinach. Następnie sprawdzić kilka ROI HSG bez przerwania feedu; docs/fdtd-budget.md. Solver NOT RUN, ocena wciąż otwarta.
 
 Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jest ograniczony; negatywna ocena z dowodami kończy hipotezę, nie wymusza migracji backendu.
 

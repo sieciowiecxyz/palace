@@ -12,11 +12,20 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_native_partial_profile_stops_in_first_solve_without_weakening_full_coverage(self):
+        self.assertEqual(dev.native_coarse_builds(6, False, None),6)
+        self.assertEqual(dev.native_coarse_builds(6, False, {'first':30,'count':2}),1)
+        self.assertEqual(dev.native_coarse_builds(2, True, None),1)
+        log='PALACE_NATIVE_COMPLEX_COARSE: dimension=20 nnz=100 dtype=complex_fp32 matrix=general\n'
+        self.assertTrue(dev.native_complex_coarse_applied(log,dev.native_coarse_builds(6,False,{'first':0}), 'complex_fp32'))
+        self.assertFalse(dev.native_complex_coarse_applied(log,dev.native_coarse_builds(6,False,None),'complex_fp32'))
+
     def test_native_mixed_guards_and_observed_precision_cleanup(self):
         dev.validate_native_mixed(False, False, None, False, None, None)
         dev.validate_native_mixed(True, True, None, False, None, None)
+        dev.validate_native_mixed(True, True, None, False, '0:2', None)
         for args in [(True, False, None, False, None, None), (True, True, 512, False, None, None),
-                     (True, True, None, True, None, None), (True, True, None, False, '0:2', None),
+                     (True, True, None, True, None, None),
                      (True, True, None, False, None, 2)]:
             with self.assertRaisesRegex(ValueError, 'Native mixed'): dev.validate_native_mixed(*args)
         marker = 'PALACE_NATIVE_COMPLEX_COARSE: dimension=20 nnz=100 dtype=complex_fp32 matrix=general\n'
