@@ -117,4 +117,4 @@ per-point receipts i pełne źródłowe runyEXP153–166.170Python testsPASS, w 
 kontrole niewłaściwych jednostek/kolejności, NaN, uszkodzonego coverage, fazy
 ±360°, zera energii i błędnych sum/peaków. Standardowe benchmarki małe są
 oddzielne od tej kosztownej końcowej kwalifikacji.
-M6.3/cuBLASLt/TC research nadal otwarte; goal nieukończony.
+M6assessment zakończonyEXP176, scopedWMMA TCproofPASS/directPCfilterFAIL; goal nieukończony. AktywnyM7: docs/milestones/M7.md. Powyższe wyniki tofixed2IR; explicit --corrections3 ma osobną kwalifikację i nie może być mieszany wsummary2IR.

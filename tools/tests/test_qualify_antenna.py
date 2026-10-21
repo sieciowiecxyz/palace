@@ -59,7 +59,7 @@ class QualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'identical'):q.qualify(*paths)
 
     def receipt(self,f,ref,cand,refmem,candmem):
-        return dict(passed=True,frequency_ghz=f,source_sha256='same',build_manifest_sha256='same',case_without_frequency_sha256='same',
+        return dict(passed=True,frequency_ghz=f,coarse_corrections=2,source_sha256='same',build_manifest_sha256='same',case_without_frequency_sha256='same',
                     metrics=dict(passed=True,max_delta_S=0,max_delta_vswr=0,max_delta_power=0,max_relative_energy=0),
                     fields=dict(passed=True,entries=[dict(relative_E=0,relative_B=0)]),
                     reference=dict(end_to_end_seconds=ref,cgroup_memory_peak_bytes=refmem,iterations=[1,1]),
@@ -76,6 +76,15 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(s['candidate_max_cgroup_bytes'],900)
         self.assertEqual(s['max_cgroup_saving_percent'],25)
         self.assertEqual(s['total_field_rows'],2)
+
+    def test_fixed_correction_policies_are_explicit_and_never_mixed(self):
+        for count in [None,True,1,5,2.0]:
+            with self.assertRaisesRegex(ValueError,'fixed correction count'):q.qualify('/unused','/unused',count)
+        a=self.receipt(3.3,100,50,1000,500)
+        b=self.receipt(3.4,200,200,1200,900);b['coarse_corrections']=3
+        with self.assertRaisesRegex(ValueError,'mixes fixed correction'):q.summarize([a,b],[3.3,3.4])
+        a['coarse_corrections']=3
+        self.assertEqual(q.summarize([a,b],[3.3,3.4])['coarse_corrections'],3)
 
     def test_summary_rejects_duplicates_failures_and_changed_mesh_or_build(self):
         a=self.receipt(3.3,100,50,1000,500)

@@ -39,7 +39,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: DirectWMMA W.1FAIL/REJECT, scopedTCproof i microgain zachowane; bezpromocji PC, ograniczenia FGMRES.
 - [M7: kwalifikacja finalisty](milestones/M7.md)
   - Czytaj gdy: planujesz W.4/W.5, mediany pełnych par, nową geometrię lub pakiet
-  - Opis: Active checklista i dokładny coverage; pierwsza nowa para1.710GHz, reusable7f tylko przyzgodnymmanifest.
+  - Opis: Active checklista/coverage;1.710GHz2IRFAIL/3IR KPASS z kompromisemczas/RAM, fixedcounty nie są mieszane; nowageometria/pakiet nadalotwarte.
 - [M6.1: audyt baz libCEED](ceed-basis-audit.md)
   - Czytaj gdy: wybierasz kształty prototypu FP32/TF32 lub oceniasz długości workspace
   - Opis: EXP105–106 host metadata tiny/W.3, frozen quality PASS, logiczne bytes osobno od długości buforów; brak deklaracji TC/speedupu.

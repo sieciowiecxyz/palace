@@ -129,7 +129,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. NajpierwW.4 1.710GHz/oba porty (EXP177–178), bez nowej zmiany precyzji lub przebudowy native.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. EXP177–1791.710GHz:2IRFAIL,3IR KPASS z−23.72%cgroup/+9.72%czasu; polityka globalnegofinalisty nieustalona. Następnie2.690GHz fixed3 i3.300GHz porównanie kosztu dofixed2. Bez przebudowy native lub luźniejszych progów.
 
 - [ ] Wykonać kwalifikację częstotliwości/portów według MILESTONES, trzy pomiary finalisty bez profilera.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.

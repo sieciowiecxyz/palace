@@ -57,7 +57,9 @@ def rf_metrics(sref, scand, eref, ecand, frequencies):
                 passed=ds<=1e-3 and dv<=.01 and dp<=1e-3 and de<=1e-3)
 
 
-def qualify(reference,candidate):
+def qualify(reference,candidate,corrections=2):
+    require(isinstance(corrections,int) and not isinstance(corrections,bool) and corrections in (2,3,4),
+            'Require explicit fixed correction count2/3/4')
     paths=[Path(reference).resolve(),Path(candidate).resolve()]
     cfgs=[dev.read(p/'config.json') for p in paths]
     builds=[dev.read(p/'build-manifest.json') for p in paths]
@@ -76,12 +78,14 @@ def qualify(reference,candidate):
             'PALACE_NATIVE_COARSE_FP32','PALACE_REUSE_PORT_SETUP']), 'Reference is not fullFP64/fresh setup')
     require(all(envs[1].get(k)=='1' for k in ['PALACE_GMRES_FP32_BASIS','PALACE_GMRES_FP32_DIRECT',
             'PALACE_NATIVE_COARSE_FP32','PALACE_REUSE_PORT_SETUP']), 'Combined candidate flags differ')
+    require(envs[1].get('PALACE_NATIVE_COARSE_CORRECTIONS')==str(corrections),
+            'Candidate correction policy differs from requested fixed count')
     forbidden=['PALACE_SWEEP_PREDICTOR','PALACE_PROM_VALIDATE','PALACE_INITIAL_FIELDS','PALACE_HISTORY_FIELDS',
                'PALACE_GMRES_FP64_DISK_BASIS','PALACE_GMRES_FP32_DISK_BASIS','PALACE_CUDSS_FP32']
     require(not any(k in env for env in envs for k in forbidden), 'Cold/in-memory protocol violated')
     require(dev.native_complex_coarse_applied(logs[0],2,'complex_fp64') and
             dev.native_complex_coarse_applied(logs[1],1,'complex_fp32') and
-            dev.native_mixed_applied(logs[1],1,2), 'Native precision/count/residual audit failed')
+            dev.native_mixed_applied(logs[1],1,corrections), 'Native precision/count/residual audit failed')
     raws=[]
     for i,(p,c) in enumerate(zip(paths,cfgs)):
         dev.verified_field_reference(p,c,dev.read(p/'fixture.json'),builds[0])
@@ -101,7 +105,7 @@ def qualify(reference,candidate):
     for sample in normalized['Solver']['Driven']['Samples']:sample['Freq']=[0]
     normalized['Model']['Mesh']=dev.read(paths[0]/'fixture.json')['mesh_sha256']
     case_id=hashlib.sha256(json.dumps(normalized,sort_keys=True).encode()).hexdigest()
-    return dict(passed=metrics['passed'] and fields['passed'],frequency_ghz=frequencies[0],raw=raws,fields=fields,
+    return dict(passed=metrics['passed'] and fields['passed'],frequency_ghz=frequencies[0],coarse_corrections=corrections,raw=raws,fields=fields,
                 metrics=metrics,reference=results[0],candidate=results[1],
                 time_saving_percent=100*(1-results[1]['end_to_end_seconds']/results[0]['end_to_end_seconds']),
                 cgroup_saving_percent=100*(1-results[1]['cgroup_memory_peak_bytes']/results[0]['cgroup_memory_peak_bytes']),
@@ -119,6 +123,9 @@ def summarize(receipts,expected):
     require([r['frequency_ghz'] for r in receipts]==expected, 'Summary frequency coverage/duplicates differ')
     require(all(r['passed'] and r['metrics']['passed'] and r['fields']['passed'] for r in receipts),
             'Summary contains an unqualified case')
+    require(len({r['coarse_corrections'] for r in receipts})==1 and
+            all(r['coarse_corrections'] in (2,3,4) for r in receipts),
+            'Summary mixes fixed correction policies')
     require(len({r['source_sha256'] for r in receipts})==1 and
             len({r['build_manifest_sha256'] for r in receipts})==1 and
             len({r['case_without_frequency_sha256'] for r in receipts})==1,
@@ -130,7 +137,7 @@ def summarize(receipts,expected):
     candidate=sum(r['candidate']['end_to_end_seconds'] for r in receipts)
     refmem=max(r['reference']['cgroup_memory_peak_bytes'] for r in receipts)
     candmem=max(r['candidate']['cgroup_memory_peak_bytes'] for r in receipts)
-    return dict(passed=True,frequencies_ghz=expected,reference_end_to_end_seconds=reference,
+    return dict(passed=True,frequencies_ghz=expected,coarse_corrections=receipts[0]['coarse_corrections'],reference_end_to_end_seconds=reference,
                 candidate_end_to_end_seconds=candidate,time_saving_percent=100*(1-candidate/reference),
                 speed_ratio=reference/candidate,reference_max_cgroup_bytes=refmem,candidate_max_cgroup_bytes=candmem,
                 max_cgroup_saving_percent=100*(1-candmem/refmem),
@@ -152,18 +159,20 @@ if __name__=='__main__':
     parser.add_argument('--summary',type=Path,nargs='+',help='Recheck original pairs named by these receipts, then aggregate; no trust in cached passed flags')
     parser.add_argument('--expected-frequencies',type=float,nargs='+',help='Explicit required coverage for --summary')
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--corrections',type=int,choices=[2,3,4],default=2,
+                        help='Required fixed correction policy, validated in environment and native summaries; default two')
     args=parser.parse_args()
     if args.summary:
         if args.reference or args.candidate or not args.expected_frequencies:
             parser.error('--summary requires --expected-frequencies and no pair positional arguments')
-        receipt=summarize([qualify(*dev.read(p)['input_paths']) for p in args.summary],args.expected_frequencies)
+        receipt=summarize([qualify(*dev.read(p)['input_paths'],corrections=args.corrections) for p in args.summary],args.expected_frequencies)
     else:
         if not args.reference or not args.candidate or args.expected_frequencies:
             parser.error('Specify reference and candidate, or --summary with expected frequencies')
-        receipt=qualify(args.reference,args.candidate)
+        receipt=qualify(args.reference,args.candidate,corrections=args.corrections)
     dev.write(args.output,receipt)
-    keys=(['passed','frequencies_ghz','reference_end_to_end_seconds','candidate_end_to_end_seconds',
+    keys=(['passed','coarse_corrections','frequencies_ghz','reference_end_to_end_seconds','candidate_end_to_end_seconds',
            'time_saving_percent','max_cgroup_saving_percent','maxima','total_field_rows'] if args.summary else
-          ['passed','frequency_ghz','metrics','time_saving_percent','cgroup_saving_percent'])
+          ['passed','coarse_corrections','frequency_ghz','metrics','time_saving_percent','cgroup_saving_percent'])
     print(json.dumps({k:receipt[k] for k in keys},indent=2))
     raise SystemExit(0 if receipt['passed'] else 1)

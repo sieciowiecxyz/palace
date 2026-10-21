@@ -3753,3 +3753,56 @@ EXP176 checkpoint172Python/8shell/docschecker/diffPASS. SameLuna docs-garden
 foundstale current/open headings inM6; rootmarked oldcheckpointsections as
 history and updatedcurrentTC/integration assessment, checker/diffPASS.
 Native verifiedmanifest exactlyequalsEXP153–166, no rebuild required forM7.
+
+EXP177 prereg M7/W.4: cold1.710GHz/physicalports1+2 fullFP64 reference,
+identicalnative manifest toEXP153–166, same frozenmedium mesh/materials/feed,
+RIGHT/K64/Tol1e-6, nativecomplexFP64coarse/freshsetup, deferredenergy+solver
+release, snapshotsforE/B.1800s/60GiBcgroup/no swap/6GiBhostguard. GPUlocal;
+noWMMA/PCbasisexperimentalflags, noseeds/predictor/PROM/profiler. Storeordinary
+input/snapshotresults once and countbytes. Rootvalidatesraw/native/setup/
+fields/inventory before EXP178 candidate. No new build/paidcompute.
+EXP177 root referencePASS: endtoend686.203s/40+41iter/cgroup60146286592B.
+Originalraw8.2004e-7/7.0181e-7, nativecomplexFP64/fresh2setups/strictoutput/
+fieldinventory PASS; fourE/Bsnapshots. IndependentstoredS/energyfinitechecks,
+source/nativeexactmatching; root-reference-check.json retained. Helpername
+typo inrootanalysisfirstattempt raised beforewritingreceipt, corrected using
+versionedrf_metrics; simulation unaffected/no rerun. Ordinaryartifactbytes
+~1.18GB; exact inreceipt. No candidate outcome inferred.
+EXP178 prereg: same1.710GHz/bothports/medium/config/native, combineddirect
+FP32storage/scalednativeFP32LU+2fixedFP64IR/reuse, fieldreferenceEXP177.
+Same1800s/60GiB/no swap/6GiBhostguard/frozenK; noTCexperimentalflags.
+EXP178 rootconfirmedFAIL incomplete exit1/OOMfalse after399.041s,
+firstport42iter/originalraw7.2463555e-7PASS; secondportfirstcoarseapply
+failed originalFP64coarseresidual1.2963985270678087e-3>1e-3. No fullfields,
+no valid candidate time/memorycomparison. Failure remains recorded. 2IR
+cannotbeclaimedqualified acrossLTE; prior7n78points remain onlytheirscope.
+
+EXP179 prereg: test one fixedadditional correction (3everycoarseapply) at
+same1.710GHz/2ports/cold/fieldreferenceEXP177. This existingnativepath already
+passedtiny/mediumW.2 inEXP143–144; previous3fdeadlineFAIL remains distinct
+fromthissinglef bound. No newbuild/tolerancechange/adaptivePC/countpolicy.
+Same1800s/60GiB/no swap/hostguard. PreserveEXP178failure separately; do not
+claim rerunpolicycostfree or aggregate2IRand3IRasonefixedcandidate. Root
+willqualifyexplicitcount3 ifcomplete, then choose broaderqualificationpolicy
+basedonactualquality/cost. No failedrun speedupclaim.
+
+EXP179 rootfixed3pairKPASS: reference686.203s/60146286592B →candidate
+752.869s/45877805056B, time+9.715%/cgroup−23.723%. 42/43iter,
+originalraw6.4386174e-7/6.5444737e-7/coarsemax8.063580729e-4,
+14whole+regionalfieldrowsPASS, maxΔcomplexS5.1000644e-9,
+ΔVSWR5.0958924e-9/power1.1911106e-9/relativeenergy9.4594957e-9.
+Explicitfixed3receipt artifacts/m7-1710-fixed3-qualification-20261021.json.
+Qualifier now accepts requested --corrections2/3/4, validates env/nativecounts,
+summaryrejects mixedcounts; count4stillNOTRUN/notpromoted. Default2behavior
+retained. Updatedtests mixedcohort/countguards, no globaltolerancechanges.
+Older7fixed2pairs rechecked separately withcurrentversion; never combined
+with1.71fixed3 asonefixedpolicy. FailedEXP178preserved; noautomaticrerunpolicy
+claim/timegainfromincomplete. M7policyselectionstillopen; next2.69fixed3,
+then3.30costvsfixed2beforebroaderW5. No GPUjobsactive.
+EXP179 checkpoint173Python/8shell/docschecker/diffPASS; sameLuna readonly
+docs-gardenPASS/rootreview. Actualguards rejectfixed3underdefault2policy and
+rejectincompleteEXP178. Sevenlegacyfixed2pairs independentlyrecheckedPASS
+withnewqualifier,21.095%time/23.825%cgroup unchanged; separatecohortreceipt
+artifacts/m7-rechecked-seven-fixed2-summary-20261021.json. No nativebuild/
+physics/defaultchange. M7active, globalpolicyselectionandremainingcoverage
+stillopen. No paidresources/GPUjobsleft; all3runhandlesconfirmedterminal.
