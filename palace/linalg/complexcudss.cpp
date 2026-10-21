@@ -17,6 +17,7 @@
 #include <map>
 #include <string_view>
 #include "linalg/rap.hpp"
+#include "linalg/mixedcoarse.hpp"
 
 namespace palace
 {
@@ -32,6 +33,11 @@ void Sync()
 {
   const auto status = cudaDeviceSynchronize();
   MFEM_VERIFY(status == cudaSuccess, "Native complex CUDA error: " << cudaGetErrorString(status));
+}
+
+void CheckCuda(cudaError_t status)
+{
+  MFEM_VERIFY(status == cudaSuccess, "Mixed coarse CUDA error: " << cudaGetErrorString(status));
 }
 
 bool Enabled(const char *name)
@@ -51,17 +57,31 @@ struct ComplexCuDSSSolver::Impl
   mfem::Array<int> offsets, columns;
   Vector values;
   mutable Vector rhs, solution;
+  MPI_Comm comm;
+  const bool mixed = Enabled("PALACE_NATIVE_COARSE_FP32");
+  Vector scale;
+  mutable Vector residual;
+  mfem::Array<cuComplex> float_values;
+  mutable mfem::Array<cuComplex> float_rhs, float_solution;
+  mutable mfem::Array<int> invalid;
+  mutable unsigned long long solves = 0;
+  mutable double max_residual = 0.0;
 
-  Impl()
+  explicit Impl(MPI_Comm comm_) : comm(comm_)
   {
     values.UseDevice(true);
     rhs.UseDevice(true);
     solution.UseDevice(true);
+    scale.UseDevice(true);
+    residual.UseDevice(true);
   }
 
   void Clear()
   {
     if (handle) Sync();
+    if (handle && mixed && solves)
+      Mpi::Print("PALACE_NATIVE_MIXED_COARSE: solves={} corrections=2 max_relative_residual={:.9e} backend=cuda_fp64\n",
+                 solves, max_residual);
     if (data) Check(cudssDataDestroy(handle, data));
     if (matrix) Check(cudssMatrixDestroy(matrix));
     if (rhs_matrix) Check(cudssMatrixDestroy(rhs_matrix));
@@ -72,18 +92,22 @@ struct ComplexCuDSSSolver::Impl
     config = nullptr;
     data = nullptr;
     matrix = rhs_matrix = solution_matrix = nullptr;
+    solves = 0;
+    max_residual = 0.0;
   }
 
   ~Impl() { Clear(); }
 };
 
 ComplexCuDSSSolver::ComplexCuDSSSolver(MPI_Comm comm, bool drop)
-  : Solver<ComplexOperator>(false), impl(std::make_unique<Impl>()), drop_small_entries(drop)
+  : Solver<ComplexOperator>(false), impl(std::make_unique<Impl>(comm)), drop_small_entries(drop)
 {
   MFEM_VERIFY(Mpi::Size(comm) == 1 && mfem::Device::Allows(mfem::Backend::CUDA_MASK),
               "Native complex coarse requires one MPI rank and CUDA!");
   MFEM_VERIFY(!Enabled("PALACE_CUDSS_FP32") && !Enabled("PALACE_CUDSS_HYBRID_EXECUTE"),
-              "Native complex coarse requires FP64 factors and GPU execution!");
+              "Native complex coarse cannot use the real FP32 shim or CPU hybrid execution!");
+  MFEM_VERIFY(!impl->mixed || !std::getenv("PALACE_CUDSS_HYBRID_MIB"),
+              "Mixed coarse cannot combine hybrid memory in this prototype!");
 }
 
 ComplexCuDSSSolver::~ComplexCuDSSSolver() = default;
@@ -115,6 +139,7 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   const double *rv = ar ? real.HostReadData() : nullptr, *iv = ai ? imag.HostReadData() : nullptr;
   std::vector<int> offsets(n + 1), columns;
   std::vector<double> values;
+  std::vector<double> scales(impl->mixed ? n : 0);
   const double threshold = drop_small_entries ? std::pow(std::numeric_limits<double>::epsilon(), 2) : -1.0;
   for (int row = 0; row < n; ++row)
   {
@@ -136,6 +161,36 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     }
   }
   offsets[n] = int(columns.size());
+  if (impl->mixed)
+  {
+    // Equilibrate the exact stored coarse CSR, including the existing drop policy.
+    for (int row = 0; row < n; ++row)
+    {
+      double diagonal = 0.0, row_max = 0.0;
+      for (int j = offsets[row]; j < offsets[row + 1]; ++j)
+      {
+        const double magnitude = std::hypot(values[2*j], values[2*j+1]);
+        MFEM_VERIFY(std::isfinite(magnitude), "Nonfinite original mixed coarse CSR!");
+        row_max = std::max(row_max, magnitude);
+        if (columns[j] == row) diagonal = magnitude;
+      }
+      scales[row] = mixedcoarse::Scale(diagonal, row_max);
+      MFEM_VERIFY(std::isfinite(scales[row]) && scales[row] > 0.0,
+                  "Mixed coarse cannot scale an empty/invalid row!");
+    }
+    for (int row = 0; row < n; ++row)
+      for (int j = offsets[row]; j < offsets[row + 1]; ++j)
+      {
+        const double d = scales[row] * scales[columns[j]];
+        MFEM_VERIFY(std::isfinite(float(d * values[2*j])) && std::isfinite(float(d * values[2*j+1])),
+                    "Mixed coarse matrix overflows FP32 after scaling!");
+      }
+    impl->scale.SetSize(n);
+    std::copy(scales.begin(), scales.end(), impl->scale.HostWrite());
+    const auto range = std::minmax_element(scales.begin(), scales.end());
+    Mpi::Print("PALACE_NATIVE_MIXED_SCALE: min={:.9e} max={:.9e} corrections=2 original=complex_fp64\n",
+               *range.first, *range.second);
+  }
   const bool audit = std::getenv("PALACE_PORT_SETUP_AUDIT") != nullptr;
   if (audit)
   {
@@ -167,15 +222,36 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   Check(cudssCreate(&impl->handle));
   Check(cudssConfigCreate(&impl->config));
   Check(cudssDataCreate(impl->handle, &impl->data));
+  const auto dtype = impl->mixed ? CUDA_C_32F : CUDA_C_64F;
+  void *matrix_values = const_cast<double *>(impl->values.Read());
+  void *rhs_values = impl->rhs.Write(), *solution_values = impl->solution.Write();
+  if (impl->mixed)
+  {
+    // Built-in same-dtype refinement is explicitly disabled: all corrections below
+    // use the original FP64 CSR. A fixed count preserves the chosen PC structure.
+    int refinement = 0;
+    Check(cudssConfigSet(impl->config, CUDSS_CONFIG_IR_N_STEPS, &refinement, sizeof(refinement)));
+    impl->float_values.SetSize(impl->columns.Size());
+    impl->float_rhs.SetSize(n);
+    impl->float_solution.SetSize(n);
+    impl->residual.SetSize(2*n);
+    impl->invalid.SetSize(1);
+    CheckCuda(mixedcoarse::MatrixPack(n, impl->offsets.Read(), impl->columns.Read(),
+        reinterpret_cast<const cuDoubleComplex *>(impl->values.Read()), impl->scale.Read(),
+        impl->float_values.Write()));
+    matrix_values = impl->float_values.Write();
+    rhs_values = impl->float_rhs.Write();
+    solution_values = impl->float_solution.Write();
+  }
   // A complex-symmetric Maxwell matrix is not generally Hermitian. Use GENERAL.
   Check(cudssMatrixCreateCsr(&impl->matrix, n, n, impl->columns.Size(),
                             const_cast<int *>(impl->offsets.Read()), nullptr,
                             const_cast<int *>(impl->columns.Read()),
-                            const_cast<double *>(impl->values.Read()), CUDA_R_32I, CUDA_C_64F,
+                            matrix_values, CUDA_R_32I, dtype,
                             CUDSS_MTYPE_GENERAL, CUDSS_MVIEW_FULL, CUDSS_BASE_ZERO));
-  Check(cudssMatrixCreateDn(&impl->rhs_matrix, n, 1, n, impl->rhs.Write(), CUDA_C_64F,
+  Check(cudssMatrixCreateDn(&impl->rhs_matrix, n, 1, n, rhs_values, dtype,
                            CUDSS_LAYOUT_COL_MAJOR));
-  Check(cudssMatrixCreateDn(&impl->solution_matrix, n, 1, n, impl->solution.Write(), CUDA_C_64F,
+  Check(cudssMatrixCreateDn(&impl->solution_matrix, n, 1, n, solution_values, dtype,
                            CUDSS_LAYOUT_COL_MAJOR));
   Sync();
   const auto analysis_begin = std::chrono::steady_clock::now();
@@ -227,10 +303,10 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   int info = 0;
   size_t written = 0;
   Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_INFO, &info, sizeof(info), &written));
-  MFEM_VERIFY(info == 0, "Native complex cuDSS factorization device error: " << info);
+  MFEM_VERIFY(written == sizeof(info) && info == 0, "Native complex cuDSS factorization device error: " << info);
   height = width = n;
-  Mpi::Print("PALACE_NATIVE_COMPLEX_COARSE: dimension={} nnz={} dtype=complex_fp64 matrix=general\n",
-             n, impl->columns.Size());
+  Mpi::Print("PALACE_NATIVE_COMPLEX_COARSE: dimension={} nnz={} dtype={} matrix=general\n",
+             n, impl->columns.Size(), impl->mixed ? "complex_fp32" : "complex_fp64");
 }
 
 void ComplexCuDSSSolver::Mult(const ComplexVector &x, ComplexVector &y) const
@@ -238,6 +314,39 @@ void ComplexCuDSSSolver::Mult(const ComplexVector &x, ComplexVector &y) const
   MFEM_VERIFY(impl->handle && x.Size() == width && y.Size() == height,
               "Uninitialized or mismatched native complex coarse solve!");
   x.Get(reinterpret_cast<std::complex<double> *>(impl->rhs.Write()), width, true);
+  if (impl->mixed)
+  {
+    const auto *b = reinterpret_cast<const cuDoubleComplex *>(impl->rhs.Read());
+    auto *s = reinterpret_cast<cuDoubleComplex *>(impl->solution.Write());
+    for (int step = 0; step <= 2; ++step)
+    {
+      auto *r = reinterpret_cast<cuDoubleComplex *>(impl->residual.Write());
+      if (step) CheckCuda(mixedcoarse::Residual(width, 1, impl->offsets.Read(), impl->columns.Read(),
+          reinterpret_cast<const cuDoubleComplex *>(impl->values.Read()), s, b, r));
+      CheckCuda(cudaMemset(impl->invalid.Write(), 0, sizeof(int)));
+      CheckCuda(mixedcoarse::Pack(width, 1, impl->scale.Read(), step ? r : b,
+          impl->float_rhs.Write(), nullptr, impl->invalid.Write()));
+      Sync();
+      MFEM_VERIFY(impl->invalid.HostRead()[0] == 0, "Mixed coarse RHS conversion overflow/nonfinite!");
+      Check(cudssExecute(impl->handle, CUDSS_PHASE_SOLVE, impl->config, impl->data,
+          impl->matrix, impl->solution_matrix, impl->rhs_matrix), "FP32 solve/correction");
+      CheckCuda(mixedcoarse::Accumulate(width, 1, impl->scale.Read(), impl->float_solution.Read(), s, step != 0));
+      Sync();
+    }
+    CheckCuda(mixedcoarse::Residual(width, 1, impl->offsets.Read(), impl->columns.Read(),
+        reinterpret_cast<const cuDoubleComplex *>(impl->values.Read()), s, b,
+        reinterpret_cast<cuDoubleComplex *>(impl->residual.Write())));
+    Sync();
+    const double rn = linalg::Norml2(impl->comm, impl->residual), bn = linalg::Norml2(impl->comm, impl->rhs);
+    const double relative = bn > 0.0 ? rn / bn : rn;
+    MFEM_VERIFY(std::isfinite(rn) && std::isfinite(bn) && std::isfinite(relative) && relative <= 1e-3,
+                "Mixed coarse original FP64 residual failed: " << relative);
+    impl->max_residual = std::max(impl->max_residual, relative);
+    ++impl->solves;
+    y.Set(reinterpret_cast<const std::complex<double> *>(impl->solution.Read()), height, true);
+    Sync();
+    return;
+  }
   Check(cudssMatrixSetValues(impl->rhs_matrix, impl->rhs.Write()));
   Check(cudssMatrixSetValues(impl->solution_matrix, impl->solution.Write()));
   Sync();

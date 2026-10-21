@@ -15,7 +15,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 - Regresje124PASS, cachedbuild9,215s, zachowane native/cache i fallback build/m4-reuse/pre-exp94-native. Gorące dane RAM/VRAM; SSDpolicy w PLAN. Bez płatnego compute/zamykania aplikacji.
 - M5/EXP95–96: hybrid cuDSS API/tiny/medium/W.3P2 PASS, ale REJECT jako net speedup: UVM350,371s vs4GiB363,872s/6GiB511,069s. Coarse około2× szybciej, pozostały PC wolniej; nowy profil potrzebny do dowodu przyczyny. DefaultUVM/fallback zachowane.
 - EXP97 AMS: tiny/mediumquality i CUDAprofilePASS, W3P2deadline900sFAIL (iter264/recurrence1,501e−3, brak rawfinal/pól); REJECT obecnegoC2. Partialcgroup29,32GB nie kwalifikuje oszczędności anteny.
-- Następny krok: M5.3 scaled nativecomplexFP32/fixed FP64correction, najpierw mały known-solution i ill-scaled probe (NOT RUN). Brak kolejnych losowych hybridbudget/AMSfull retries. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria dodane na prośbę użytkownika, NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
+- EXP98–101 scaled native complexFP32/dwie FP64 CUDA korekcje: API/W.2 trzyfreq/oba porty i W.3P2 PASS. Jedna para W.3 339,362→273,843s (−19,31%),35/35iter; cgroup56,027→45,376GB (−19,01%). Pola/S/VSWR/energia/raw PASS; opt-in bez nowego defaultu. Raport docs/milestones/mixed-coarse-plan.md; build18,615s, fallback build/m5-mixed/pre-mixed-native.
+- Następne: M5.5 aktualne transfery i M5.6 ocena FDTD/CUDA. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
 
 ## Historyczny skrót M1/M2
 
@@ -2248,3 +2249,134 @@ db205b5d63d0746cba3c791af11e89bc87754e168bd0ae5ce6112943b6886c90.
 Root S/VSWR/power/energy andprofile/terminalscopechecksPASS forcompletedfilters.
 Read-onlyLuna docs-garden/diffcheck/checkerPASS,nodiscrepancies. No livePalace
 containers, fallbackunchanged, localcommitonly/no publicupstreampush. M5active.
+
+## EXP98 — manufactured scaled complex FP32 + external FP64 correction (2026-10-21)
+Previousgoalturnprogress: EXP97actualGPU/mediumPASS/fullFAIL documented+commit2971f3c.
+M5.3 begins cheapAPIprobe, no nativePalaceintegration/default changes. Reuse
+complex_coarse.py build/run harness via --variant mixed, separatebinary/cache,
+recipehash primary+includedreferenceCPP+script/arch/images. Oldmain guarded so
+matrix/Allocation/Buffer shared, no dependencyrebuild. FP32factor C_32F GENERAL,
+originalA remainsFP64host for independent residual/correction, libraryIRexplicit0.
+TwoRHS/twovalueupdates atfixedpattern; normalindefinitecomplex stencil and
+illscaled A=Gamma*A0*Gamma with gamma1e−3..1e3. B=DAD, g=Db, x=Dy with
+D=1/sqrt(abs(diagA)), explicitzero/nonfiniteguard. BaselineF64/rawF32/refinedscaledF32.
+ExactlytwoFP64originalCSRresidualcorrections; norequestadaptiveinnerpolicy.
+
+Preregistersixcasecoverage: FP64/refined eachsolution,originalRHSresidual and
+componentwisebackwarderror≤1e−10. RawFP32 ≤1e−2 sanitycontrol (notqualifiedhigh
+accuracy). Perturbedx[0]mustbe rejectedby solution+rowwisebackward metric, to
+catcherrorshiddenbyillscaledglobalRHSnorm. AllfactorINFO/finitevalues/cleanup0,
+dtype/count/scale/manifest verified. ExpectedillscaleDmax/Dmin≥1e5. NOTfull
+antennaquality orspeedproof; host-managedreading/correctioncostcounted explicitly.
+First cachedmixedbuild+oneboundedAPIrun,60s/2GiB/no swap/2CPU/75swatchdog.
+Rootselectsnextactiononlyafteractualdata. No paidcompute/appsclosing/SSDworkspace.
+Planned artifacts/m5-mixed-coarse-api-20261021. Legacyreferenceprobe rebuilt/smoke
+alsoaftermixedPASS toprotectvariantcompatibility; no fullFEMjobbeforeAPIPASS.
+
+EXP98 initialbuild1,646s, APIrun2,232s incomplete afterillscaledrawF32fail:
+solution0,20214/backward0,42083 thoughglobalRHSrelative1,085e−7. Fourpreviousrows
+passed, includingregularscaled/refined4,36e−16 andillscaledFP646,47e−12.
+RefinedillscaledNOTRUN becauseharnessstoppedonnegativecontrol. Newv2 preserves
+rawpassed=false asdiagnostic (notcandidate), continues toREQUIREDrefinedcase.
+F64/refined1e−10 gatesUNCHANGED; rawfinite/dtype/cleanup/faultcoverage stillrequired.
+Thisisreclassificationofknownnegativecontrol, notqualificationofraw20%error.
+Newtest ensurefalsepassedcan'tbehiddenandbadrefinedstillFAIL. Explicitnonfinite
+checks beforemax avoidNaNhiding. Artifactv1retained; v2newoutputname.
+
+EXP98v2 API completed2.219s: scaled/refined regular solution4.41e-16,
+ill-scaled4.56e-12; original FP64 componentwise backward6.75e-16.
+Raw ill-scaled remains failed (~0.202 solution/~0.420 backward) diagnostic.
+Reference compatibility run2.178s PASS. These corrections ran on HOST; no native
+antenna integration or runtime/memory win claimed. Artifacts m5-mixed-coarse-api-v2-
+20261021 and m5-mixed-reference-regression-20261021 retained separately from v1.
+
+EXP98 GPU-v3 preregistration: move packing, DAD, original FP64 CSR residual,
+FP64 accumulation to shared CUDA helpers in palace/linalg/mixedcoarse.hpp.
+Same six cases, 2 RHS/2 updates/exactly2 corrections and frozen1e-10 gates.
+Independent CPU checks final solution/RHS residual/componentwise backward error;
+host does not calculate correction RHS in FP32 cases. Additional helper tests
+n=0,1,509,1009, two RHS, invalid dimensions, assign/add, non-Hermitian CSR and
+canaries; parser requires exact success marker and actual correction backend.
+New artifact m5-mixed-coarse-api-gpu-20261021; bounded2GiB/no swap/2CPU/60s,
+75s watchdog, cached standalone compile. Stop on failure before native integration.
+
+GPU-v3 complete/exit0 in2.241s, compile1.580s. All four boundary/canary cases
+and six cuDSS cases covered; refined ill-scaled solution5.78e-12, backward6.16e-16.
+FP64cuDSSpeak2,637,284B vsFP32 2,441,380B: not a half-total-memory result.
+API GPU correction PASS; no antenna speed/accuracy claim. Add explicit conversion
+overflow flag and diagonal-zero/rowmax/invalid scaling controls before integration.
+
+EXP99 preregistration: opt-in --native-coarse-fp32 requires native complex coarse,
+rejects realshim/hybrid/CPU/AMS/profile combinations. DAD complexFP32 GENERAL LU,
+exactly2 CUDA original-FP64 corrections and FP64 accumulation, unchanged outer
+FP64 operator/Tol/K and direct FP32 basis. Every PC apply must satisfy finite
+original coarse ||b-Ax||/||b||<=1e-3 (separate PC safety, not outerqualitygate),
+no silent fallback/adaptive count. Empty/nonfinite rows, matrix/RHS overflow or
+factorINFO fail closed. Whole-field/raw/S/TEM gates remain frozen.
+Fallback snapshot build/m5-mixed/pre-mixed-native +pre-mixed-manifest.json.
+First cached2job build, rerun strengthened mixed API (new-v4 artifact), then
+samebuild tiny FP64control and mixedcandidate at3.55GHz/bothports,60s each.
+Both use portsetupreuse/deferredpostprocess, fieldcomparison to existing qualified
+tiny FP64control, analyticTEM/L2, RAM/VRAM-only/no swap/hostguard. Stop firstFAIL;
+medium/full only after root confirms tiny data. No source/dependency cache deletion.
+
+EXP99 native build18.615s, API GPU-v4 compile1.531s/run2.256s PASS incloverflowflag
+andscalecontrols. Tiny samebuild FP64control16.625s39/42iter vs mixed16.606s40/42.
+Both complete/fieldgatePASS; mixed first recurrence stop failed true residual,
+existing reliable restart recovered final8.496e-7/7.736e-7 (failure retained in log).
+E/B candidate deltas<=1.060e-6/3.442e-8; nativeTEM<0.5%. Coarseapply85solves,
+2corrections,maxoriginalcoarseresidual8.754e-5<1e-3 safetygate. cuDSSpeak
+113,329,412→78,529,844B; cgroup575,119,360→579,624,960B (NOTmemorywin overall).
+No tiny speed claim. Root reviewed actualresult/fields/CSRmarkers.
+Next filter samebuild coax-medium3.55GHz/bothports,180s each, matchedflags and
+fieldreference m4-deferred-medium-on-20261020; outputs m5-mixed-medium-{control,on}
+-20261021. Frozenquality and limits unchanged; stop before full if any failure.
+
+Medium completed101.531s45/47iter control vs97.503s47/49iter mixed (singlepair
+-3.97%, notmedian). cuDSSpeak1,917,315,108→1,089,091,988B; cgroup2,614,333,440→
+1,920,925,696B; managedphasepeak3,777,996,444→2,975,739,840B. Reliable true
+residual restarts bothRHS retained (initial1.37e-5/1.23e-5), final9.830e-7/
+8.949e-7; maxcoarse residual2.559e-4. Final qualityPASS, notfakeconvergence.
+Root receipt m5-mixed-filters-root-analysis-20261021.json confirms matchedtiny/
+medium deltaS<=5.05e-9, deltaVSWR<=1.01e-8, energy<=1.02e-8, fields/TEMPASS.
+
+EXP100 preregistration W3: samebuild T-Shaped medium3.50GHz/P2, identical original
+mesh/config/Tol/K64/initialfields and fieldreference m3-antenna-native-direct-
+20261019; initial m1-antenna-resident-fp64-20261018 is ONLY startingapproximation.
+ControlnativeFP64 and mixedcandidate, both directFP32basis/rightPC/releaseGMRES/
+finalsolver/audit/pool256MiB. 900s each,60GiB/no swap/hostguard6GiB unchanged;
+stop first failedexecution/field gate. No changing mesh/Tol, no partial claimed
+memorywin. Compare complete walltime/iterations/exclusivephases/memory and K4
+S/VSWR/power/energy/fields. Outputs m5-mixed-antenna-p2-{control,on}-20261021.
+No bothport/sweep/globalpromotion from this onepoint; W4/W5/M7 remain required.
+
+EXP100 pair COMPLETE/PASS. FP64 339.362s vs mixed273.843s (-19.31%),35/35iter;
+cgroup56,026,882,048→45,375,688,704B (-19.01%); managedpeak52,276,667,194→
+40,962,568,438B. cuDSS25,008,217,684→13,348,006,188B; factors40.528→4.823s,
+exclusivecoarse61.613→32.038s, setup83.600→48.390s, otherPC96.235→95.123s.
+Originalouterresidual8.35661e-7/8.35698e-7; mixed36calls/maxcoarseresidual2.32445e-5.
+Root m5-mixed-antenna-root-analysis-20261021.json: deltaS6.70e-10,deltaVSWR5.92e-10,
+power4.96e-11, relativeenergy1.85e-9; allsevenfieldregionsPASS E<=1.469e-8/B<=1.558e-9.
+Measured GPUprocess bytes are NOT physicalUVMVRAM residency. One pair, no median.
+Candidate promising opt-in, notglobalpromotion or wholebandqualification.
+
+EXP101 preregistration: finish W2 coax-medium at3.3 and3.8GHz/bothports, same
+FP64control/mixedcandidate pair perfrequency,180s each. Root prepared exact
+artifacts/m5-mixed-w2-commands-20261021.sh; refs m4-reuse-medium-on-{330,380}-
+20261019, identicalphysics/fields/TEM. Same flags/limits as3.55GHz. StopfirstFAIL,
+no automaticretuning/retry. These separatefrequencyfilters do not prove sweepreuse.
+
+EXP101 four jobs complete/PASS. Coax-medium3.3 control101.640s45/47iter vs
+mixed96.486s48/50;3.8 control101.659s45/47 vs97.634s47/49. True restarts retained,
+finalraw<=9.198e-7; maxcoarse safety5.068e-4, TEM E/B<0.5%, weightedfieldsPASS.
+Root receipt updated: allthreefreq/bothports deltaS<=7.04e-9,deltaVSWR<=1.39e-8,
+power<=1.38e-8,energy<=1.29e-8. Native source unchanged since qualified build.
+No globaldefault/push; M5 staysACTIVE. Next: M5.5 actualmigration profile,
+M5.6 FDTDcostassessment before M6. W4/W5/repeats/newgeometry remainNOTRUN.
+
+EXP98–101 checkpoint validation: pinned134 unit tests PASS,8shell tests PASS,
+docs index/stage check PASS, gitdiffcheck PASS. Same Luna read-only docs-garden
+PASS; root reviewed diff/receipts and verified current native manifest sourceSHA
+8692e80d926a58a74f38bff9c643b578810a94d35d4d534a2c027215fd11607f.
+Hardened dtype/scaling/cleanup parser rechecked against allfive actual native
+mixed artifacts PASS. Native default FP64 preserved; all jobs terminal/cleaned.

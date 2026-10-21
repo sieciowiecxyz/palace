@@ -109,7 +109,7 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 - [x] Audyt cuDSS0.7.1.4 hybrid memory/execute/UVM/rank1, actualAPI i ograniczeń; docs/native-hybrid-memory.md.
 - [x] Dwa wykonalne budżety hybrid po odczycie minimum, W.3P2 vsUVM: numeryczniePASS/netperformanceREJECT, EXP96.
 - [x] AMS na realnym shifted pomocniczym PC, actualCUDAtracePASS; tiny/mediumqualityPASS, W3deadlineFAIL. Ocena EXP97, bez promocji.
-- [ ] FP32 faktory tylko z nową hipotezą: scaling, korekcja FP64, stagnacja i fallback. Jeśli potrzebny FGMRES, najpierw kompatybilność bazy i rachunek dodatkowych wektorów Z. Plan nowej hipotezy: docs/milestones/mixed-coarse-plan.md (NOT RUN).
+- [x] EXP98–101: native complex FP32/scaling/dwie FP64 CUDA korekcje, fail-closed i FP64 fallback; API/W.2/W.3 PASS. Jedna para W.3 −19,31% czasu/−19,01% cgroup, bez globalnej promocji; docs/milestones/mixed-coarse-plan.md. Zmienna liczba korekt/FGMRES pozostaje osobną hipotezą.
 
 - [ ] Rozdzielić koszt PC na analizę, faktoryzację, apply, migracje i zmianę liczby iteracji; oszacować limit zysku pełnego zadania przed kolejnym prototypem.
 - [ ] M5.6 — research jednego konkurenta FDTD/CUDA (najpierw gprMax): koszt siatki/CFL/zaniku, porty i kilka częstotliwości z jednego przebiegu; mały test tylko po pozytywnej ocenie zasobów.

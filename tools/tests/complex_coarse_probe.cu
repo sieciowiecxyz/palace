@@ -183,6 +183,7 @@ template <typename T> void run_case(int side, int hybrid_mib) {
   if(!passed) throw std::runtime_error("quality/cleanup failed");
 }
 
+#ifndef PALACE_COARSE_PROBE_LIBRARY
 int main() {
   try {
     int hybrid_mib=0;
@@ -196,3 +197,5 @@ int main() {
   }
   catch(const std::exception &error) { std::fprintf(stderr,"probe: %s\n",error.what()); return 1; }
 }
+
+#endif

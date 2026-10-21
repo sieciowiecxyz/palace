@@ -4,6 +4,11 @@ Wykonuj z katalogu głównego repo. Narzędzia wymagają Linux i Python 3.11+; u
 
 ## Szybkie kontrole
 
+Nowy opt-in `--native-coarse-fp32`: API CUDA/boundary/overflow, W.2 trzy
+częstotliwości/oba porty i W.3 jedna para PASS w EXP98–101. Regresje parsera
+odrzucają niewłaściwy dtype, brak korekcji i cleanup. Komendy i zakres jakości:
+[scaled mixed coarse](milestones/mixed-coarse-plan.md). Nie oznacza W.4/W.5/M7.
+
 ```sh
 python3 -m unittest discover -s tools/tests -p 'test_*.py' -v
 sh .agents/skills/docs-garden/scripts/test.sh

@@ -38,8 +38,8 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Czytaj gdy: oceniasz pozytywny pomocniczy PC zamiast25GB complex LU
   - Opis: Tiny/medium i actualCUDA PASS, W3P2 deadlineFAIL; brak kwalifikacji anteny/memorysaving.
 - [M5.3: scaled mixed coarse](milestones/mixed-coarse-plan.md)
-  - Czytaj gdy: po AMS planujesz nową próbę FP32factors z FP64residual correction
-  - Opis: NOT RUN; manufactured ill-scaled probe przed nativeprototype, jawna ocena stationarity/FGMRES i brak blind-cast.
+  - Czytaj gdy: używasz scaled FP32 LU z oryginalną FP64 korekcją lub sprawdzasz zakres kwalifikacji
+  - Opis: EXP98–101 API/W.2/W.3 PASS, jedna para W.3 −19,31% czasu/−19,01% cgroup; opt-in bez globalnej promocji, stationarity i dalsze bramki jawne.
 - [M6.6: sweepy](milestones/sweeps.md)
   - Czytaj gdy: po M5 planujesz wiele częstotliwości z reuse/PROM/recycling
   - Opis: Cel3,3–3,9GHz/oba porty; kontrola całego kosztu, pamięci i błędu bez ślepego reuse faktorów.

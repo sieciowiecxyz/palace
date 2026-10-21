@@ -12,6 +12,30 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_native_mixed_guards_and_observed_precision_cleanup(self):
+        dev.validate_native_mixed(False, False, None, False, None, None)
+        dev.validate_native_mixed(True, True, None, False, None, None)
+        for args in [(True, False, None, False, None, None), (True, True, 512, False, None, None),
+                     (True, True, None, True, None, None), (True, True, None, False, '0:2', None),
+                     (True, True, None, False, None, 2)]:
+            with self.assertRaisesRegex(ValueError, 'Native mixed'): dev.validate_native_mixed(*args)
+        marker = 'PALACE_NATIVE_COMPLEX_COARSE: dimension=20 nnz=100 dtype=complex_fp32 matrix=general\n'
+        self.assertTrue(dev.native_complex_coarse_applied(marker,1,'complex_fp32'))
+        self.assertFalse(dev.native_complex_coarse_applied(marker,1))
+        log = ('PALACE_NATIVE_MIXED_SCALE: min=0.1 max=10 corrections=2 original=complex_fp64\n'
+               'PALACE_NATIVE_MIXED_COARSE: solves=20 corrections=2 max_relative_residual=1e-8 backend=cuda_fp64\n'
+               'CUDSS_MEMORY: precision=fp32 managed=1 peak_bytes=100 live_bytes=0 allocations=2\n')
+        self.assertTrue(dev.native_mixed_applied(log,1))
+        for bad in ['', log+log, log.replace('corrections=2','corrections=1'),
+                    log.replace('solves=20','solves=0'), log.replace('1e-8','NaN'),
+                    log.replace('1e-8','0.002'), log.replace('live_bytes=0','live_bytes=1'),
+                    log.replace('min=0.1','min=0'), log.replace('max=10','max=inf'),
+                    log.replace('precision=fp32','precision=fp64'), log.replace('managed=1','managed=0'),
+                    log.replace('peak_bytes=100','peak_bytes=0'), log.replace('allocations=2','allocations=0'),
+                    log+'PALACE_NATIVE_MIXED_COARSE: malformed\n',
+                    log+'PALACE_NATIVE_MIXED_SCALE: malformed\n']:
+            self.assertFalse(dev.native_mixed_applied(bad,1))
+
     def test_ams_changes_preconditioner_only_and_preserves_physics(self):
         _, info, original = dev.fixture('coax-tiny')
         build = {'runtime_base_id': 'runtime', 'builder_image_id': 'builder'}

@@ -120,7 +120,7 @@ int dss_free(void *,void *p,size_t n,cudaStream_t) {
 __attribute__((destructor)) void report_memory() {
   if(dss_allocations) std::fprintf(stderr,
     "CUDSS_MEMORY: precision=%s managed=%d peak_bytes=%llu live_bytes=%llu allocations=%llu\n",
-    flag("PALACE_CUDSS_FP32")?"fp32":"fp64",int(managed() && !hybrid()),(unsigned long long)dss_peak.load(),
+    (flag("PALACE_CUDSS_FP32") || flag("PALACE_NATIVE_COARSE_FP32"))?"fp32":"fp64",int(managed() && !hybrid()),(unsigned long long)dss_peak.load(),
     (unsigned long long)dss_live.load(),(unsigned long long)dss_allocations.load());
   if(managed()) {
     auto &s=managed_state();

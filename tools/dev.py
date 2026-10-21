@@ -562,9 +562,32 @@ def verified_qpool(native):
     return directory, metadata
 
 
-def native_complex_coarse_applied(log, solves):
-    markers = re.findall(r'PALACE_NATIVE_COMPLEX_COARSE: dimension=(\d+) nnz=(\d+) dtype=complex_fp64 matrix=general', log)
-    return len(markers) == solves and all(int(n) > 0 and int(nnz) > 0 for n, nnz in markers)
+def native_complex_coarse_applied(log, solves, dtype='complex_fp64'):
+    markers = re.findall(r'PALACE_NATIVE_COMPLEX_COARSE: dimension=(\d+) nnz=(\d+) dtype=(\w+) matrix=general', log)
+    return (solves > 0 and dtype in ['complex_fp64', 'complex_fp32'] and len(markers) == solves
+            and all(int(n) > 0 and int(nnz) > 0 and actual == dtype for n, nnz, actual in markers))
+
+
+def validate_native_mixed(enabled, native, hybrid, cpu, profile, ams):
+    if enabled and (not native or hybrid is not None or cpu or profile is not None or ams is not None):
+        raise ValueError('Native mixed requires native complex coarse without hybrid/CPU/profile/AMS')
+
+
+def native_mixed_applied(log, builds):
+    summaries = re.findall(r'PALACE_NATIVE_MIXED_COARSE: solves=(\d+) corrections=2 max_relative_residual=(\S+) backend=cuda_fp64', log)
+    scales = re.findall(r'PALACE_NATIVE_MIXED_SCALE: min=(\S+) max=(\S+) corrections=2 original=complex_fp64', log)
+    if (builds < 1 or len(summaries) != builds or len(scales) != builds
+            or log.count('PALACE_NATIVE_MIXED_COARSE:') != builds
+            or log.count('PALACE_NATIVE_MIXED_SCALE:') != builds):
+        return False
+    try:
+        valid = (all(int(n) > 0 and math.isfinite(float(r)) and 0 <= float(r) <= 1e-3 for n, r in summaries)
+                 and all(0 < float(lo) <= float(hi) and math.isfinite(float(hi)) for lo, hi in scales))
+    except ValueError:
+        return False
+    cleanup = re.findall(r'CUDSS_MEMORY: precision=(\w+) managed=(\d+) peak_bytes=(\d+) live_bytes=(\d+) allocations=(\d+)', log)
+    return (valid and len(cleanup) == 1 and cleanup[0][0:2] == ('fp32', '1')
+            and int(cleanup[0][2]) > 0 and int(cleanup[0][3]) == 0 and int(cleanup[0][4]) > 0)
 
 
 def basis_prefetch_applied(log, solves):
@@ -692,7 +715,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         phase_trace=False, complex_coarse=False, release_final_solver=False, native_complex_coarse=False,
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
-        release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None):
+        release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
+        native_coarse_fp32=False):
+    validate_native_mixed(native_coarse_fp32, native_complex_coarse, cudss_hybrid_mib,
+                          cpu_reference, nsys_window, ams_cycles)
     validate_ams(ams_cycles, native_complex_coarse, complex_coarse, cpu_reference, cudss_hybrid_mib,
                  ceed_qpool, setup_audit, port_setup_reuse)
     if direct_basis and basis != 'fp32':
@@ -776,6 +802,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                       'OMP_NUM_THREADS': '8', 'OPENBLAS_NUM_THREADS': '1'})
     if native_complex_coarse:
         flags['PALACE_NATIVE_COMPLEX_COARSE'] = '1'
+    if native_coarse_fp32:
+        flags['PALACE_NATIVE_COARSE_FP32'] = '1'
     if cudss_hybrid_mib is not None:
         flags['PALACE_CUDSS_HYBRID_MIB'] = str(cudss_hybrid_mib)
     if ams_cycles is not None:
@@ -840,6 +868,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_CUDSS_HYBRID_EXECUTE', '--unsetenv', 'PALACE_CUDSS_HYBRID_MIB',
             '--unsetenv', 'PALACE_AMS_FIXED_GPU',
             '--unsetenv', 'PALACE_NATIVE_COMPLEX_COARSE', '--unsetenv', 'PALACE_CUDSS_FP32',
+            '--unsetenv', 'PALACE_NATIVE_COARSE_FP32',
             '--unsetenv', 'PALACE_PHASE_TRACE',
             '--unsetenv', 'PALACE_KRYLOV_PROFILE',
             '--unsetenv', 'PALACE_PROFILE_CAPTURE_RANGE',
@@ -886,6 +915,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                                   'release_gmres_basis': release_gmres_basis,
                                                   'release_final_solver': release_final_solver},
                                    'native_complex_coarse': native_complex_coarse,
+                                   'native_coarse_fp32': native_coarse_fp32,
                                    'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
@@ -949,8 +979,13 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['scope'] = profile['scope']
         if native_complex_coarse:
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
-                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'])
+                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'],
+                'complex_fp32' if native_coarse_fp32 else 'complex_fp64')
             status['complete'] = status['complete'] and status['native_complex_coarse_applied']
+        if native_coarse_fp32:
+            status['native_mixed_applied'] = native_mixed_applied(
+                (output/'palace.log').read_text(), 1 if port_setup_reuse else status['expected_solves'])
+            status['complete'] = status['complete'] and status['native_mixed_applied']
         if setup_audit or port_setup_reuse:
             audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse)
             write(output/'port-setup-audit.json',audit)
@@ -1098,7 +1133,8 @@ def main():
     r.add_argument('--cpu-reference', action='store_true', help='Experimental FP64 host FEM/GMRES with cuDSS hybrid execute; not the CUDA baseline')
     r.add_argument('--phase-trace', action='store_true', help='Diagnostic host BlockTimer/NVTX scopes, including nested preconditioner phases')
     r.add_argument('--complex-coarse', action='store_true', help='Diagnostic exact complex coarse solve; GPU profile only, unshifted preconditioner')
-    r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex FP64 cuDSS coarse, without real 2N block; implies --complex-coarse')
+    r.add_argument('--native-complex-coarse', action='store_true', help='Experimental rank1 complex cuDSS coarse, FP64 default, without real 2N block; implies --complex-coarse')
+    r.add_argument('--native-coarse-fp32', action='store_true', help='Opt-in scaled complex FP32 LU with two original-FP64 CUDA corrections; requires native coarse, no hybrid/AMS')
     r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Partial CUDA trace with calibrated host phases; FIRST=0..32, COUNT=2..8; no RF qualification')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
@@ -1139,7 +1175,8 @@ def main():
             args.initial_fields, args.krylov_size, args.linear_tol, args.cpu_reference, args.phase_trace,
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
-            args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles)
+            args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
+            args.native_coarse_fp32)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),
