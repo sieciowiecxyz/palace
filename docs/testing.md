@@ -255,3 +255,13 @@ adaptive/viz; noSilentDeferredNF>1.155pinnedtestsPASS. RootCSV/raw/wholefields/
 TEMalignedmultirowsPASS tiny/medium, medium53,570→45,344s/singlepair; nieM7median/
 antena/promotion. ExactTEM2freq/magnetic-sign/frequency-misalignment tests helpera.
 EXP122 stara onefreqreuse/deferredścieżkaPASS. Odtwarzanie wmilestones/sweeps.md.
+
+### EXP123–127: per-f release i preset7freq
+
+`--coax-sweep n78` wybiera jawnie3,3..3,9GHz; stary argument bez wartości
+zachowuje3fixturefreq. Testy sprawdzają niezmienione mesh/ports/Tol i odrzucają
+nieznany preset. Deferred NF>1 wymaga major+energy+final release; negatywne
+kontrole kolejności/per-f release/skumulowanych solve i iteracji oraz wymagane
+pary phasebegin/end. Runner porównuje metadata TotalSolves/TotalIts z pełnym
+logiem. 156Python regresji PASS; actual tiny/medium3/7freq i stary singlefreq
+EXP127 PASS. Pełna antena tego rozszerzenia NOT RUN; patrz raport sweepów.

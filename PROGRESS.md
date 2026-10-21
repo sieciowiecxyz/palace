@@ -25,7 +25,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP114–116: compensateddot+bit-split actionfilter PASS (CPU/linearity/range1e-300..1e300). ActualND20/Q14/N1601320 forward3,474–3,482→3,035–3,048ms; error~6e-15. Pierwszywariantbyłwolniejszy; scalar/trace nieprzyspieszone. Nie solver/RF/UVM/TCclaim; nativebez zmian. docs/ceed-tensor-probe.md.
 - EXP117–119 compensatedPC tiny/medium3,55 quality/scope/cachePASS po naprawie envguard (pierwszy candidateFAILzachowany). Iteracje40/42 i47/49 bez wzrostu, lecz16,533→16,629s i98,577→98,546s bez netgain, HOLD/W3NOTRUN. docs/pc-basis-fp32.md.
 - EXP120–122 M6.6 sourceaudit+frequency-major2portreuse/per-portRAMhistory: tiny12,544→11,501s i medium53,570→45,344s/6→3factorbuilds, frozenRF/raw/wholefields/TEMPASS. Jedna para, nie antena/mediana/promocja. Cgroupmedium2,255→2,304GB, nie oszczędnośćpamięci. Singlefreqreuse/deferred regressionPASS. docs/milestones/sweeps.md.
-- Następne: NF>1per-frequencyrelease/deferredmeasurement przed dużą anteną,7freqcoax iresourcegate; potem PROM/heldout. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
+- EXP123–127: per-f deferred release i skumulowane metadata PASS; 7freq coax medium 93,540→75,664s (jedna para −19,1%), wszystkie14 pól/raw/K PASS. Cgroup2,515→2,535GB: bez oszczędności RAM całego runu. Stary singlefreq regression9,473sPASS.
+- Następne: resourcegate i kontrola pełnej anteny z tym samym deferred release; potem symbolic/recycling/PROM/heldout. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2854,3 +2855,73 @@ Currentnative31c23ac6…7a24cac bytesverified againstbothsamebuildpairs/rootKrec
 No globalpromotion/fullantenna/mediansclaim; prototypependingNF>1deferredpeakgate,
 7points/PROM/heldout/generalization/W4/W5/finalpackage. GoalM6/M7remainOPEN.
 No paidcompute/swap/appsclosed/depsrebuild; nativefallback/cachepreserved.
+
+EXP123 prereg: extendexistingdefer tofrequency-majorreuseNF>1, withmandatory
+energyrelease+finalsolverrelease/rank1/fixed2lumpedports/noexternal/viz/adaptive.
+AfterP2eachf destroyksp/currentoperators/factors beforemeasuringP1/P2; keepK/C/M
+untilfinalf. Recreatekspatnextf, addexplicitcumulative metadata counts so not
+silentlyreportonlylast2solves. Originalprecision/Tol/fields/portphysicsunchanged.
+Keep2historyE plusonetransientdeferredE (3vectorscapacity, independentofNF),
+no many-LUcache/noSSDworkspace. W3capacity~538.5MBextraEvs359MBplainreuse,
+measure netpeakbeforeclaimingsaving. No premature reuse ofdanglingoperators.
+Strictfreqrelease/order+counteraudit andmemoryphasecounts per-f; finalrelease
+oneexistingmarkerandPCcachecleanup onlyatend. Firsttiny3freqsamebuildplainreuse
+control/candidate60seach, savedfields+TEM/K. Oldonefreqregressionretained.
+Fallbackbuild/m6-sweep-deferred/pre-deferred-{native,manifest.json}. Cachedjobs2,
+no paidcompute/swap/appsclosing/depscleanup.7points/mediumthenresourcegate.
+EXP123 implementation156pinnedtestsPASS: optionalper-frequiredphasecounts,
+strictstore→actualrelease→measure orderforeachf andcumulativecounts, missing/
+wrongcounter/frequency/finalrelease negatives. Metadatahelper preservesexisting
+SaveMetadata API andsumsreleasedsolvers. No tolerancechange. Ready cachedjobs2
+build thenfreshsamebuildtinyplainreuse vsdeferredNF3, no doublequadL2.
+EXP123 cachedbuild32.409s (driverheaderdependentTUs, no dependencyrebuild),
+source037574a7…15bfc92c; tinycontrol11.508s/deferred11.538s, both40/40/31/31/30/30.
+Actual3per-freleases/order+6cumulativesolves/202iterations metadataPASS,
+wholefieldE/B≤1.562e-7/4.510e-8 andTEMallfreqPASS. Managedliveatpostprocessbegin
+~241–259→97–113MB first2f; lifetimewindowonly, cgroup609.45→608.57MBnotnetclaim.
+Histories+deferredbufferconstantNF. Rootinspectedphaseevents/counters/source,
+originalrawchecksunchanged. No broadantenna/memorypromotion.
+EXP124 prereg: medium3freq bothports samebuildplainreuse/deferred180s each,
+referenceplaincontrolvsEXP121normalcontrol thennewcandidatevssamebuildcontrol.
+No native/depsrebuild orfullantenna. Assessnetmemory/time/wholeK before7freq.
+EXP124 mediumquality/metadata/lifetimePASS45.373→45.250s (singlenoisypair,
+not timespeedup), both48/48/38/38/38/38iter. Cgroup2.307→2.264GB (~1.9%),
+processGPU660.603→631.243MB notphysicalUVM. ΔS1.984e-10/VSWR8.156e-11/
+energy1.393e-10/power2.509e-10, E/B≤3.996e-8/8.031e-8. Rootreplay receipts
+artifacts/m6-sweep-deferred-{tiny,medium}-root-analysis-20261021.json.
+EXP125 prereg: explicit --coax-sweep n78 selects[3.3..3.9 step0.1] runtimeonly,
+no mesh/Tol/solverchange ornativebuild. Tiny7freq×2ports normalcontrol vs
+frequencymajorreuse+deferred candidate60s each; baselinefullHDM14solves,
+newcandidateall14originalraw/fields/TEM checked. Measurewholecost+metadata,
+14→7factors/per-frelease, noPROM orsampling omission.156pinnedtestsPASS.
+No expensive doublequadL2, paidcompute/swap/appsclosing. Medium7onlyafterrootgate.
+EXP125 tiny7freq×2portsPASS18.675→15.598s (~16.5%,singlepair),14→7factorbuilds,
+14completedrawsolves/28fieldfiles. AllfreqCPU TEM/K/wholefield+metadataPASS,
+logicalhistory2.851MB/oneconstantdeferredE. Cgroup646.25→638.70MB notGPUphysical.
+Root receipt artifacts/m6-sweep7-tiny-root-analysis-20261021.json. No antenna/
+median/globalpromotion. FullHDMeverypoint, no approximatefrequencyinterpolation.
+EXP126 prereg: samebuildmedium7freq×bothports normalfullcontrol vsreuse+deferred
+candidate180seach; current--coax-sweep n78/runtimefreqoverride, frozenmesh/Tol.
+Savefields/refcontrols plusCPU TEMall14, metadata14andper-frelease7/factors14→7.
+No native/depsbuild/paidcompute/swap/appsclosing. Beforefullantennare-evaluate
+memory/timegate vspriorverifiedM4deferredchunks, notunsafe80GBmonolithiccontrol.
+EXP126 medium7freq×2portsPASS93.540→75.664s (~19.1%shorter,singlepair),14→7
+factorbuilds,14fullHDMsolves/nointerpolation; candidateallraw/fields/metadata/
+phase/order/historycleanupPASS. Cgroup2.515→2.535GB (+20.4MB), no netRAMsaving;
+processGPU660.603→631.243MB notphysicalUVM. ΔS8.951e-9/VSWR8.180e-10/
+energy1.373e-8/power1.043e-8, fieldsE/B≤5.945e-8/9.565e-8. CPU TEMall7freq/
+bothports RMS≤0.4253%,energy≤1.506e-5. Root replay
+artifacts/m6-sweep7-root-analysis.py +{tiny,medium}-root-analysis JSON; ordinary
+snapshotoutputs49.74MBtiny/466.60MBmedium, no workinghistoryonSSD.
+Deferredmedium3freq managedlivewindowfirst2f2.63–2.74→0.918–1.015GB, notprocess
+peak/physicalresidency. Need antenna/UVM resourcegate; no M6/M7/globalpromotion.
+Nextbaselineforlargecase mustalsofitmemory: allowfrequency-major(no setupreuse)
+withsameper-fdeferredrelease forfaircontrol, then2fantenna/coldresourceestimate.
+Avoidunsafe giantmonolithicnondeferredcontrol orsyntheticmergedreferences.
+EXP127 prereg: oldonefreqtinyreuse/deferred regression currentbuild60s, fields
+vsM5tiny+metadata2solves, then docs/rootreview/commit. No newnativebuild.
+
+EXP127 wynik: singlefreq tiny reuse/deferred9,473s,40/42iter,2solves,
+wholefields vsM5tiny +raw/setup/energyrelease/memorymarks/metadata PASS.
+Artifact artifacts/m6-sweep-deferred-single-regression-20261021/result.json;
+postpro/palace.json2solves/82iterations. Bez nowego nativebuilda.

@@ -124,7 +124,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
 - [ ] EXP109–110 fusedFP32 actionfilter PASS; EXP112–113 PCforwardtiny/medium poprawne lecz więcejiteracji/brak wykazanego speedupu, HOLD przedW3. EXP114–116 compensated/bit-split actionfilterPASS, actualNforward~12%taniej/przybłędzie~6e-15, scalar/tracewolniejsze. EXP117–119 scopedPCtiny/mediumKPASS, iteracjebezwzrostu ale netgain niewykazany/HOLD, W3NOTRUN. Następnie audytM6.6 sweep/PROM/reuse; W3/UVM przedpromocją M6.4/M6.5. docs/pc-basis-fp32.md.
 
-- [ ] M6.6 — ACTIVE: EXP120–122 sourceaudit+3freq/bothports tiny/medium PASS,15,4%singlepairmedium/6→3factors, niepromowane; NF>1deferred/memory/7freq/PROM iantennaOPEN. Szybsze sweepy3,3–3,9GHz/oba porty: audyt existingPROM, continuation/warmstart, symbolic reuse i recycling; cały czas/pamięć/jakość vs niezależne solve. docs/milestones/sweeps.md.
+- [ ] M6.6 — ACTIVE: EXP120–127 audyt, frequency-major reuse, per-port history i per-f deferred release; 3/7freq coax tiny/medium PASS. Siedem punktów medium 93,540→75,664s (jedna para −19,1%), cgroup +20,4MB, nie memory saving. Następne: kontrola anteny mieszcząca się w limicie, resourcegate i pomiar UVM; symbolic/recycling/PROM z held-out i M7 pozostają otwarte. docs/milestones/sweeps.md.
 
 ### M7 — utrwalić najlepszy zaakceptowany wariant
 

@@ -67,6 +67,8 @@ public:
   void SaveAdaptationIteration(int iteration) const;
   template <typename SolverType>
   void SaveMetadata(const SolverType &ksp) const;
+  // Accumulate counters when a sweep releases/recreates its solver between frequencies.
+  void SaveLinearSolverMetadata(int solves, int iterations) const;
   void SaveMetadata(const Timer &timer) const;
   void SaveMetadata(const memory_reporting::MemoryStats &peak_memory) const;
   void SaveMetadata(const PortExcitations &excitation_helper) const;

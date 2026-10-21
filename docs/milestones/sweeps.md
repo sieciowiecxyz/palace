@@ -73,7 +73,7 @@ onefreqreuse/deferred path sprawdzony oddzielnie w EXP122.
 
 Wymagane: rank1/fixedmesh/Restart1, rosnące unikalne Point frequencies,
 2lumpedports dla wielu f, nativecoarse. Brak wave/Floquet/AMR/adaptive,
-externalfieldseed i visualizationwrites. NF>1 +deferredpostprocessing nadal
+externalfieldseed i visualizationwrites. W historycznym EXP120–122 NF>1 +deferredpostprocessing było nadal
 jawnie odrzucane; to prototyp przed kontrolą pamięci pełnej anteny.
 Runner usuwa odziedziczone env i zapisuje jawny mode. Native final-history
 assert, strictaudit sekwencji build/reuse, realnych CSR/factorcounts i per-port
@@ -134,14 +134,66 @@ m6-sweep-{tiny,medium}-root-analysis-20261021.json i replay m6-sweep-root-analys
 EXP122 singlefreqreuse/deferred regression:9,445s/40,42iter/wholefieldsPASS,
 1build+1reuse, raw-check retry zachowany, nie zaostrzono/nie poluzowano tolerancji.
 
+## Per-frequency release i siedem punktów, EXP123–127
+
+Native source SHA: `037574a7a055fc873dfb372b88e6d9dc4df93b21d44b2f42998edc4f15bfc92c`.
+Cached build32,409s (zależne TU po zmianie nagłówka, bez rebuild dependencies).
+Aktualne NF>1 deferred wymaga frequency-major reuse, energy release i final
+solver release. Po obu RHS każdej f niszczymy ksp przed A/P/A2, a pomiary
+wykonujemy bez faktorów. K/C/M pozostają do ostatniej f. Zapisujemy sumę
+liczników wszystkich zniszczonych solverów; metadata nie zawiera tylko ostatnich
+2 solve. Dwie historie E plus jeden przejściowy deferred E:3E niezależnie od NF;
+na W3 rachunkowo538,5MB dodatkowej pojemności, nie zmierzony peak.
+
+| Test | Kontrola → kandydat [s] | Cgroup peak [GB] | Zakres |
+| --- | ---: | ---: | --- |
+| EXP123 tiny3freq |11,508→11,538|0,609→0,609|plain reuse → reuse+deferred|
+| EXP124 medium3freq |45,373→45,250|2,307→2,264|plain reuse → reuse+deferred|
+| EXP125 tiny7freq |18,675→15,598|0,646→0,639|normal → reuse+deferred|
+| EXP126 medium7freq |93,540→75,664|2,515→2,535|normal → reuse+deferred|
+
+Każdy wiersz to jedna para, nie mediana. EXP126 **−19,1% czasu**, bez redukcji
+pamięci całego runu (+20,4MB cgroup). ProcessGPU660,603→631,243MB nie mierzy
+fizycznej rezydencji UVM. Dla EXP124 managed-live przy początku postprocessingu
+pierwszych2f spadło2,63–2,74→0,918–1,015GB: okno życia buforów, nie globalpeak.
+
+Siedem punktów3,3..3,9GHz co0,1: wszystkie14 pełnych HDM solve,14→7 faktoryzacji,
+bez interpolacji ani pomijania próbek. Wszystkie rawresidual, wholefield, frozenK,
+TEM oraz audyty kolejności/release/history/metadata PASS. Medium maxΔS8,951e-9,
+ΔVSWR8,180e-10, relativeenergy1,373e-8, portpower1,043e-8, E/B≤5,945e-8/9,565e-8.
+CPU TEM RMS≤0,42530%, energy≤1,506e-5 we wszystkich f/portach. Native całe pola
+porównane normą energii; nie wykonywano podwójnej kwadratury coax volumeL2.
+Struktura CSR zgodna, fingerprints wartości między runami różne: nadal brak
+pomiaru normy różnicy CSR i dowodu przyczyny wyłącznie roundoff.
+
+Odtwarzanie: w komendzie powyżej użyj `--coax-sweep n78` i dodaj
+`--defer-postprocessing` dla kandydata. Kontrola7freq pomija reuse/deferred/ref,
+kandydat wskazuje kontrolę tych samych7freq. Tiny60s/medium180s. Preset jest
+wyłącznie nadpisaniem runtime Samples; nie zmienia mesh, Tol ani portów.
+Nazwa n78 jest identyfikatorem presetu; punkt3,9GHz wykracza poza pasmo n78.
+
+Dowody i replay:
+- `artifacts/m6-sweep-deferred-{tiny,medium}-{control,on}-20261021`;
+- `artifacts/m6-sweep-deferred-root-analysis.py` i odpowiednie root-analysis JSON;
+- `artifacts/m6-sweep7-{tiny,medium}-{control,on}-20261021`;
+- `artifacts/m6-sweep7-root-analysis.py` i odpowiednie root-analysis JSON;
+- EXP127 `artifacts/m6-sweep-deferred-single-regression-20261021`:
+  stary singlefreq9,473s/40,42iter, fields/raw/audyty i metadata2/82 PASS.
+
+Zwykłe snapshot outputs:49,74MB/tiny7 i466,60MB/medium7 na run; historia robocza
+pozostaje w RAM/VRAM. Fallback: pominąć opt-in; wcześniejszy native/manifest
+`build/m6-sweep-deferred/pre-deferred-{native,manifest.json}`. Defaulty bez zmian.
+
 ### Następne bramki
 
-1. Rozszerzyć release/deferred pomiar na każdą f przed dużą anteną. Zachować
-   K/C/M między f, zwolnić tylko aktualny ksp/faktory przed pomiarami; nie mnożyć
-   pamięci przez liczbę częstotliwości. Mały test kolejności/lifetime/K najpierw.
-2. Siedem punktów3,3–3,9, tani coax; sumować cały koszt, resourcegate przed W3.
+1. Przed W3 przygotować kontrolę, która też zwalnia solver przed pomiarem;
+   uniknąć ponownego OOM dużego monolitycznego wariantu. Rozdzielić harmonogram
+   frequency-major od reuse, aby porównać świeże faktory/reuse z identyczną
+   polityką pamięci. Najpierw tani filtr, potem2f właściwej anteny po resourcegate.
+2. Zmierzyć rzeczywisty cały koszt anteny/UVM, cold start i peak; nie przenosić
+   automatycznie wyniku coax na antenę. Wszystkie punkty zachowują frozenK.
 3. Odrębna ocena adaptive/PROM z held-out point i oryginalnym residual, symbolic
-   reuse i recycling z policzonym workspace. Obecny filtr nie zalicza ich.
-4. Dopiero potem antena/W4/W5/nowa geometria/repeats/finalpackage w M7.
+   reuse i recycling z policzonym workspace. Obecne filtry nie zaliczają ich.
+4. Antena/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
 
-M6.6, M6 i goal nadal otwarte. Nie generalizować tych dwóch coax na każdą geometrię.
+M6.6, M6 i goal nadal otwarte. Nie generalizować dwóch coax na każdą geometrię.

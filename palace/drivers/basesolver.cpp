@@ -435,11 +435,16 @@ void BaseSolver::SaveMetadata(const mesh::MeshEntityCounts &counts) const
 template <typename SolverType>
 void BaseSolver::SaveMetadata(const SolverType &ksp) const
 {
+  SaveLinearSolverMetadata(ksp.NumTotalMult(), ksp.NumTotalMultIterations());
+}
+
+void BaseSolver::SaveLinearSolverMetadata(int solves, int iterations) const
+{
   if (root)
   {
     json meta = LoadMetadata(post_dir);
-    meta["LinearSolver"]["TotalSolves"] = ksp.NumTotalMult();
-    meta["LinearSolver"]["TotalIts"] = ksp.NumTotalMultIterations();
+    meta["LinearSolver"]["TotalSolves"] = solves;
+    meta["LinearSolver"]["TotalIts"] = iterations;
     WriteMetadata(post_dir, meta);
   }
 }

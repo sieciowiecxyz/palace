@@ -137,11 +137,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   const bool defer_postprocessing = std::getenv("PALACE_DEFER_POSTPROCESSING") != nullptr;
   MFEM_VERIFY(!defer_postprocessing ||
-                  (release_final_solver && omega_sample.size() == 1 &&
+                  (release_final_solver && (omega_sample.size() == 1 || (frequency_batch && release_postprocess_energy)) &&
                    port_excitations.Size() == 2 && iodata.solver.driven.restart == 1 &&
                    Mpi::Size(space_op.GetComm()) == 1 && !post_op.WillWriteFields() &&
                    space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
-              "Deferred postprocessing requires two lumped excitations, one frequency, one rank, final solver release and no visualization/wave/Floquet ports!");
+              "Deferred postprocessing requires two lumped excitations, rank1, final solver release and no visualization/wave/Floquet ports; multiple frequencies require frequency-major reuse and energy release!");
 
   // Set up RHS vector for the incident field at port boundaries, and the vector for the
   // first frequency step.
@@ -296,6 +296,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                      { return a.frequency < b.frequency; });
   std::map<int, std::unique_ptr<ComplexVector>> sweep_history;
   std::size_t retained_frequency = omega_sample.size();
+  int completed_mult = 0, completed_iterations = 0;
   auto t0 = Timer::Now();
   for (const auto &sample : samples)
   {
@@ -311,6 +312,9 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
     // solver.
     MemoryMark("preconditioner.begin");
     std::unique_ptr<ComplexOperator> A2, A, P;
+    if (!ksp)
+      ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
+                                             &space_op.GetH1Spaces());
     const bool reuse = reuse_port_setup && retained_A && retained_frequency == omega_i;
     if (!reuse)
     {
@@ -407,31 +411,44 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
     }
 
-    // No later solve needs this workspace. Destroy the solver before its referenced
-    // operators, retaining Curl, fields and spaces for postprocessing.
-    if (release_final_solver && excitation_counter == port_excitations.Size() &&
-        omega_i + 1 == omega_sample.size())
+    // Release current factors before deferred measurements; K/C/M remain for the next f.
+    const bool last_rhs = excitation_counter == port_excitations.Size();
+    const bool final_sample = last_rhs && omega_i + 1 == omega_sample.size();
+    const bool frequency_release = frequency_batch && defer_postprocessing && last_rhs;
+    if (release_final_solver && (final_sample || frequency_release))
     {
-      MemoryMark("linear_workspace_release.begin");
-      SaveMetadata(*ksp);
+      if (final_sample) MemoryMark("linear_workspace_release.begin");
+      if (frequency_release) MemoryMark("frequency_workspace_release.begin");
+      completed_mult += ksp->NumTotalMult();
+      completed_iterations += ksp->NumTotalMultIterations();
+      SaveLinearSolverMetadata(completed_mult, completed_iterations);
       ksp.reset();
       A.reset();
       P.reset();
       A2.reset();
       retained_P.reset(); retained_A.reset(); retained_A2.reset();
-      K.reset();
-      C.reset();
-      M.reset();
-      const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
-      const char *pc_compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
-      if ((pc_basis && std::string(pc_basis) == "1") ||
-          (pc_compensated && std::string(pc_compensated) == "1"))
+      if (frequency_release)
       {
-        MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
-        PalacePCBasisRelease();
+        Mpi::Print("PALACE_FREQUENCY_SOLVER_RELEASED: frequency_index={} solves_so_far={} iterations_so_far={}\n",
+                   omega_i, completed_mult, completed_iterations);
+        MemoryMark("frequency_workspace_release.end");
       }
-      Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
-      MemoryMark("linear_workspace_release.end");
+      if (final_sample)
+      {
+        K.reset();
+        C.reset();
+        M.reset();
+        const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
+        const char *pc_compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
+        if ((pc_basis && std::string(pc_basis) == "1") ||
+            (pc_compensated && std::string(pc_compensated) == "1"))
+        {
+          MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
+          PalacePCBasisRelease();
+        }
+        Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
+        MemoryMark("linear_workspace_release.end");
+      }
     }
 
     const double rhs_norm = linalg::Norml2(space_op.GetComm(), RHS);
@@ -450,9 +467,9 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       if (deferred_E)
       {
         MFEM_VERIFY(!ksp, "Deferred measurements must follow final solver destruction!");
-        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index=0\n",
-                   deferred_excitation);
-        Postprocess(*deferred_E, deferred_excitation, 1, 0, omega, true, deferred_rhs_norm);
+        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index={}\n",
+                   deferred_excitation, omega_i);
+        Postprocess(*deferred_E, deferred_excitation, 1, omega_i, omega, omega_i == omega_start, deferred_rhs_norm);
         deferred_E.reset();
       }
       if (defer_postprocessing)

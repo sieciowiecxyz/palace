@@ -277,6 +277,8 @@ def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size
                       complex_coarse=False, native_complex_coarse=False, preserve_coax_sweep=False,
                       coax_frequency=None):
     """Explicit runtime diagnostics; never change a frozen fixture on disk."""
+    if preserve_coax_sweep not in [False,True,'fixture','n78']:
+        raise ValueError('Unknown coax sweep preset')
     if coax_frequency is not None:
         samples=config['Solver']['Driven']['Samples']
         allowed=[value for sample in samples if sample.get('Type')=='Point' for value in sample.get('Freq',[])]
@@ -310,6 +312,8 @@ def diagnostic_config(name, config, coax_fields=False, pc_side=None, krylov_size
         geometry = coax_geometry(name)
         if not preserve_coax_sweep:
             config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [3.55]}]
+        elif preserve_coax_sweep=='n78':
+            config['Solver']['Driven']['Samples'] = [{'Type': 'Point', 'Freq': [i/10 for i in range(33,40)]}]
         probes = []
         for fraction in [0.25, 0.5, 0.75]:
             z = fraction*geometry['length_mm']
@@ -504,7 +508,7 @@ def process_gpu_memory(pid):
         return None
 
 
-def memory_phase_report(log, solves, fields=False, release=False, release_final=False):
+def memory_phase_report(log, solves, fields=False, release=False, release_final=False,frequency_releases=0):
     events, errors = [], []
     decoder = json.JSONDecoder()
     for line in log.splitlines():
@@ -537,6 +541,9 @@ def memory_phase_report(log, solves, fields=False, release=False, release_final=
         required.update({'gmres.basis_release.begin': solves, 'gmres.basis_release.end': solves})
     if release_final:
         required.update({'linear_workspace_release.begin': 1, 'linear_workspace_release.end': 1})
+    if frequency_releases:
+        required.update({'frequency_workspace_release.begin': frequency_releases,
+                         'frequency_workspace_release.end': frequency_releases})
     coverage = {label: sum(e['to'] == label for e in events) for label in required}
     complete = not errors and coverage == required
     return dict(complete=complete, events=events, required=required, coverage=coverage, errors=errors,
@@ -703,24 +710,38 @@ def native_hybrid_applied(log, mib, builds):
                    r'CUDSS_MEMORY: precision=fp64 managed=0 peak_bytes=\d+ live_bytes=0 allocations=\d+', log))
 
 
-def validate_deferred_postprocessing(config, release_final_solver):
+def validate_deferred_postprocessing(config, release_final_solver,frequency_major=False,release_energy=False):
     boundaries = config['Boundaries']
     excitations = {int(p['Excitation']) for p in boundaries['LumpedPort'] if p.get('Excitation')}
     driven = config['Solver']['Driven']
     if (not release_final_solver or len(excitations) != 2
-            or sum(len(s['Freq']) for s in driven['Samples']) != 1
+            or (sum(len(s['Freq']) for s in driven['Samples']) != 1 and not (frequency_major and release_energy))
             or driven.get('Restart', 1) != 1 or driven.get('Save')
             or config.get('Model', {}).get('Refinement', {}).get('MaxIts', 0) != 0
             or boundaries.get('WavePort') or boundaries.get('FloquetPort')):
-        raise ValueError('Deferred postprocessing requires two lumped excitations, one frequency, fixed mesh and final solver release without visualization/wave/Floquet ports')
+        raise ValueError('Deferred postprocessing requires two lumped excitations, fixed mesh/final solver release without visualization/wave/Floquet ports; multiple frequencies require frequency-major reuse and energy release')
 
 
-def deferred_postprocessing_applied(log, config):
+def deferred_postprocessing_applied(log, config,frequency_major=False):
     excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
     if len(excitations) != 2:
         return False
     matches = list(re.finditer(r'PALACE_DEFERRED_POSTPROCESS: action=(store|measure) excitation=(\d+) frequency_index=(\d+)', log))
-    expected = [('store', str(excitations[0]), '0')] + [('measure', str(e), '0') for e in excitations]
+    frequencies=sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
+    if frequencies>1 and not frequency_major:return False
+    expected=[(a,str(e),str(f)) for f in range(frequencies) for a,e in ([('store',excitations[0])]+[('measure',e) for e in excitations])]
+    if [m.groups() for m in matches]!=expected:return False
+    if frequency_major and frequencies>1:
+        releases=list(re.finditer(r'PALACE_FREQUENCY_SOLVER_RELEASED: frequency_index=(\d+) solves_so_far=(\d+) iterations_so_far=(\d+)',log))
+        iterations=[int(n) for n in re.findall(r'GMRES solver converged in (\d+) iterations',log)]
+        if len(releases)!=frequencies or len(iterations)!=2*frequencies:return False
+        for f,r in enumerate(releases):
+            group=matches[f*3:f*3+3]
+            if (r.groups()!=(str(f),str(2*(f+1)),str(sum(iterations[:2*(f+1)])))
+                    or not group[0].start()<r.start()<group[1].start()<group[2].start()
+                    or (f+1<frequencies and group[2].start()>=matches[(f+1)*3].start())):return False
+        return (log.count('PALACE_FINAL_SOLVER_RELEASED: enabled=1')==1
+                and releases[-1].start()<log.find('PALACE_FINAL_SOLVER_RELEASED: enabled=1')<matches[-2].start())
     released = log.find('PALACE_FINAL_SOLVER_RELEASED: enabled=1')
     return (len(excitations) == 2 and [m.groups() for m in matches] == expected
             and matches[0].start() < released < matches[1].start())
@@ -802,7 +823,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0):
         raise ValueError('Energy release requires multiple solves, fixed mesh and no visualization saves')
     if defer_postprocessing:
-        validate_deferred_postprocessing(config, release_final_solver)
+        validate_deferred_postprocessing(config, release_final_solver,frequency_major,release_postprocess_energy)
     if release_gmres_basis and config['Solver']['Linear']['KSPType'] != 'GMRES':
         raise ValueError('Basis release is qualified only for GMRES')
     # Include the cable dielectric as a separate region for antenna field qualification.
@@ -1078,7 +1099,12 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['complete'] = status['complete'] and status['native_hybrid_applied']
         if defer_postprocessing:
             status['deferred_postprocessing_applied'] = deferred_postprocessing_applied(
-                (output/'palace.log').read_text(), config)
+                (output/'palace.log').read_text(), config,frequency_major)
+            try: counters=read(output/config['Problem']['Output']/'palace.json').get('LinearSolver',{})
+            except (OSError,ValueError): counters={}
+            status['solver_metadata_counts_passed']=(counters.get('TotalSolves')==status['expected_solves']
+                and counters.get('TotalIts')==sum(status['iterations']))
+            status['complete'] = status['complete'] and status['solver_metadata_counts_passed']
             status['complete'] = status['complete'] and status['deferred_postprocessing_applied']
         if release_postprocess_energy:
             status['postprocess_energy_release_applied'] = postprocess_energy_release_applied((output/'palace.log').read_text(),config,frequency_major)
@@ -1100,7 +1126,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         if memory_marks:
             phases = memory_phase_report((output/'palace.log').read_text(), status['expected_solves'],
                                          bool(save_fields or reference), release_gmres_basis,
-                                         release_final_solver)
+                                         release_final_solver,frequency_count if frequency_major and defer_postprocessing else 0)
             write(output/'memory-phases.json', phases)
             status['memory_marks_passed'] = phases['complete']
             status['complete'] = status['complete'] and phases['complete']
@@ -1189,7 +1215,7 @@ def main():
     r.add_argument('--cudss-hybrid-mib', type=int, help='Experimental native FP64 cuDSS host/device memory budget; query actual minimum before factorization')
     r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
     r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
-    r.add_argument('--coax-sweep', action='store_true', help='Keep fixture frequencies with coax fields/L2 diagnostics instead of selecting 3.55 GHz only')
+    r.add_argument('--coax-sweep',nargs='?',const='fixture',default=False,choices=['fixture','n78'],help='Keep fixture frequencies or explicitly select n78 preset 3.3..3.9GHz/0.1GHz with coax field diagnostics')
     r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')

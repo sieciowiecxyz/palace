@@ -127,6 +127,28 @@ class ToolRegressionTests(unittest.TestCase):
                     store+release+first+second+second]:
             self.assertFalse(dev.deferred_postprocessing_applied(log, config))
 
+    def test_multifrequency_deferred_requires_each_release_and_cumulative_counts(self):
+        _,_,config=dev.fixture('coax-tiny');config=dev.port_batch_config(config,reuse=True)
+        dev.validate_deferred_postprocessing(config,True,True,True)
+        for final,major,energy in [(False,True,True),(True,False,True),(True,True,False)]:
+            with self.assertRaises(ValueError):dev.validate_deferred_postprocessing(config,final,major,energy)
+        text=''
+        for f in range(3):
+            text+='GMRES solver converged in 10 iterations\n'
+            text+=f'PALACE_DEFERRED_POSTPROCESS: action=store excitation=1 frequency_index={f}\n'
+            text+='GMRES solver converged in 20 iterations\n'
+            text+=f'PALACE_FREQUENCY_SOLVER_RELEASED: frequency_index={f} solves_so_far={2*(f+1)} iterations_so_far={30*(f+1)}\n'
+            if f==2:text+='PALACE_FINAL_SOLVER_RELEASED: enabled=1\n'
+            for e in [1,2]:text+=f'PALACE_DEFERRED_POSTPROCESS: action=measure excitation={e} frequency_index={f}\n'
+        self.assertTrue(dev.deferred_postprocessing_applied(text,config,True))
+        self.assertFalse(dev.deferred_postprocessing_applied(text,config))
+        for bad in [text.replace('solves_so_far=4','solves_so_far=2'),
+                    text.replace('iterations_so_far=60','iterations_so_far=30'),
+                    text.replace('frequency_index=1 solves_so_far','frequency_index=0 solves_so_far'),
+                    text.replace('PALACE_FINAL_SOLVER_RELEASED: enabled=1\n',''),
+                    text.replace('action=measure excitation=1 frequency_index=0','action=measure excitation=1 frequency_index=2')]:
+            self.assertFalse(dev.deferred_postprocessing_applied(bad,config,True))
+
     def test_energy_workspace_release_requires_release_and_rebuild_for_every_transition(self):
         _,_,config=dev.fixture('tshaped-medium');config=dev.port_batch_config(config,True)
         release='PALACE_POSTPROCESS_ENERGY_RELEASED: excitation=1 frequency_index=0\n'
@@ -326,6 +348,12 @@ class ToolRegressionTests(unittest.TestCase):
         self.assertEqual(kept['Solver']['Driven'],expected)
         self.assertEqual(len(kept['Domains']['Postprocessing']['Probe']),18)
         self.assertNotEqual(selected['Solver']['Driven'],expected)
+        n78=dev.diagnostic_config('coax-medium',json.loads(json.dumps(config)),coax_fields=True,preserve_coax_sweep='n78')
+        self.assertEqual(n78['Solver']['Driven']['Samples'],[{'Type':'Point','Freq':[i/10 for i in range(33,40)]}])
+        self.assertEqual(n78['Solver']['Linear'],config['Solver']['Linear'])
+        self.assertEqual(n78['Boundaries'],config['Boundaries'])
+        with self.assertRaises(ValueError):
+            dev.diagnostic_config('coax-medium',config,coax_fields=True,preserve_coax_sweep='unknown')
         with patch.object(dev,'require_host_memory') as host:
             for name,kwargs in [('tshaped-medium',dict(coax_l2=True)),('coax-medium',{})]:
                 with self.assertRaises(ValueError):dev.run(name,'/unused',60,coax_sweep=True,**kwargs)
@@ -484,7 +512,7 @@ class ToolRegressionTests(unittest.TestCase):
         post = ['postprocess.begin', 'postprocess.end']
         labels += solve + post + solve + ['linear_workspace_release.begin',
                                          'linear_workspace_release.end'] + post + ['driven.end']
-        def report(names):
+        def report(names,frequency_releases=0):
             previous = 'unmarked'
             events = []
             for i, label in enumerate(names):
@@ -493,12 +521,16 @@ class ToolRegressionTests(unittest.TestCase):
                     managed_live_bytes=10, managed_interval_peak_bytes=20,
                     managed_process_peak_bytes=30, cudss_live_bytes=5)))
                 previous = label
-            return dev.memory_phase_report('\n'.join(events), 2, release_final=True)
+            return dev.memory_phase_report('\n'.join(events), 2, release_final=True,frequency_releases=frequency_releases)
         self.assertTrue(report(labels)['complete'])
         self.assertFalse(report(labels[:-1])['complete'])
         doubled = labels[:-1] + ['linear_workspace_release.begin',
                                  'linear_workspace_release.end', 'driven.end']
         self.assertFalse(report(doubled)['complete'])
+        per_frequency=labels[:-1]+['frequency_workspace_release.begin','frequency_workspace_release.end','driven.end']
+        self.assertTrue(report(per_frequency,1)['complete'])
+        self.assertFalse(report(labels,1)['complete'])
+        self.assertFalse(report(per_frequency,2)['complete'])
 
     def test_process_gpu_memory_uses_only_own_pid_and_real_units(self):
         query = type('Query', (), dict(returncode=0, stdout='9, 4000\n42, 256\n'))()
