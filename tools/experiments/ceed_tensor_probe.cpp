@@ -19,6 +19,7 @@
 using json=nlohmann::json;
 extern "C" cudaError_t palace_probe_pack(const double*,float*,size_t);
 extern "C" cudaError_t palace_probe_unpack(const float*,double*,size_t,bool);
+extern "C" cudaError_t palace_probe_fused_basis(const float*,const double*,double*,int,int,int,int,bool,bool);
 #define CUDA(x) do { auto code=(x);if(code!=cudaSuccess)throw std::runtime_error(cudaGetErrorString(code)); } while(0)
 #define CEED(x) do { if((x)!=0)throw std::runtime_error("libCEED failure: " #x); } while(0)
 #define BLAS(x) do { auto code=(x);if(code!=CUBLAS_STATUS_SUCCESS)throw std::runtime_error("cuBLAS failure "+std::to_string(code)); } while(0)
@@ -77,7 +78,7 @@ template<class F> json timing(F apply) {
   return {{"wall_ms",wall},{"cuda_interval_ms",gpu},{"median_wall_ms",med(wall)},{"median_cuda_interval_ms",med(gpu)}};
 }
 
-json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add) {
+json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add,bool fused) {
   CeedInt p,q,qc;CEED(CeedBasisGetNumNodes(basis,&p));CEED(CeedBasisGetNumQuadraturePoints(basis,&q));CEED(CeedBasisGetNumQuadratureComponents(basis,mode,&qc));
   const double *tab=nullptr;
   if(mode==CEED_EVAL_INTERP)CEED(CeedBasisGetInterp(basis,&tab));
@@ -93,6 +94,8 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
   const auto setup_start=std::chrono::steady_clock::now();
   CUDA(palace_probe_pack(db.data,fb.data,db.size));CUDA(cudaDeviceSynchronize());
   const double basis_pack_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-setup_start).count();
+  if(fused&&palace_probe_fused_basis(fb.data,dx.data,dy.data,7,q,qc,n,trans,add)!=cudaErrorNotSupported)
+    throw std::runtime_error("fused unsupported-shape guard failed");
   CeedVector u,v;CEED(CeedVectorCreate(ceed,ni,&u));CEED(CeedVectorCreate(ceed,no,&v));
   CEED(CeedVectorSetArray(u,CEED_MEM_DEVICE,CEED_USE_POINTER,dx.data));CEED(CeedVectorSetArray(v,CEED_MEM_DEVICE,CEED_USE_POINTER,dy.data));
   auto native=[&] {if(add)CEED(CeedBasisApplyAdd(basis,elements,CEED_TRANSPOSE,mode,u,v));else CEED(CeedBasisApply(basis,elements,trans?CEED_TRANSPOSE:CEED_NOTRANSPOSE,mode,u,v));};
@@ -107,8 +110,9 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
   // accumulates another result, without any reset/copy hidden inside its timing.
   dy.write(initial);result["original_timing"]=timing(native);
   json methods=json::array();
-  for(int precision=0;precision<3;++precision){const bool mixed=precision!=0;const double tol=precision==0?1e-11:(precision==1?2e-6:2e-3);
-    auto apply=[&]{if(mixed)CUDA(palace_probe_pack(dx.data,fx.data,ni));
+  for(int precision=0;precision<(fused?4:3);++precision){const bool mixed=precision!=0;const double tol=precision==0?1e-11:(precision==2?2e-3:2e-6);
+    auto apply=[&]{if(precision==3){CUDA(palace_probe_fused_basis(fb.data,dx.data,dy.data,p,q,qc,n,trans,add));return;}
+      if(mixed)CUDA(palace_probe_pack(dx.data,fx.data,ni));
       for(int d=0;d<qc;++d){const double alpha=1,beta=trans?(d>0||(!mixed&&add)?1:0):0;const float af=1,bf=float(trans&&d>0);
         const int m=trans?p:q,k=trans?q:p;const auto op=trans?CUBLAS_OP_N:CUBLAS_OP_T;
         const size_t xo=trans?size_t(d)*n*q:0,yo=trans?0:size_t(d)*n*q;
@@ -118,7 +122,8 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
       if(mixed)CUDA(palace_probe_unpack(fy.data,dy.data,no,add));};
     dy.write(initial);apply();auto value=dy.read();json check=error(ref,value,tol);
     if(elements==257)check["independent_cpu"]=error(oracle(coefficients,input,initial,p,q,qc,n,trans,add),value,tol);
-    dy.write(initial);methods.push_back({{"precision",precision==0?"FP64":precision==1?"FP32_pedantic":"TF32_requested"},{"accuracy",check},{"timing",timing(apply)}});
+    dy.write(initial);methods.push_back({{"precision",precision==0?"FP64":precision==1?"FP32_pedantic":precision==2?"TF32_requested":"FP32_fused"},{"accuracy",check},{"timing",timing(apply)},
+      {"extra_fp32_workspace_bytes",precision==3?db.size*4:precision==0?0:(ni+no+db.size)*4}});
   }
   result["methods"]=methods;db.check();dx.check();dy.check();fb.check();fx.check();fy.check();result["canaries_passed"]=true;
   CEED(CeedVectorDestroy(&u));CEED(CeedVectorDestroy(&v));return result;
@@ -126,13 +131,17 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
 
 int main(int argc,char**argv){
   try{
-    if(argc<2||argc>3||(argc==3&&std::string(argv[2])!="scale"))throw std::runtime_error("expected output path [scale]");
-    const bool scale=argc==3;
+    if(argc<2||argc>4)throw std::runtime_error("expected output path [scale] [fused]");
+    bool scale=false,fused=false;
+    for(int i=2;i<argc;++i){if(std::string(argv[i])=="scale"&&!scale)scale=true;
+      else if(std::string(argv[i])=="fused"&&!fused)fused=true;else throw std::runtime_error("invalid/duplicate suite option");}
+    if(palace_probe_fused_basis(nullptr,nullptr,nullptr,20,14,3,0,false,false)!=cudaErrorInvalidValue)
+      throw std::runtime_error("fused argument guard failed");
     mfem::Mpi::Init(argc,argv);mfem::Device device("cpu");
     Ceed ceed;CEED(CeedInit("/gpu/cuda/magma",&ceed));cublasHandle_t handle;BLAS(cublasCreate(&handle));
     cudaDeviceProp prop;CUDA(cudaGetDeviceProperties(&prop,0));int blas_version;BLAS(cublasGetVersion(handle,&blas_version));
     json report={{"scope","Isolated GPU-resident basis actions; not UVM, solver speedup or RF qualification. TF32 request is not proof of Tensor Core instructions."},
-      {"gpu",prop.name},{"cublas_version",blas_version},{"suite",scale?"scale":"screen"},{"rows",json::array()}};
+      {"gpu",prop.name},{"cublas_version",blas_version},{"suite",scale?"scale":"screen"},{"fused",fused},{"rows",json::array()}};
     // MFEM caches tabulations by rule address: retain mapped rules until FE teardown.
     std::vector<std::unique_ptr<mfem::IntegrationRule>> mapped_rules;
     mfem::ND_FECollection nd(2,3),nd2(2,2);mfem::RT_FECollection rt(1,3);mfem::H1_FECollection h1(2,3);
@@ -158,7 +167,7 @@ int main(int argc,char**argv){
       palace::ceed::InitBasisFromRule(*fe,*ir,components,ceed,&basis);
       for(auto mode:{CEED_EVAL_INTERP,(family==0||family==3)?CEED_EVAL_CURL:family==1?CEED_EVAL_DIV:CEED_EVAL_GRAD})
         for(int elems:(scale?std::vector<int>{257,1023,4099,16383,65537,131071,1601320}:std::vector<int>{257,131071}))for(int variant=0;variant<3;++variant) {
-          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2);row["family"]=family;row["rule_degree"]=degree;
+          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2,fused);row["family"]=family;row["rule_degree"]=degree;
           row["rule_source"]=trace?"representative_triangle_z0_trace":family==3?"triangle":"tet_volume";
           report["rows"].push_back(row);std::cout<<"completed family="<<family<<" Q="<<points<<" mode="<<int(mode)<<" n="<<elems<<" variant="<<variant<<std::endl;
         }

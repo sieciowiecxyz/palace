@@ -205,3 +205,12 @@ w ustalonych action gates, canaries/perturbationdetector. Parser sprawdza
 coverage, NaN/progi/flag consistency, mediany i zachowuje negatywne mixed
 wyniki. Nie są to bramki RF/UVM/TC ani M7promocja. Błędy pierwszego buildu i
 pierwszej volumeQ6 próby zachowane. [Raport](ceed-tensor-probe.md).
+
+
+## M6.5 — fused register action screen, EXP109–110
+
+147pinnedtestsPASS. Same CPU/reference/canary gates plus --fused fourthmethod,
+96screen/42size-ladder passed; only6atactualN. Fusedper-methodworkspace must
+matchP*Q*qcomp*4 (staticbasis); malformed extravectorworkspace rejected.
+Badargument/unsupportedshape deviceAPI guards exercised. Forwardgain/~2,6×,
+transposemarginal; no operator/RF/UVM/physicalpeak promotion. [Report](ceed-tensor-probe.md).

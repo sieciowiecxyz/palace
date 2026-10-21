@@ -131,3 +131,8 @@ Powiązany z hashami źródeł/native/runtime/arch/flags; nie przebudowuje solve
 ani zależności. `run NEW --seconds 120 [--scale]` ma oddzielny nowy katalog,
 6GiB/no swap/min2GiBfreeGPU/cleanup. Mały screen przed ladderem do actualN;
 [wyniki i ograniczenia](ceed-tensor-probe.md). Brak instalacji nowych bibliotek.
+
+
+M6.5 `--fused` adds an optional CUDA register-FP32 action in the same cached
+probe; host/native/dependencies unchanged. `--scale --fused` uses the identical
+binary and42action ladder. No fullPalace recompile or newlibrary needed.

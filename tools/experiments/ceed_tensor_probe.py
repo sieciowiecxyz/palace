@@ -106,10 +106,10 @@ def validate_case(case):
             accuracy(row['original_vs_cpu'],1e-11)
             if row['original_vs_cpu']['passed'] is not True:
                 raise ValueError('Original vs independent reference failed')
-        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']:
+        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else []):
             raise ValueError('Missing precision comparison')
         for method in row['methods']:
-            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3}[method['precision']]
+            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'FP32_fused':2e-6}[method['precision']]
             accuracy(method['accuracy'],tol)
             if row['elements']==257:
                 accuracy(method['accuracy']['independent_cpu'],tol)
@@ -118,11 +118,13 @@ def validate_case(case):
             if method['precision']=='FP64' and method['accuracy']['passed'] is not True:
                 raise ValueError('FP64 library/layout control failed')
             timing(method['timing'])
+            if method['precision']=='FP32_fused' and method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*4:
+                raise ValueError('Unexpected fused vector workspace')
     if seen!=expected:raise ValueError('Incomplete basis action coverage')
     return True
 
 
-def run(output,seconds,scale=False):
+def run(output,seconds,scale=False,fused=False):
     if not 30<=seconds<=120:raise ValueError('Probe requires30..120s deadline')
     dev.require_host_memory();manifest=verified();settings=dev.read(dev.SETTINGS)
     gpu=dev.capture(['nvidia-smi','--query-gpu=name,uuid,driver_version,memory.free','--format=csv,noheader,nounits'])
@@ -142,6 +144,7 @@ def run(output,seconds,scale=False):
         '-v',f'{dev.BUILD/"native/libpalace.so"}:/native/libpalace.so:ro',
         '--entrypoint','/native/ceed-tensor-probe',settings['runtime_image'],'/work/case.json']
     if scale:args.append('scale')
+    if fused:args.append('fused')
     dev.write(output/'command.json',dict(argv=args,manifest=manifest,gpu_before=gpu,runner_sha256=dev.sha(Path(__file__))))
     started=time.monotonic();code=None
     try:
@@ -168,8 +171,9 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=['build','check','run']);parser.add_argument('output',nargs='?',type=Path)
     parser.add_argument('--scale',action='store_true',help='ND2/Q14 size ladder through actual N1601320, bounded GPU-resident action probe')
+    parser.add_argument('--fused',action='store_true',help='Also screen fused FP32-register action without intermediate vector buffers')
     parser.add_argument('--seconds',type=int,default=120);args=parser.parse_args()
     if args.action=='build':build()
     elif args.action=='check':print('CEED tensor probe verified' if verified() else 'invalid')
     elif args.output is None:parser.error('run requires new output directory')
-    else:run(args.output,args.seconds,args.scale)
+    else:run(args.output,args.seconds,args.scale,args.fused)

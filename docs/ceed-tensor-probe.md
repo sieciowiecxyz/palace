@@ -78,19 +78,67 @@ odwraca), dodatkowy własny FP32 workspace397 130 720B. Static basis pack
 0,037–0,042ms. Kopie/konwersje mogą nasilić UVM traffic w pełnym FEM.
 Zysk resident compute nie dowodzi zysku w oversubscribed runie.
 
-## Decyzja i następny eksperyment
+## Decyzja po bibliotecznym filtrze
 
 Nie promować tego TF32 requested ani FP64 cuBLAS backendu. Zwykłe FP32 jest
 lepszym kandydatem jakości/kosztu w tym teście. M6.3 instruction/counter proof
 TC **NOT RUN**; brak deklaracji użycia TC i brak uniwersalnego odrzucenia TF32.
 
-Następny tani filtr: fused FP32 accumulation w istniejącym układzie FP64 caller,
-konwersje w rejestrach zamiast dodatkowego397MB scratch i całych pack/unpack.
-Ta sama kontrola CPU/FP64, rzeczywiste N, transpose/add i pamięć przed integracją.
-Potem wyłącznie jawny scope PC z fallbackiem i niezależnym oryginalnym FP64 A
+Filtr fused FP32 opisany poniżej. Potem wyłącznie jawny scope PC z fallbackiem
+i niezależnym oryginalnym FP64 A
 oraz Ax−b. K/W.1→W.2→W.3 i czas całego jobu wymagane przed promocją; zmiana
 liczby iteracji oraz UVM może odwrócić mikrobenchmark. BF16/FP16 i cuBLASLt tuning
 nie wykonane. M6.4–M6.6/M7 pozostają otwarte.
+
+## EXP109–110 — fused FP32 w rejestrach
+
+Opcjonalny czwarty wariant `--fused`. Własny mały CUDA kernel po ocenie biblioteki,
+bez CUTLASS/TC. FP64 x/y, staticFP32basis; cast i fmaf w rejestrach. Forward
+przelicza dane wejściowe raz na p i współdzieli je między q_components;
+transpose sumuje wszystkie składowe, ApplyAdd zachowuje FP64 initialY.
+Specjalizacje P/Q/qcomp, nie geometrii/material/freq; unsupported shape i złe
+argumenty jawnie odrzucane, brak cichego innego działania. CPU/reference/
+canaries/perturbationdetector i progi2e-6 pozostają. Kolejność sumowania różna
+od BLAS, więc to nowy kandydat, wymagający później pełnych bramek K.
+
+EXP109:96działań,13,685s; EXP110:42ladder/6actualN,19,344s.
+Cached addon build4,904s, bez native/deps rebuild; drugi run z tej samej binarki.
+Wszystkie fused action gates PASS, maxrelativeL2 ≤1,148e-7/scaledmax≤5,003e-7.
+Przy actualN1601320/P20/Q14/qcomp3, mediany wall3powtórzeń:
+
+| Akcja | Oryginalny FP64 | FP32 fused | Fused/original |
+| --- | --- | --- | --- |
+| interp forward | 3,474 ms | 1,342 ms | 0,386 |
+| interp transpose | 3,634 ms | 3,550 ms | 0,977 |
+| interp transpose Add | 3,738 ms | 3,560 ms | 0,952 |
+| curl forward | 3,478 ms | 1,334 ms | 0,384 |
+| curl transpose | 3,634 ms | 3,549 ms | 0,977 |
+| curl transpose Add | 3,738 ms | 3,562 ms | 0,953 |
+
+Forward ~2,6× szybsze, transpose tylko2–5% mniej czasu. Nie ukrywać kierunków
+w jednej średniej ani zastępować wszystkich działań. Brak nowych bramek
+RF/fullsolver/UVM; tutaj nadal wszystko mieści się wGPU. Cała ścieżka
+fused potrzebuje tylko3360B dodatkowej FP32bazy przy tym rozmiarze, **nie**
+397130720B wektorów+bazy wariantu bibliotecznego. To koszt własnych buforów
+algorytmu; porównawczy proces nadal alokuje float wektory innych metod.
+Nie zmierzono spadku processpeak/fullFEMmemory. W row metadata wspólne
+extra_fp32_workspace_bytes odnosi się do biblioteki; per-method fused pole
+podaje wyłącznie rozmiar bazy, zweryfikowany przez parser.
+
+Decyzja: kandydatem do M6.4 jest **tylko forward w obrębie PC**. Transpose
+zostawić oryginalne FP64 w pierwszej próbie; zysk z wersji fused zbyt mały
+do uzasadnienia globalnej podmiany. Read-only audyt źródła wskazał ApplyB w
+palace/linalg/iterative.cpp jako granicę wokół B->Mult. Plan integracji:
+RAII scopePC z audytem wejść/wyjść, zero mixed poza nim (w szczególności A*x
+i niezależny rawresidual). Cache coefficientów musi sprawdzać treść/dimensions
+i lifetime; sam adres CeedBasis może zostać ponownie użyty po destroy.
+Ta granica i cache nie zostały jeszcze zaimplementowane/zakwalifikowane.
+Przed W.3: tiny i W.2, frozenK/iteracje/pamięć oraz faktyczne wywołania mixed;
+fallback FP64 i cleanup obowiązkowe. Przy braku netzysku odrzucić integrację.
+
+Dowody: artifacts/m6-ceed-fused-{screen,scale}-20261021 i niezależny
+artifacts/m6-ceed-fused-root-analysis-20261021.json. JSON394168/157144B,
+stdout4608/2052B, zwykłe małe wyniki. Gorące dane tylkoRAM/VRAM.
 
 ## Odtworzenie
 
@@ -98,12 +146,21 @@ nie wykonane. M6.4–M6.6/M7 pozostają otwarte.
 python3 tools/experiments/ceed_tensor_probe.py build
 python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-screen --seconds 120
 python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-scale --scale --seconds 120
+python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-fused-screen --fused --seconds 120
+python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-fused-scale --scale --fused --seconds 120
 ```
 
 Build cache/hashe w build/m6-ceed-tensor; niezmienione dependencies i solver.
 Screen source/manifest snapshot w build/m6-ceed-tensor/exp107-screen.
-146pinnedtestsPASS, w tym coverage/flags/NaN/progi/mediany i zachowanie
+147pinnedtestsPASS, w tym coverage/flags/NaN/progi/mediany i zachowanie
 negatywnego mixed wyniku. Przywrócenie solvera niepotrzebne: nie został zmieniony.
 Wyniki: artifacts/m6-ceed-tensor-probe-v3-20261021 i m6-ceed-tensor-scale-20261021;
 niezależna root analiza artifacts/m6-ceed-tensor-root-analysis-20261021.json.
 JSON303735/120695B, stdout4608/2052B; małe normalne wyniki, bez dyskowego workspace.
+
+
+EXP111 current-recipe regression after argument bounds hardening(p/q≤40,
+qcomp≤3 beforeproducts): build1,811s,96screen13,764s/42ladder19,295s PASS,
+allprecisionactioncontrols. CurrentbinarySHAa5900a00…c772aa04;
+artifacts/m6-ceed-fused-guard-{screen,scale}-20261021. Root checked strictJSON
+and commandmanifest hashes. Not M7 performance repeats or RFqualification.

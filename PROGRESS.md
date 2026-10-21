@@ -20,7 +20,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP104: actual exportSHA powiązany z mesh audit; PCBbbox72mm, wybrany PCB/feedsubset91,676×72×47,750mm. SingleHSG0,1mm wymaga36,144GBbase. Publicnesting odrzucony; directportgprMaxREJECT bez nowego sprzęgania/subcell. SolverNOTRUN po resource/API gate, nie blanketFDTDrejection. Audyt M5.1–M5.6 w docs/milestones/M5.md.
 - EXP105–106 M6.1 PASS: host audit tiny i pełny W.3,108grup/14627calls/zeroerrors; raw/pola/S/energy PASS. W.3 272,718s/35iter (kontrola audytu, nie nowy speedup). Actual Hcurl P20/Q14/qcomp3/N1601320; wymagane bytes osobno od długości workspace. docs/ceed-basis-audit.md.
 - EXP107–108 M6.2 filtrPASS:96screen+42size-ladder (tylko6actualN1601320), FP32actionerror≤1,054e-7, TF32requested≤4,973e-4. ActualN FP32+konwersje2,598–3,223ms vsoriginal3,473–3,744ms; TF32wolniejszyodFP32, małeNmixedwolniejsze. To nie UVM/solver/RF/TCproof. docs/ceed-tensor-probe.md.
-- Następne: fused FP32 register-conversion basis filter bez dodatkowego397MB scratch/pack/unpack. Potem jawny scopePC z zachowanym niezależnym FP64A/rawresidual iK/W1→W3 przedpromocją. M6.3TCinstructionproof/M6.4integration/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/3powtórzenia otwarte.
+- EXP109–110 fusedFP32 filterPASS: 96screen/42ladder, error≤1,148e-7; actualNforward1,334–1,342ms vs3,474–3,478ms, transpose tylko2–5%zysku. Fused per-path FP32basis3360B, alecomparisonprocessnadaltrzymalibraryscratch, brakmeasuredpeak/RF/UVM/solverclaim.
+- Następne M6.4: tylkoPCforward, RAII/audyt scopeB->Mult/coeffcachecontent+lifetime+cleanup, FP64outsidePC/A/rawresidual/transpose/fallback zachowane, K/W1→W3 przedpromocją. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/3powtórzenia otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2583,3 +2584,49 @@ controls/currentstrictvalidator andrecipehash; native/dependencies unchanged.
 M6.2 firstlibraryfilterPASS; no solverpromotion/TCproof/UVMspeedup, no paidcompute.
 NextfusedFP32workspace-free actionfilter, thenexplicitPCscope/K/W1→W3.
 M6/M7/sweeps/generalization/W4/W5/median stillOPEN, goal remainsactive.
+
+EXP109 prereg M6.5: isolated --fused fourthmethod in existingtwoTU actionprobe,
+FP64caller arrays/FP32register FMAs, staticFP32basis only. Dimensiontemplates
+P/Q/qcomp, forwardreusesconvertedx for3components; transpose sumsallcomponents,
+AddkeepsoriginalFP64Y. No intermediaryvectors/packingkernel; noTCclaim. Explicit
+badargument/unsupportedshape guard; CPU/FP64/canary/faultdetector retained,
+fused actiongate2e-6 unchangedfromFP32; metadataworkspacebasisbytesonly.
+First96actionsscreen120s/6GiB/noSwap, cachedaddoncompileonly120s. Candidate
+negativeaccuracypreserved, notRFqualification. Benchmarkstillallocateslibrary
+scratchforcomparators; do notclaimmeasuredprocesspeakreduction. Ifpromising,
+second42size-ladder toactualN1601320; no fullFEM/defaultchange/paidcompute.
+
+EXP109 screenPASS13.685s/build4.904s,96actions/fused maxrelative1.102e-7,
+scaledmax5.003e-7. Root inspected individual NDtetQ14/N131071: fusedforward
+.117–.119ms vsoriginal.298–.304ms (~.39ratio), transpose.297–.305ms vs
+.320–.340ms (~.88–.96ratio), lessusefulthantheSGEMM+scratchtranspose.
+Do notaverageawaydirectiondifferences. No native/operatorchange/RFclaim.
+EXP110 prereg: samecode --scale --fused,42size-ladderactions/6actualN1601320,
+120s/6GiB/noSwap. Keepforward/transpose/Add/permethodcosts separate before
+integration. SourceunchangedafterEXP109; cachedprobe, nobuildrequired.
+
+EXP110 rootreview strictvalidator/cache/CPU/GPU PASS. SixactualN rowstargeted:
+forward1.334–1.342ms vs3.474–3.478ms; transpose3.549–3.562ms vs3.634–3.738ms.
+Fusedmaxrelative1.148e-7/scaledmax5.003e-7; per-methodownbasis3360B vs
+library397130720B, comparisonstillallocatesbothvectors, nopeakclaim.
+Rootreceipt artifacts/m6-ceed-fused-root-analysis-20261021.json. Candidate
+PCforwardonly; transposekeepFP64. ApplyB/B->Mult boundaryread initerative.cpp;
+nextRAIIscopeaudit+content/lifetimecache/FP64outsidePC+cleanupbeforeKrun.
+Root tighteneduntrustedkernelargumentp/q<=40/qcomp<=3 before64bitproducts
+(nochangeforalltestedshapes), requirescachedrebuild+samecheapfilterbeforecommit.
+
+EXP111 prereg regressiononly afterargumenthardening: cachedaddonrebuild,
+96screen then42ladder samefrozenactiongates120s each. Newartifacts
+m6-ceed-fused-guard-{screen,scale}-20261021 preserveEXP109/110 untouched.
+Not aM7repeat/performancepromotion; verifycurrentcompiledrecipebeforecommit.
+
+EXP111 guardedrecipePASS build1.811s/screen13.764s/scale19.295s,
+96/42actions/noOOM; currentbinarya5900a00…c772aa04. Rootverified both strict
+caseJSON+commandmanifest hash vsactualcachedbinary, allprecisionfiltersPASS;
+fused errorsunchanged≤1.148e-7/5.003e-7. No native/dependencychange ornewRFclaim.
+
+EXP109–111 checkpoint:147pinnedtests/8shell/docschecker/diffcheckPASS.
+SameLuna read-onlydocs-garden PASS; root reviewed sharedcode/actions/error
+bounds/currentrecipe hashes and direction/bytes distinction. Candidateonly
+PCforward; integration/scope/cache/cleanup+fullK/netjob stillOPEN. No paidcompute,
+no native/depsrebuild/swap/appsclosing. M6/M7/W4/W5/median/sweeps remainOPEN.

@@ -22,12 +22,23 @@ def case():
                                 check=accuracy(tol);check['independent_cpu']=accuracy(tol)
                                 methods.append(dict(precision=p,accuracy=check,timing=timing()))
                             rows.append(dict(family=family,P=[20,15,10,8][family],Q=q,components=c,N=n*c,
+                                q_components=(1 if family==2 else 2 if family==3 else 3) if mode==1 else (1 if family in [1,3] else 3),
                                 eval=mode,elements=n,transpose=trans,add=add,canaries_passed=True,
                                 original_vs_cpu=accuracy(1e-11),original_timing=timing(),methods=methods))
     return dict(complete=True,rows=rows)
 
 
 class TensorProbeTests(unittest.TestCase):
+    def test_fused_fourth_method_requires_small_basis_only_workspace(self):
+        data=case();data['fused']=True
+        for row in data['rows']:
+            method=copy.deepcopy(row['methods'][1]);method['precision']='FP32_fused'
+            method['extra_fp32_workspace_bytes']=row['P']*row['Q']*row['q_components']*4
+            row['methods'].append(method)
+        self.assertTrue(probe.validate_case(data))
+        data['rows'][0]['methods'][-1]['extra_fp32_workspace_bytes']+=100000
+        with self.assertRaises(ValueError):probe.validate_case(data)
+
     def test_scaling_requires_full_actual_size_ladder(self):
         data=case();data['suite']='scale';rows=[]
         for r in data['rows']:
