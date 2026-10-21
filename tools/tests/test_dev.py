@@ -16,6 +16,7 @@ class ToolRegressionTests(unittest.TestCase):
         self.assertEqual(dev.native_coarse_builds(6, False, None),6)
         self.assertEqual(dev.native_coarse_builds(6, False, {'first':30,'count':2}),1)
         self.assertEqual(dev.native_coarse_builds(2, True, None),1)
+        self.assertEqual(dev.native_coarse_builds(6, True, None,3),3)
         log='PALACE_NATIVE_COMPLEX_COARSE: dimension=20 nnz=100 dtype=complex_fp32 matrix=general\n'
         self.assertTrue(dev.native_complex_coarse_applied(log,dev.native_coarse_builds(6,False,{'first':0}), 'complex_fp32'))
         self.assertFalse(dev.native_complex_coarse_applied(log,dev.native_coarse_builds(6,False,None),'complex_fp32'))
@@ -198,7 +199,7 @@ class ToolRegressionTests(unittest.TestCase):
         good=dev.port_batch_config(config,both_ports=True,reuse=True)
         for kind in ['frequency','wave','floquet','refinement','restart','sameexcitation','bool']:
             bad=json.loads(json.dumps(good))
-            if kind=='frequency':bad['Solver']['Driven']['Samples'][0]['Freq'].append(3.8)
+            if kind=='frequency':bad['Solver']['Driven']['Samples'][0]['Freq']*=2
             if kind=='wave':bad['Boundaries']['WavePort']=[{}]
             if kind=='floquet':bad['Boundaries']['FloquetPort']=[{}]
             if kind=='refinement':bad['Model']['Refinement']={'MaxIts':1}
@@ -228,6 +229,50 @@ class ToolRegressionTests(unittest.TestCase):
                           dict(setup_audit=True,native_complex_coarse=True,nsys_window='0:2')]:
                 with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**flags)
             host.assert_not_called()
+
+    def test_multifrequency_reuse_requires_two_ports_and_exact_order_factor_and_history(self):
+        _,_,config=dev.fixture('coax-tiny');config=dev.port_batch_config(config,reuse=True)
+        csr='PALACE_COARSE_CSR: algorithm=fnv1a64 structure=0123456789abcdef values=0123456789abcdef\n'
+        phase='PALACE_COARSE_SETUP: analysis_s=1.0e-2 factor_s=1.1e-2\n'
+        chunks=[]
+        for f in range(3):
+            for e in [1,2]:
+                if e==1:chunks.append(csr+phase)
+                chunks.append(f'PALACE_PORT_SETUP: action={"build" if e==1 else "reuse"} excitation={e} frequency_index={f}\n')
+                action='zero' if f==0 else 'restore'
+                chunks.append(f'PALACE_SWEEP_SEED: action={action} excitation={e} frequency_index={f}\n')
+                action='store' if f<2 else 'release'
+                chunks.append(f'PALACE_SWEEP_SEED: action={action} excitation={e} frequency_index={f}'+(' logical_bytes=1024' if action=='store' else '')+'\n')
+        text=''.join(chunks);r=dev.port_setup_audit(text,config,True)
+        self.assertTrue(r['passed']);self.assertEqual(r['expected_builds'],3)
+        self.assertEqual(r['history']['logical_history_capacity_bytes'],2048)
+        for bad in [text.replace(csr,'',1),text.replace('action=release','action=restore'),
+                    text.replace('logical_bytes=1024','logical_bytes=0',1),
+                    text.replace('action=reuse','action=build',1),
+                    text.replace('action=restore excitation=1','action=restore excitation=2',1)]:
+            self.assertFalse(dev.port_setup_audit(bad,config,True)['passed'])
+        self.assertFalse(dev.port_setup_audit(text,config,False)['passed'])
+        cold=json.loads(json.dumps(config));cold['Solver']['Linear']['InitialGuess']=False
+        no_history='\n'.join(line for line in text.splitlines() if not line.startswith('PALACE_SWEEP_SEED:'))
+        self.assertTrue(dev.port_setup_audit(no_history,cold,True)['passed'])
+        for freqs in [[3.8,3.3],[3.3,3.3],[float('nan')],[True],[]]:
+            bad=json.loads(json.dumps(config));bad['Solver']['Driven']['Samples'][0]['Freq']=freqs
+            with self.assertRaises(ValueError):dev.port_batch_config(bad,reuse=True)
+        for flag in ['AdaptiveTol','Save','sampleSave','thirdPort']:
+            bad=json.loads(json.dumps(config))
+            if flag=='AdaptiveTol':bad['Solver']['Driven']['AdaptiveTol']=1e-3
+            if flag=='Save':bad['Solver']['Driven']['Save']=True
+            if flag=='sampleSave':bad['Solver']['Driven']['Samples'][0]['Save']=True
+            if flag=='thirdPort':bad['Boundaries']['LumpedPort'].append({'Index':3,'Excitation':3})
+            with self.assertRaises(ValueError):dev.port_batch_config(bad,reuse=True)
+        with self.assertRaises(ValueError):dev.validate_deferred_postprocessing(config,True)
+
+    def test_multifrequency_energy_release_tracks_frequency_major_measurements(self):
+        _,_,config=dev.fixture('coax-tiny');order=[(e,f) for f in range(3) for e in [1,2]]
+        log=''.join(f'PALACE_POSTPROCESS_ENERGY_RELEASED: excitation={e} frequency_index={f}\n' for e,f in order[:-1])
+        log+=''.join(f'PALACE_POSTPROCESS_ENERGY_REBUILT: excitation={e} frequency_index={f}\n' for e,f in order[1:])
+        self.assertTrue(dev.postprocess_energy_release_applied(log,config,True))
+        self.assertFalse(dev.postprocess_energy_release_applied(log,config))
 
     def test_prefetch_requires_direct_cuda_before_resource_allocation(self):
         with patch.object(dev, 'require_host_memory') as host:

@@ -22,22 +22,11 @@ def csv_rows(path):
     return rows
 
 
-def evaluate(directory, geometry):
-    config = json.loads((directory / 'config.json').read_text())
-    post = directory / config['Problem']['Output']
-    probes = config['Domains']['Postprocessing']['Probe']
+def evaluate_frequency(geometry, probes, erow, brow, vrow, energy):
     eps = geometry['epsilon_r']
     a = geometry['inner_radius_mm'] * 1e-3
     b = geometry['shield_inner_radius_mm'] * 1e-3
     length = geometry['length_mm'] * 1e-3
-    # Check this known fixture, not an arbitrary coax/port geometry.
-    if config['Model']['L0'] != 0.001 or len(config['Boundaries']['LumpedPort']) != 2:
-        raise ValueError('Requires known two-port millimetre coax fixture')
-    e_rows, b_rows = csv_rows(post/'probe-E.csv'), csv_rows(post/'probe-B.csv')
-    voltage_rows, energy_rows = csv_rows(post/'port-V.csv'), csv_rows(post/'domain-E.csv')
-    if not len(e_rows) == len(b_rows) == len(voltage_rows) == len(energy_rows) == 1:
-        raise ValueError('Expected one frequency and both excitations')
-    erow, brow, vrow, energy = e_rows[0], b_rows[0], voltage_rows[0], energy_rows[0]
     f = erow['f (GHz)'] * 1e9
     if any(row['f (GHz)']*1e9 != f for row in [brow, vrow, energy]):
         raise ValueError('Frequency mismatch')
@@ -79,6 +68,26 @@ def evaluate(directory, geometry):
             'analytic_electric_energy_j': expected_energy,
             'electric_energy_relative_error': abs(energy[f'E_elec[{port}] (J)']/expected_energy-1),
             'magnetic_energy_relative_error': abs(energy[f'E_mag[{port}] (J)']/expected_energy-1)}
+    return result
+
+
+def evaluate(directory, geometry):
+    config = json.loads((directory / 'config.json').read_text())
+    post = directory / config['Problem']['Output']
+    probes = config['Domains']['Postprocessing']['Probe']
+    if config['Model']['L0'] != 0.001 or len(config['Boundaries']['LumpedPort']) != 2:
+        raise ValueError('Requires known two-port millimetre coax fixture')
+    tables=[csv_rows(post/name) for name in ['probe-E.csv','probe-B.csv','port-V.csv','domain-E.csv']]
+    samples=config.get('Solver',{}).get('Driven',{}).get('Samples')
+    requested=[f for sample in samples for f in sample['Freq']] if samples is not None else [3.55]
+    if not requested or any(len(rows)!=len(requested) for rows in tables):
+        raise ValueError('Expected all requested frequencies and both excitations')
+    results=[]
+    for f, rows in zip(requested,zip(*tables),strict=True):
+        if not math.isclose(rows[0]['f (GHz)'],f,rel_tol=1e-9,abs_tol=0):
+            raise ValueError('Requested frequency mismatch')
+        results.append(evaluate_frequency(geometry,probes,*rows))
+    result=results[0] if len(results)==1 else {'frequencies':results}
     result['scope'] = 'TEM samples/energy; native volume L2 only where logged; not antenna qualification'
     result['model'] = 'matched travelling TEM, zero reflection; numerical port reflections are not fitted away'
     result['volume_l2_checks'] = [

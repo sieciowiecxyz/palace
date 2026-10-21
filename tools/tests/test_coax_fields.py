@@ -31,9 +31,9 @@ class CoaxFieldTests(unittest.TestCase):
             energy = math.pi*(1/(1.25663706212e-6*299792458**2))*2.1/logratio*length*voltage**2
             def write(name, row):
                 with (post/name).open('w') as stream:
-                    writer = csv.DictWriter(stream, fieldnames=list(row))
+                    writer = csv.DictWriter(stream, fieldnames=list(row[0] if isinstance(row,list) else row))
                     writer.writeheader()
-                    writer.writerow(row)
+                    writer.writerows(row if isinstance(row,list) else [row])
             erow, brow, vrow, urow = ({'f (GHz)': 3.55} for _ in range(4))
             for port, sign in [(1, 1), (2, -1)]:
                 for field, row, unit, values in [
@@ -52,6 +52,33 @@ class CoaxFieldTests(unittest.TestCase):
                 self.assertLess(port['E_sample_relative_rms'], 1e-12)
                 self.assertLess(port['B_sample_relative_rms'], 1e-12)
                 self.assertLess(port['electric_energy_relative_error'], 1e-12)
+            # A second frequency has a different physical phase, not duplicated data.
+            config['Solver']={'Driven':{'Samples':[{'Type':'Point','Freq':[3.55,3.8]}]}}
+            (root/'config.json').write_text(json.dumps(config))
+            import cmath
+            ratio=cmath.exp(-1j*(3.8/3.55-1)*beta*length/2)
+            second=[]
+            names=['probe-E.csv','probe-B.csv','port-V.csv','domain-E.csv']
+            for name,row in zip(names,[erow,brow,vrow,urow]):
+                other=dict(row);other['f (GHz)']=3.8
+                for key in row:
+                    if key.startswith('Re{'):
+                        imaginary=key.replace('Re{','Im{')
+                        value=complex(row[key],row[imaginary])*ratio
+                        other[key]=value.real;other[imaginary]=value.imag
+                second.append(other);write(name,[row,other])
+            multi=fields.evaluate(root,geometry)
+            self.assertEqual([r['frequency_ghz'] for r in multi['frequencies']],[3.55,3.8])
+            for r in multi['frequencies']:
+                for port in r['ports'].values():
+                    self.assertLess(port['E_sample_relative_rms'],1e-12)
+                    self.assertLess(port['B_sample_relative_rms'],1e-12)
+            second[1]['f (GHz)']=3.7;write('probe-B.csv',[brow,second[1]])
+            with self.assertRaisesRegex(ValueError,'Frequency mismatch'):fields.evaluate(root,geometry)
+            write('probe-B.csv',brow)
+            with self.assertRaisesRegex(ValueError,'all requested frequencies'):fields.evaluate(root,geometry)
+            del config['Solver'];(root/'config.json').write_text(json.dumps(config))
+            for name,row in zip(names,[erow,brow,vrow,urow]):write(name,row)
             # A wrong travel-direction sign must be detected, never fitted away.
             for key in brow:
                 if key != 'f (GHz)':

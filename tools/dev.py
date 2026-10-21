@@ -570,10 +570,10 @@ def native_complex_coarse_applied(log, solves, dtype='complex_fp64'):
             and all(int(n) > 0 and int(nnz) > 0 and actual == dtype for n, nnz, actual in markers))
 
 
-def native_coarse_builds(solves, reuse, profile):
+def native_coarse_builds(solves, reuse, profile, frequencies=1):
     # The controlled profiling stop occurs inside the FIRST solve, even if the
     # input requests more frequencies/ports. Full-run coverage is unchanged.
-    return 1 if reuse or profile else solves
+    return 1 if profile else frequencies if reuse else solves
 
 
 def validate_native_mixed(enabled, native, hybrid, cpu, profile, ams):
@@ -620,27 +620,44 @@ def port_batch_config(config, both_ports=False, reuse=False, excitation=None):
     if reuse:
         samples = config['Solver']['Driven']['Samples']
         excitations = {p.get('Excitation') for p in ports if p.get('Excitation')}
-        if (len(samples) != 1 or samples[0].get('Type') != 'Point' or len(samples[0]['Freq']) != 1
+        frequencies=[f for s in samples for f in s.get('Freq',[])]
+        if (not samples or any(s.get('Type')!='Point' for s in samples) or not frequencies
+                or not all(isinstance(f,(int,float)) and not isinstance(f,bool) and math.isfinite(f) and f>0 for f in frequencies)
+                or frequencies!=sorted(set(frequencies)) or (len(frequencies)>1 and len(excitations)!=2)
                 or len(excitations) < 2 or any(isinstance(e,bool) or not isinstance(e,int) or e <= 0 for e in excitations)
                 or config['Boundaries'].get('WavePort') or config['Boundaries'].get('FloquetPort')
+                or config['Solver']['Driven'].get('AdaptiveTol',0)>0
+                or (len(frequencies)>1 and (config['Solver']['Driven'].get('Save') or any(s.get('Save') for s in samples)))
                 or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0
                 or config['Solver']['Driven'].get('Restart',1) != 1):
-            raise ValueError('Port setup reuse requires one point frequency, fixed mesh, distinct lumped excitations, no wave/Floquet ports and first solve')
+            raise ValueError('Port setup reuse requires sorted distinct point frequencies, fixed mesh, distinct lumped excitations, no wave/Floquet ports and first solve; sweeps require two excitations')
     return config
 
 
 def port_setup_audit(log, config, reuse=False):
     excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
     frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
-    expected = [('reuse' if reuse and i else 'build', str(e), str(f))
-                for i,e in enumerate(excitations) for f in range(frequencies)]
+    frequency_major=reuse and frequencies>1
+    order=[(i,e,f) for i,e in enumerate(excitations) for f in range(frequencies)]
+    if frequency_major:order.sort(key=lambda x:x[2])
+    expected = [('reuse' if reuse and i else 'build', str(e), str(f)) for i,e,f in order]
     markers = re.findall(r'PALACE_PORT_SETUP: action=(build|reuse) excitation=(\d+) frequency_index=(\d+)',log)
     hashes = re.findall(r'PALACE_COARSE_CSR: algorithm=fnv1a64 structure=([0-9a-f]{16}) values=([0-9a-f]{16})',log)
     phases = re.findall(r'PALACE_COARSE_SETUP: analysis_s=([\deE+.-]+) factor_s=([\deE+.-]+)',log)
     builds = sum(a=='build' for a,_,_ in expected)
     passed = (builds > 0 and markers == expected and len(hashes)==builds and len(phases)==builds
               and all(math.isfinite(float(t)) and float(t)>=0 for pair in phases for t in pair))
-    return dict(passed=passed, expected_builds=builds, markers=markers,
+    history=None
+    if frequency_major:
+        seeds=re.findall(r'PALACE_SWEEP_SEED: action=(zero|restore|store|release) excitation=(\d+) frequency_index=(\d+)',log)
+        expected_seeds=[(action,str(e),str(f)) for _,e,f in order for action in
+                        [('zero' if f==0 else 'restore'),('store' if f+1<frequencies else 'release')]] if config['Solver']['Linear'].get('InitialGuess',True) else []
+        sizes=[int(b) for b in re.findall(r'PALACE_SWEEP_SEED: action=store excitation=\d+ frequency_index=\d+ logical_bytes=(\d+)',log)]
+        history_passed=seeds==expected_seeds and ((len(sizes)==len(excitations)*(frequencies-1) and min(sizes)>0 and len(set(sizes))==1) if expected_seeds else not sizes)
+        history=dict(passed=history_passed,markers=seeds,logical_history_capacity_bytes=len(excitations)*sizes[0] if sizes else 0,
+                     scope='Per-port previous solution buffers; logical capacity, not physical VRAM peak')
+        passed=passed and history_passed
+    return dict(passed=passed, expected_builds=builds, markers=markers,history=history,
                 csr_fingerprints=hashes, setup_seconds=[dict(analysis=float(a),factor=float(f)) for a,f in phases])
 
 
@@ -709,10 +726,11 @@ def deferred_postprocessing_applied(log, config):
             and matches[0].start() < released < matches[1].start())
 
 
-def postprocess_energy_release_applied(log, config):
+def postprocess_energy_release_applied(log, config,frequency_major=False):
     excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
     frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
     order = [(str(e),str(f)) for e in excitations for f in range(frequencies)]
+    if frequency_major:order.sort(key=lambda x:int(x[1]))
     released = re.findall(r'PALACE_POSTPROCESS_ENERGY_RELEASED: excitation=(\d+) frequency_index=(\d+)',log)
     rebuilt = re.findall(r'PALACE_POSTPROCESS_ENERGY_REBUILT: excitation=(\d+) frequency_index=(\d+)',log)
     return len(order)>1 and released==order[:-1] and rebuilt==order[1:]
@@ -776,6 +794,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     if ams_cycles is not None:
         config = ams_config(config, ams_cycles)
     config = port_batch_config(config, both_ports, port_setup_reuse, excitation)
+    frequency_count=sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
+    frequency_major=port_setup_reuse and frequency_count>1
+    if frequency_major and initial_fields:
+        raise ValueError('Frequency-major reuse uses per-port RAM/VRAM history, not external field seeds')
     if release_postprocess_energy and (len(expected_field_files(config)) < 4 or config['Solver']['Driven'].get('Save')
             or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0):
         raise ValueError('Energy release requires multiple solves, fixed mesh and no visualization saves')
@@ -943,6 +965,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                    'basis_audit': basis_audit,
                                    'pc_basis_fp32_forward': pc_basis_fp32_forward,
                                    'pc_basis_compensated_forward': pc_basis_compensated_forward,
+                                   'frequency_major_reuse': frequency_major,
                                    'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
@@ -1006,14 +1029,14 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             status['scope'] = profile['scope']
         if native_complex_coarse:
             status['native_complex_coarse_applied'] = native_complex_coarse_applied(
-                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile),
+                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile,frequency_count),
                 'complex_fp32' if native_coarse_fp32 else 'complex_fp64')
             status['complete'] = status['complete'] and status['native_complex_coarse_applied']
             if profile:
                 status['profile_complete'] = status['profile_complete'] and status['native_complex_coarse_applied']
         if native_coarse_fp32:
             status['native_mixed_applied'] = native_mixed_applied(
-                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile))
+                (output/'palace.log').read_text(), native_coarse_builds(status['expected_solves'], port_setup_reuse, profile,frequency_count))
             status['complete'] = status['complete'] and status['native_mixed_applied']
             if profile:
                 status['profile_complete'] = status['profile_complete'] and status['native_mixed_applied']
@@ -1049,7 +1072,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             if not profile:
                 status['complete'] = status['complete'] and status['ams_fixed_gpu_config_applied']
         if cudss_hybrid_mib is not None:
-            expected_builds = 1 if port_setup_reuse else status['expected_solves']
+            expected_builds = frequency_count if port_setup_reuse else status['expected_solves']
             status['native_hybrid_applied'] = native_hybrid_applied(
                 (output/'palace.log').read_text(), cudss_hybrid_mib, expected_builds)
             status['complete'] = status['complete'] and status['native_hybrid_applied']
@@ -1058,7 +1081,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                 (output/'palace.log').read_text(), config)
             status['complete'] = status['complete'] and status['deferred_postprocessing_applied']
         if release_postprocess_energy:
-            status['postprocess_energy_release_applied'] = postprocess_energy_release_applied((output/'palace.log').read_text(),config)
+            status['postprocess_energy_release_applied'] = postprocess_energy_release_applied((output/'palace.log').read_text(),config,frequency_major)
             status['complete'] = status['complete'] and status['postprocess_energy_release_applied']
         if basis_prefetch and not profile:
             status['basis_prefetch_applied'] = basis_prefetch_applied(
@@ -1158,7 +1181,7 @@ def main():
     r.add_argument('--direct-basis', action='store_true', help='Experimental direct FP32 basis dot/axpy with FP64 arithmetic; requires --basis fp32')
     r.add_argument('--basis-prefetch', action='store_true', help='Experimental managed basis prefetch before Dot on CUDA stream 0; requires --direct-basis')
     r.add_argument('--setup-audit', action='store_true', help='Log driver setup counts and native coarse CSR fingerprints/analysis/factor times')
-    r.add_argument('--port-setup-reuse', action='store_true', help='Opt-in one-frequency lumped-port setup reuse; includes setup audit')
+    r.add_argument('--port-setup-reuse', action='store_true', help='Opt-in lumped-port setup reuse at equal frequency; multi-frequency two-port batches use per-port RAM/VRAM history and frequency-major order; includes setup audit')
     r.add_argument('--both-ports', action='store_true', help='Excite both existing lumped ports separately, preserving geometry and terminations')
     r.add_argument('--excitation', type=int, help='Solve only one existing lumped port index, preserving physical terminations')
     r.add_argument('--partial-initial-fields', action='store_true', help='Allow verified initial snapshot for a subset of requested excitations; others start at zero')

@@ -244,3 +244,14 @@ fields/cachemode/scope/cleanup tiny i medium3,55PASS. Pierwszy candidate miał
 nativeenvguards i regresje, nie bramki. 153pinnedtestsPASS. Zachowane iteracje
 40/42 i47/49, brak wykazanego netgain, niepromowany/W3NOTRUN. Raport i dokładne
 SHA/argv/artefakty w docs/pc-basis-fp32.md; bez zmiany globalnych defaultów.
+
+## M6.6 — frequency-major equal-f reuse, EXP120–122
+
+`--coax-sweep --port-setup-reuse` zachowuje3fixturefreq; dwa porty przy jednejf,
+nowe faktory przy następnejf, per-porthistoryRAM/VRAM. Strictaudit oczekuje3builds/
+3reuse/6solves oraz exactzero/restore/store/release+positiveconsistentbytes.
+Testy odrzucają wrongorder/missingfactor/staleseedmarkers/invalidfreqs/AMR/wave/
+adaptive/viz; noSilentDeferredNF>1.155pinnedtestsPASS. RootCSV/raw/wholefields/
+TEMalignedmultirowsPASS tiny/medium, medium53,570→45,344s/singlepair; nieM7median/
+antena/promotion. ExactTEM2freq/magnetic-sign/frequency-misalignment tests helpera.
+EXP122 stara onefreqreuse/deferredścieżkaPASS. Odtwarzanie wmilestones/sweeps.md.

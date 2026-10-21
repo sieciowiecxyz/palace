@@ -3,6 +3,9 @@
 
 #include "drivensolver.hpp"
 
+#include <algorithm>
+#include <map>
+#include <vector>
 #include <complex>
 #include <cstdlib>
 #include <cstddef>
@@ -106,11 +109,12 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   // Set up the linear solver.
   // The operators are constructed for each frequency step and used to initialize the ksp.
-  // Opt-in one-frequency RHS reuse owns operators longer than the referencing solver.
+  // Opt-in equal-frequency RHS reuse owns operators longer than the referencing solver.
   std::unique_ptr<ComplexOperator> retained_A2, retained_A, retained_P;
   auto ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
                                                &space_op.GetH1Spaces());
   const bool reuse_port_setup = std::getenv("PALACE_REUSE_PORT_SETUP") != nullptr;
+  const bool frequency_batch = reuse_port_setup && omega_sample.size() > 1;
   const bool setup_audit = reuse_port_setup || std::getenv("PALACE_PORT_SETUP_AUDIT");
   const bool release_postprocess_energy = std::getenv("PALACE_RELEASE_POSTPROCESS_ENERGY") != nullptr;
   bool energy_released = false;
@@ -118,10 +122,14 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                   (iodata.model.refinement.max_it == 0 && !post_op.WillWriteFields()),
               "Postprocess energy release requires fixed mesh without visualization writes!");
   MFEM_VERIFY(!reuse_port_setup ||
-                  (omega_sample.size() == 1 && port_excitations.Size() > 1 && iodata.solver.driven.restart == 1 &&
+                  ((omega_sample.size() == 1 || port_excitations.Size() == 2) && port_excitations.Size() > 1 && iodata.solver.driven.restart == 1 &&
                    iodata.model.refinement.max_it == 0 && Mpi::Size(space_op.GetComm()) == 1 &&
                    space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
-              "Port setup reuse requires one frequency, fixed mesh, one rank and multiple lumped excitations without wave/Floquet ports!");
+              "Port setup reuse requires fixed mesh/rank1/first solve and lumped ports only; multi-frequency batches require exactly two excitations!");
+  MFEM_VERIFY(!frequency_batch || !std::getenv("PALACE_INITIAL_FIELDS"),
+              "Frequency-major reuse uses per-port in-memory history, not external field seeds!");
+  MFEM_VERIFY(!frequency_batch || !post_op.WillWriteFields(),
+              "Frequency-major reuse does not yet support visualization writes!");
   const char *release_env = std::getenv("PALACE_RELEASE_FINAL_SOLVER");
   const bool release_final_solver = release_env && std::string(release_env) == "1";
   MFEM_VERIFY(!release_final_solver || iodata.model.refinement.max_it == 0,
@@ -269,159 +277,193 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   int deferred_excitation = 0;
   double deferred_rhs_norm = 0.0;
 
-  // Main excitation and frequency loop.
-  auto t0 = Timer::Now();
-  std::size_t excitation_counter = 0;
-  const std::size_t excitation_restart_counter =
-      ((iodata.solver.driven.restart - 1) / omega_sample.size()) + 1;
-  const std::size_t freq_restart_idx =
-      (iodata.solver.driven.restart - 1) % omega_sample.size();
-  for (const auto &[excitation_idx, excitation_spec] : port_excitations)
+  // Preserve the default excitation-major schedule. Reuse batches visit both
+  // RHS at each frequency before replacing its factors; never cache multiple LU's.
+  struct SweepSample { int excitation; std::size_t counter, frequency, start; };
+  std::vector<SweepSample> samples;
+  const auto restart_counter = ((iodata.solver.driven.restart - 1) / omega_sample.size()) + 1;
+  const auto restart_frequency = (iodata.solver.driven.restart - 1) % omega_sample.size();
+  std::size_t counter = 0;
+  for (const auto &[index, spec] : port_excitations)
   {
-    if (++excitation_counter < excitation_restart_counter)
-    {
-      continue;
-    }
-    if (port_excitations.Size() > 1)
-    {
+    if (++counter < restart_counter) continue;
+    const auto start = counter == restart_counter ? restart_frequency : 0;
+    for (auto f = start; f < omega_sample.size(); ++f)
+      samples.push_back({index, counter, f, start});
+  }
+  if (frequency_batch)
+    std::stable_sort(samples.begin(), samples.end(), [](const auto &a, const auto &b)
+                     { return a.frequency < b.frequency; });
+  std::map<int, std::unique_ptr<ComplexVector>> sweep_history;
+  std::size_t retained_frequency = omega_sample.size();
+  auto t0 = Timer::Now();
+  for (const auto &sample : samples)
+  {
+    const auto excitation_idx = sample.excitation;
+    const auto excitation_counter = sample.counter;
+    const auto omega_i = sample.frequency;
+    const auto omega_start = sample.start;
+    if (omega_i == omega_start && port_excitations.Size() > 1)
       Mpi::Print("\nSweeping excitation index {:d} ({:d}/{:d}):\n", excitation_idx,
                  excitation_counter, port_excitations.Size());
-    }
-    // Frequency loop. Delay the potentially large visualization operators until the
-    // first solution is ready, so they do not increase the solve/preconditioner peak.
-    const std::size_t omega_start =
-        (excitation_counter == excitation_restart_counter) ? freq_restart_idx : 0;
-    for (std::size_t omega_i = omega_start; omega_i < omega_sample.size(); omega_i++)
+    auto omega = omega_sample[omega_i];
+    // Assemble frequency dependent matrices and initialize operators in linear
+    // solver.
+    MemoryMark("preconditioner.begin");
+    std::unique_ptr<ComplexOperator> A2, A, P;
+    const bool reuse = reuse_port_setup && retained_A && retained_frequency == omega_i;
+    if (!reuse)
     {
-      auto omega = omega_sample[omega_i];
-      // Assemble frequency dependent matrices and initialize operators in linear
-      // solver.
-      MemoryMark("preconditioner.begin");
-      std::unique_ptr<ComplexOperator> A2, A, P;
-      const bool reuse = reuse_port_setup && retained_A;
-      if (!reuse)
+      A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
+      A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
+                                      K.get(), C.get(), M.get(), A2.get());
+      P = space_op.GetPreconditionerMatrix<ComplexOperator>(
+        1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, omega);
+      ksp->SetOperators(*A, *P);
+      if (reuse_port_setup)
       {
-        A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
-        A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i,
-                                        K.get(), C.get(), M.get(), A2.get());
-        P = space_op.GetPreconditionerMatrix<ComplexOperator>(
-          1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, omega);
-        ksp->SetOperators(*A, *P);
-        if (reuse_port_setup)
-        {
-          retained_A2 = std::move(A2); retained_A = std::move(A); retained_P = std::move(P);
-        }
-      }
-      if (setup_audit)
-      {
-        Mpi::Print("PALACE_PORT_SETUP: action={} excitation={} frequency_index={}\n",
-                   reuse ? "reuse" : "build", excitation_idx, omega_i);
-      }
-      MemoryMark("preconditioner.end");
-
-      Mpi::Print(
-          "\nIt {:d}/{:d}: ω/2π = {:.3e} GHz (total elapsed time = {:.2e} s{})\n",
-          omega_i + 1, omega_sample.size(),
-          iodata.units.Dimensionalize<Units::ValueType::FREQUENCY>(omega) / (2 * M_PI),
-          Timer::Duration(Timer::Now() - t0).count(),
-          (port_excitations.Size() > 1)
-              ? fmt::format(", solve {:d}/{:d}",
-                            1 + omega_i + (excitation_counter - 1) * omega_sample.size(),
-                            omega_sample.size() * port_excitations.Size())
-              : "");
-
-      // Solve linear system.
-      space_op.GetExcitationVector(excitation_idx, omega, RHS);
-
-      if (const char *initial_fields = std::getenv("PALACE_INITIAL_FIELDS"))
-      {
-        MFEM_VERIFY(Mpi::Size(space_op.GetComm()) == 1 && iodata.solver.linear.initial_guess,
-                    "Field restart requires one rank and InitialGuess=true!");
-        const char *mask = std::getenv("PALACE_INITIAL_FIELDS_EXCITATIONS");
-        const bool seeded = !mask || std::string(mask).find("," + std::to_string(excitation_idx) + ",") != std::string::npos;
-        if (seeded)
-        {
-          GridFunction initial_E(space_op.GetNDSpace(), true);
-          const std::string stem = "s" + std::to_string(excitation_idx) + "-f" +
-                                   std::to_string(omega_i) + "-E.bin";
-          FieldSnapshot(std::filesystem::path(initial_fields) / stem, initial_E, false);
-          initial_E.Real().GetTrueDofs(E.Real());
-          initial_E.Imag().GetTrueDofs(E.Imag());
-          Mpi::Print("PALACE_FIELD_RESTART: excitation={} frequency_index={} norm_E={:.12e}\n",
-                     excitation_idx, omega_i, linalg::Norml2(space_op.GetComm(), E));
-        }
-        else
-        {
-          E = 0.0;
-          Mpi::Print("PALACE_FIELD_RESTART_ZERO: excitation={} frequency_index={}\n", excitation_idx, omega_i);
-        }
-      }
-
-      Mpi::Print("\n");
-      MemoryMark("gmres.begin");
-      ksp->Mult(RHS, E);
-      MemoryMark("gmres.end");
-
-      // No later solve needs this workspace. Destroy the solver before its referenced
-      // operators, retaining Curl, fields and spaces for postprocessing.
-      if (release_final_solver && excitation_counter == port_excitations.Size() &&
-          omega_i + 1 == omega_sample.size())
-      {
-        MemoryMark("linear_workspace_release.begin");
-        SaveMetadata(*ksp);
-        ksp.reset();
-        A.reset();
-        P.reset();
-        A2.reset();
         retained_P.reset(); retained_A.reset(); retained_A2.reset();
-        K.reset();
-        C.reset();
-        M.reset();
-        const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
-        const char *pc_compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
-        if ((pc_basis && std::string(pc_basis) == "1") ||
-            (pc_compensated && std::string(pc_compensated) == "1"))
-        {
-          MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
-          PalacePCBasisRelease();
-        }
-        Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
-        MemoryMark("linear_workspace_release.end");
+        retained_A2 = std::move(A2); retained_A = std::move(A); retained_P = std::move(P);
+        retained_frequency = omega_i;
       }
+    }
+    if (setup_audit)
+    {
+      Mpi::Print("PALACE_PORT_SETUP: action={} excitation={} frequency_index={}\n",
+                 reuse ? "reuse" : "build", excitation_idx, omega_i);
+    }
+    MemoryMark("preconditioner.end");
 
-      const double rhs_norm = linalg::Norml2(space_op.GetComm(), RHS);
-      if (defer_postprocessing && excitation_counter == 1)
+    Mpi::Print(
+        "\nIt {:d}/{:d}: ω/2π = {:.3e} GHz (total elapsed time = {:.2e} s{})\n",
+        omega_i + 1, omega_sample.size(),
+        iodata.units.Dimensionalize<Units::ValueType::FREQUENCY>(omega) / (2 * M_PI),
+        Timer::Duration(Timer::Now() - t0).count(),
+        (port_excitations.Size() > 1)
+            ? fmt::format(", solve {:d}/{:d}",
+                          1 + omega_i + (excitation_counter - 1) * omega_sample.size(),
+                          omega_sample.size() * port_excitations.Size())
+            : "");
+
+    // Per-port continuation must not seed port 1 with the last port 2 field.
+    if (frequency_batch && iodata.solver.linear.initial_guess)
+    {
+      auto it = sweep_history.find(excitation_idx);
+      if (it == sweep_history.end()) E = 0.0;
+      else E = *it->second;
+      Mpi::Print("PALACE_SWEEP_SEED: action={} excitation={} frequency_index={}\n",
+                 it == sweep_history.end() ? "zero" : "restore", excitation_idx, omega_i);
+    }
+    // Solve linear system.
+    space_op.GetExcitationVector(excitation_idx, omega, RHS);
+
+    if (const char *initial_fields = std::getenv("PALACE_INITIAL_FIELDS"))
+    {
+      MFEM_VERIFY(Mpi::Size(space_op.GetComm()) == 1 && iodata.solver.linear.initial_guess,
+                  "Field restart requires one rank and InitialGuess=true!");
+      const char *mask = std::getenv("PALACE_INITIAL_FIELDS_EXCITATIONS");
+      const bool seeded = !mask || std::string(mask).find("," + std::to_string(excitation_idx) + ",") != std::string::npos;
+      if (seeded)
       {
-        deferred_E = std::make_unique<ComplexVector>(E.Size());
-        deferred_E->UseDevice(true);
-        *deferred_E = E;
-        deferred_excitation = excitation_idx;
-        deferred_rhs_norm = rhs_norm;
-        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=store excitation={} frequency_index={} logical_bytes={}\n",
+        GridFunction initial_E(space_op.GetNDSpace(), true);
+        const std::string stem = "s" + std::to_string(excitation_idx) + "-f" +
+                                 std::to_string(omega_i) + "-E.bin";
+        FieldSnapshot(std::filesystem::path(initial_fields) / stem, initial_E, false);
+        initial_E.Real().GetTrueDofs(E.Real());
+        initial_E.Imag().GetTrueDofs(E.Imag());
+        Mpi::Print("PALACE_FIELD_RESTART: excitation={} frequency_index={} norm_E={:.12e}\n",
+                   excitation_idx, omega_i, linalg::Norml2(space_op.GetComm(), E));
+      }
+      else
+      {
+        E = 0.0;
+        Mpi::Print("PALACE_FIELD_RESTART_ZERO: excitation={} frequency_index={}\n", excitation_idx, omega_i);
+      }
+    }
+
+    Mpi::Print("\n");
+    MemoryMark("gmres.begin");
+    ksp->Mult(RHS, E);
+    MemoryMark("gmres.end");
+    if (frequency_batch && iodata.solver.linear.initial_guess)
+    {
+      if (omega_i + 1 < omega_sample.size())
+      {
+        auto &previous = sweep_history[excitation_idx];
+        if (!previous)
+        {
+          previous = std::make_unique<ComplexVector>(E.Size());
+          previous->UseDevice(true);
+        }
+        *previous = E;
+        Mpi::Print("PALACE_SWEEP_SEED: action=store excitation={} frequency_index={} logical_bytes={}\n",
                    excitation_idx, omega_i, 2LL * sizeof(double) * E.Size());
       }
       else
       {
-        if (deferred_E)
-        {
-          MFEM_VERIFY(!ksp, "Deferred measurements must follow final solver destruction!");
-          Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index=0\n",
-                     deferred_excitation);
-          Postprocess(*deferred_E, deferred_excitation, 1, 0, omega, true, deferred_rhs_norm);
-          deferred_E.reset();
-        }
-        if (defer_postprocessing)
-          Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index={}\n",
-                     excitation_idx, omega_i);
-        Postprocess(E, excitation_idx, excitation_counter, omega_i, omega,
-                    omega_i == omega_start, rhs_norm);
+        sweep_history.erase(excitation_idx);
+        Mpi::Print("PALACE_SWEEP_SEED: action=release excitation={} frequency_index={}\n",
+                   excitation_idx, omega_i);
       }
     }
 
-    // Final postprocessing & printing.
-    BlockTimer bt0(Timer::POSTPRO);
-    if (ksp) SaveMetadata(*ksp);
+    // No later solve needs this workspace. Destroy the solver before its referenced
+    // operators, retaining Curl, fields and spaces for postprocessing.
+    if (release_final_solver && excitation_counter == port_excitations.Size() &&
+        omega_i + 1 == omega_sample.size())
+    {
+      MemoryMark("linear_workspace_release.begin");
+      SaveMetadata(*ksp);
+      ksp.reset();
+      A.reset();
+      P.reset();
+      A2.reset();
+      retained_P.reset(); retained_A.reset(); retained_A2.reset();
+      K.reset();
+      C.reset();
+      M.reset();
+      const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
+      const char *pc_compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
+      if ((pc_basis && std::string(pc_basis) == "1") ||
+          (pc_compensated && std::string(pc_compensated) == "1"))
+      {
+        MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
+        PalacePCBasisRelease();
+      }
+      Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
+      MemoryMark("linear_workspace_release.end");
+    }
+
+    const double rhs_norm = linalg::Norml2(space_op.GetComm(), RHS);
+    if (defer_postprocessing && excitation_counter == 1)
+    {
+      deferred_E = std::make_unique<ComplexVector>(E.Size());
+      deferred_E->UseDevice(true);
+      *deferred_E = E;
+      deferred_excitation = excitation_idx;
+      deferred_rhs_norm = rhs_norm;
+      Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=store excitation={} frequency_index={} logical_bytes={}\n",
+                 excitation_idx, omega_i, 2LL * sizeof(double) * E.Size());
+    }
+    else
+    {
+      if (deferred_E)
+      {
+        MFEM_VERIFY(!ksp, "Deferred measurements must follow final solver destruction!");
+        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index=0\n",
+                   deferred_excitation);
+        Postprocess(*deferred_E, deferred_excitation, 1, 0, omega, true, deferred_rhs_norm);
+        deferred_E.reset();
+      }
+      if (defer_postprocessing)
+        Mpi::Print("PALACE_DEFERRED_POSTPROCESS: action=measure excitation={} frequency_index={}\n",
+                   excitation_idx, omega_i);
+      Postprocess(E, excitation_idx, excitation_counter, omega_i, omega,
+                  omega_i == omega_start, rhs_norm);
+    }
   }
+  MFEM_VERIFY(sweep_history.empty(), "Unreleased frequency-sweep history!");
+  if (ksp) SaveMetadata(*ksp);
   post_op.MeasureFinalize(indicator);
   return indicator;
 }

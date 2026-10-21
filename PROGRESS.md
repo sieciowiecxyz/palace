@@ -24,7 +24,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP112–113 PCforward integration tiny/medium3,55K+scope/cachecleanupPASS, lecz iteracje40/42→45/45 i48/49→55/57, medium99,580→99,592s bez wykazanego zysku. Większy rawgap skorygowany restartem; HOLD, niepromowany, W3 NOTRUN. docs/pc-basis-fp32.md.
 - EXP114–116: compensateddot+bit-split actionfilter PASS (CPU/linearity/range1e-300..1e300). ActualND20/Q14/N1601320 forward3,474–3,482→3,035–3,048ms; error~6e-15. Pierwszywariantbyłwolniejszy; scalar/trace nieprzyspieszone. Nie solver/RF/UVM/TCclaim; nativebez zmian. docs/ceed-tensor-probe.md.
 - EXP117–119 compensatedPC tiny/medium3,55 quality/scope/cachePASS po naprawie envguard (pierwszy candidateFAILzachowany). Iteracje40/42 i47/49 bez wzrostu, lecz16,533→16,629s i98,577→98,546s bez netgain, HOLD/W3NOTRUN. docs/pc-basis-fp32.md.
-- Następne: M6.6 audyt existing sweep/PROM/reuse i tani plan kosztu; nie przenosić mikrobenchmarkowego zysku na antenę. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
+- EXP120–122 M6.6 sourceaudit+frequency-major2portreuse/per-portRAMhistory: tiny12,544→11,501s i medium53,570→45,344s/6→3factorbuilds, frozenRF/raw/wholefields/TEMPASS. Jedna para, nie antena/mediana/promocja. Cgroupmedium2,255→2,304GB, nie oszczędnośćpamięci. Singlefreqreuse/deferred regressionPASS. docs/milestones/sweeps.md.
+- Następne: NF>1per-frequencyrelease/deferredmeasurement przed dużą anteną,7freqcoax iresourcegate; potem PROM/heldout. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -66,11 +67,11 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-M6.6: audyt istniejących SweepUniform/SweepAdaptive/RomOperator, kosztorys
-wielu f i wybór taniego coaxfiltra. M6.4 compensatedKtiny/mediumPASS, netgain
-niewykazany/HOLD, W3NOTRUN; brak automatycznego drogiego runu. Zachować
-oryginalnyFP64basis oraz M5mixedcoarse. Kolejność docs/milestones/sweeps.md;
-M6/M7/W4/W5/mediany/generalizacja pozostają otwarte.
+M6.6: rozszerzyć per-frequency ksp/factor release i deferredpostprocess dla
+frequency-major2port batch, aby nie nakładać peaku solve i pomiarów. Tani
+lifetime/order/K filter, potem7freqcoax/resourcegate iantena. EXP120–122
+3freqcoaxPASS/medium15,4%singlepair, niepromowane. PROM/heldout/symbolic/recycling
+wciążOPEN; zachować oryginalnyFP64basis iM5mixedcoarse, wszystkie K.
 
 ## Reguły pracy
 
@@ -2787,3 +2788,69 @@ diffcheckPASS. SameLuna read-onlydocs-gardenPASS; rootreviewed exactBscope,
 retained. Newnativehash76f1edfc…d87c775d7; originalbasisdefaultunchanged.
 HOLD/nopromotion/W3NOTRUN; nextM6.6 audittocutwhole-sweepcost. M6/M7/W4/W5/
 sweeps/medians/newgeometry stillOPEN, goalactive. No paidcompute/swap/appsclosed.
+
+M6.6 audit@ef008b0: UniformalreadysharesK/C/M andInitialGuesstrue/E continuation;
+excitation-majorlooprebuildsA/P/coarseanalysis+factor for eachport/f. Onefreq
+M4reuse guarded; ComplexCuDSSSetOperatorclearsall. PROMexistingrealbasis
+(2realvectors/complexsnapshot), HDMfielddiscrepancy training; online originalraw
+residual/ourfielddiagnostichooksnotpresent, so notalreadyqualifiedROM. Source
+receipt artifacts/m6-sweep-source-audit-20261021.json. W3onecomplexE179.5MB,
+2per-porthistoryvectors359MBcapacity vs manyLUfactorsnotacceptable. PROM basis
+at4samples/2ports up to16realvectors~1.436GB plusprojectors, notmeasuredpeak.
+EXP120 prereg: generalizeexisting--port-setup-reuse tofrequency-majorbatch for
+2lumpedports/fixedmesh/rank1, separateper-portpreviousE inRAM/VRAM; newnumeric
+LU foreachf, sameLU onlybothRHSwithequalf. No multi-LUcache/precision/Tolchange.
+Initialprototype no deferredpostprocessforNF>1 (explicitreject), noexternal
+fieldseed/adaptive/wave/Floquet; measuredmemorybeforebigantenna. Minimizecode,
+keepdefaultoldloop/onefreqreuse qualifiedpath. Strictauditexpects3builds/3reuse
+andall6solves/fields for tiny3.30/3.55/3.80. Candidatevs samebuildcontrol,
+60s each, coaxfields/probes+savefields butnoexpensiveanalyticalL2 doublequad.
+Fallbackbuild/m6-sweep/pre-sweep-{native,manifest.json}. No paidcompute/swap/
+appsclosing/cachecleanup. Fullsweep7pointsandantenna onlyaftercheapgate.
+EXP120 implementation155pinnedtestsPASS; existingflag generalized, default
+schedulepreserved. Nativehistoryguard/external/vizreject, extra2Ecapacity
+onlywhenInitialGuessenabled; modeandfactoraudits requireexpectedorder/3builds/
+6solves/historyrelease. No deferredmultiNF support claimed. Controlfirst,
+rootreview thencandidate; no sharedTC/PCbasis changes. Cachedbuildjobs2.
+EXP120 controlbuild8.727s/source31c23ac6…7a24cac; default6solvecomplete12.544s,
+40/31/30/42/31/30iter. Root3CSVrows/allS-energy-probesfinite/12fieldfilesPASS,
+actual6factorbuilds/6rawsuccesses. ExistingTEMhelperonefreqonly, nofalseclaim
+sweepanalyticalgate; willaddperfreqCPUcheck aftercandidate. Candidate uses
+samebuild3f2port andfieldreferenceexactcontrol,60sdeadline aspreregistered.
+EXP120 rootPASS: tiny12.544→11.501s (~8.3%,singlepair),6→3actualfactorbuilds,
+6completedrawsolves/12fields; per-portlogicalhistory2.851MB. IndependentCSV
+ΔS4.345e-9/VSWR8.652e-9/energy1.118e-8/power8.346e-9. CPU TEMall3freq/bothports
+RMS≤0.4497%,energy≤1.764e-5. Newhelperhandlesalignedmultirows; faulttests
+missingfreq/mismatch/wrongBsign retained.155testsPASS. Receipt
+artifacts/m6-sweep-tiny-root-analysis-20261021.json. Not antenna/globalpromotion.
+EXP121 prereg: samebuildmedium3.30/3.55/3.80/bothports control/candidate180s each,
+sameflags/no double-quadL2, savedwholefields/refcomparison+CPU TEM/RF/raw.
+No native/depsrebuild. Separateper-porthistorylogicalcapacity26.526MB, notpeak.
+Assessnettime/memory/all3CSRvalues before7point orW3. No paidcompute/swap.
+EXP121 rootindependentall3freqPASS: medium53.570→45.344s (~15.4%,singlepair),
+6→3factorbuilds, logicalhistory26.526MB, cgroup2.255→2.304GB (notmemorysaving).
+ΔS3.198e-10/VSWR1.176e-10/energy1.933e-10/power2.989e-10,
+fieldsE/B≤5.643e-8/9.511e-8, TEMsampleRMS≤0.4253%/energy≤1.506e-5.
+CSRstructureidentical+3distinctvalueshashes butexactvaluefingerprintsnotidentical
+acrosscontrol/candidate (alsotiny); no quantitativeCSRdiff/roundoff-onlyclaim.
+Physicalconfig/buildidentity+sourceequal-frequencyreuse+frozenKpass retained.
+Rootreceipt artifacts/m6-sweep-{tiny,medium}-root-analysis-20261021.json and
+replayscript artifacts/m6-sweep-root-analysis.py. Outputsnapshotstiny22.56MB/
+medium212.40MB perrun, ordinarysavedresultsnotworkinghistoryonSSD.
+Full7freq/PROM/W3/newgeometry/mediansNOTRUN. Beforebigantenna: extendper-f
+solverrelease/deferredmeasurement toavoidoldsolve+postprocesspeak, thenresourcegate.
+EXP122 prereg regressiononly: oldonefreq tinyreuse+deferred flags/wholefields
+vsM5tiny samegeometry/currentbuild60s; ensureflattenedschedule preservesoldpath.
+No newnativebuild/precision/physicschange.
+EXP122 oldonefreqreuse/deferredregressionPASS9.445s/40,42iter/1build+1reuse/
+wholefields+memoryphases, finalraw8.48e-7/7.74e-7 afterretryinitial1.15e-6.
+No newnativechanges afterqualifiedbuild31c23ac6…7a24cac; defaultfallthrough
+preserved.155testsPASS includingaligned2freqanalyticphase/wrongBsign/missingrow,
+modeguards/order/factors/seeds; no fullsweep7/antenna/defaultpromotion.
+EXP120–122 checkpoint:155pinnedtests/8shell/docschecker/diffcheckPASS.
+SameLuna read-onlydocs-gardenPASS; rootreviewed native(-w) lifetime/schedule/
+per-porthistory, strictfactorcounts/modeguards/olddeferred path andTEMmultirows.
+Currentnative31c23ac6…7a24cac bytesverified againstbothsamebuildpairs/rootKreceipts.
+No globalpromotion/fullantenna/mediansclaim; prototypependingNF>1deferredpeakgate,
+7points/PROM/heldout/generalization/W4/W5/finalpackage. GoalM6/M7remainOPEN.
+No paidcompute/swap/appsclosed/depsrebuild; nativefallback/cachepreserved.
