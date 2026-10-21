@@ -338,3 +338,15 @@ sprawdzone. Samebuild candidateFP32storage/mixed2IR/reuse przechodzi14regional
 E/B i RF/S/VSWR/power/energy/raw. Jedna para, pierwszyz7punktów;6f NOTRUN.
 Nie używać jako dowodu całego pasma, monolitycznego sweepu lub mediany M7.
 Dokładneargv i receipt w [macierzy kwalifikacji](milestones/antenna-sweep-qualification.md).
+
+### EXP155–166: siedem rzeczywistych punktów i wersjonowany qualifier
+
+170Python testsPASS. `tools/qualify_antenna.py` sprawdza dwa prawdziwe ukończone
+runy, identyczny source/config/mesh/native, inventory bytes, dtype/coarsecount/
+setup, originalraw, S/VSWR/power/energy/fields. Negatywne kontrole: NaN/missing/
+width/units/order, faza±360°, zeroenergy, nonpassiveVSWR, incomplete/config
+changes i błędna suma/peak. Summary revaliduje inputpaths zamiast ufać savedPASS.
+EXP153–166 siedem punktów/oba porty przechodzi98fieldrows/frozenK/raw; raport
+antenna-sweep-qualification.md. To pojedyncze pary; M7median/newgeometry nadal
+NOTRUN, M6.3actualTCproof/cuBLASLtresearch pozostają otwarte. Native source
+SHAa6ec732f...187c3338 nie zmienił się przy dodaniu Pythonqualifiera.

@@ -1,6 +1,6 @@
 # M6.6 — szybsze sweepy częstotliwości
 
-Status: **ACTIVE, pierwszy filtr PASS**, po M5, w ramach M6;2026-10-21.
+Status: **ocena M6.6 zakończona EXP166**, 7/7 actualantenna pointpairs PASS;2026-10-21. M6.3/cuBLASLt oraz M7 pozostają otwarte.
 Cel: krótszy czas całego zestawu3,3/3,4/3,5/3,6/3,7/3,8/3,9GHz na jednej
 RTX5070Ti16GB/96GBRAM, oba porty, bez utraty wiarygodności medium.
 To rozszerzenie celu, nie zmiana dotychczasowych progów ani zamknięcie M5.
@@ -630,4 +630,16 @@ Fallback `build/m6-prom/pre-prom-native` / `pre-prom-manifest.json`.
 Artefakty `artifacts/m6-prom-{tiny-two,tiny-three-tight,medium-three-tight,medium-four-tight,medium-uniform-control}-20261021`;
 root replay `artifacts/m6-prom-root-analysis.py tiny medium-four`,
 `artifacts/m6-prom-strategy-comparison-20261021.json`.
-Full7factualantenna/M7 pozostają otwarte; assessment nie jest globalną promocją.
+Na koniec EXP152 full7factualantenna/M7 pozostawały otwarte; późniejsza kwalifikacja EXP153–166 jest poniżej. Assessment nie jest globalną promocją.
+
+## EXP153–166 — siedem punktów anteny, pełne FP64 odniesienie
+
+Wykonano wszystkie3,3/3,4/3,5/3,6/3,7/3,8/3,9GHz/oba porty jako
+niezależne bounded single-frequency pairs. CombinedFP32storage/mixed2IR/
+portreuse vsfullFP64, samebuild/config/mesh;98regionalfieldrows/frozenRFenergy/
+originalraw/coarsegatePASS. Suma5124,017→4043,095s (−21,095%),
+maxcgroup61,224→46,637GB (−23,825%). Pełny narzut setup/IO/cleanup każdej
+części wliczony; nie monolithic7f ani mediana. Qualifier ponownie sprawdza
+surowe pary i wspólny build/mesh/config poza f.
+[Macierz, exactargv i receipts](antenna-sweep-qualification.md).
+M6.6 assessment complete; M6.3/cuBLASLt/TCproof i M7 nadal otwarte.
