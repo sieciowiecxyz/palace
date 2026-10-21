@@ -3,8 +3,12 @@ import argparse
 import fcntl
 import math
 from pathlib import Path
+import re
+import shutil
+import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -68,6 +72,8 @@ def build():
 
 def validate_case(case):
     lt=case.get('lt',False)
+    wmma=case.get('wmma',False)
+    if not isinstance(wmma,bool) or wmma and not (lt and case.get('fused')):raise ValueError('Missing WMMA comparators')
     compensated=case.get('compensated',False)
     if not isinstance(lt,bool) or lt and compensated:raise ValueError('Invalid Lt experiment scope')
     bits=case.get('compensated_bits',False)
@@ -122,7 +128,7 @@ def validate_case(case):
                 raise ValueError('Original vs independent reference failed')
         if compensated and row['elements']==257 and not row['transpose']:
             linearity(row['original_linearity'],1e-11,True)
-        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else [])+(['TF32_Lt'] if lt else []):
+        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else [])+(['TF32_Lt'] if lt else [])+(['TF32_WMMA_fused'] if wmma and not row['transpose'] else []):
             raise ValueError('Missing precision comparison')
         for method in row['methods']:
             if method['precision']=='TF32_Lt':
@@ -162,7 +168,9 @@ def validate_case(case):
                 if not method['supported']:
                     if 'accuracy' in method or 'timing' in method:raise ValueError('Unsupported Lt plan has fabricated execution')
                     continue
-            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'TF32_Lt':2e-3,'FP32_fused':2e-6,'mixed_compensated':1e-11,'mixed_compensated_bits':1e-11}[method['precision']]
+            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'TF32_Lt':2e-3,'TF32_WMMA_fused':2e-3,'FP32_fused':2e-6,'mixed_compensated':1e-11,'mixed_compensated_bits':1e-11}[method['precision']]
+            if method['precision']=='TF32_WMMA_fused' and (method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*4 or method['shared_bytes_per_block']!=18432):
+                raise ValueError('Invalid WMMA workspace')
             accuracy(method['accuracy'],tol)
             if row['elements']==257:
                 accuracy(method['accuracy']['independent_cpu'],tol)
@@ -187,8 +195,42 @@ def validate_case(case):
     return True
 
 
-def run(output,seconds,scale=False,fused=False,compensated=False,lt=False):
+def trace_summary(path):
+    with sqlite3.connect(f'file:{Path(path).resolve()}?mode=ro',uri=True) as db:
+        tables={row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        if not {'CUPTI_ACTIVITY_KIND_KERNEL','StringIds'}<=tables:raise ValueError('Missing CUDA kernel activity')
+        columns={row[1] for row in db.execute('PRAGMA table_info(CUPTI_ACTIVITY_KIND_KERNEL)')}
+        if not {'demangledName','mangledName','start','end'}<=columns:raise ValueError('Missing kernel symbols/times')
+        rows=[dict(demangled=demangled,mangled=mangled,calls=calls,seconds=seconds) for demangled,mangled,calls,seconds in db.execute(
+            'SELECT d.value,m.value,count(*),sum(k.end-k.start)*1e-9 FROM CUPTI_ACTIVITY_KIND_KERNEL k '
+            'JOIN StringIds d ON d.id=k.demangledName JOIN StringIds m ON m.id=k.mangledName '
+            'GROUP BY k.demangledName,k.mangledName ORDER BY 4 DESC')]
+        if not rows or any(r['calls']<=0 or not math.isfinite(r['seconds']) or r['seconds']<=0 for r in rows):
+            raise ValueError('Empty/invalid kernel trace')
+        diagnostics={}
+        for table in tables:
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',table):raise ValueError('Unexpected trace table name')
+            if any(word in table.upper() for word in ['DIAGNOSTIC','ERROR','WARNING','DROPPED']):
+                keys=[r[1] for r in db.execute('PRAGMA table_info('+table+')')]
+                diagnostics[table]=[dict(zip(keys,row)) for row in db.execute('SELECT * FROM '+table)]
+        levels={r['id']:r['name'] for r in diagnostics.get('ENUM_DIAGNOSTIC_SEVERITY_LEVEL',[])}
+        issues=[]
+        for table,records in diagnostics.items():
+            if table.startswith('ENUM_'):continue
+            for record in records:
+                # Preserve every diagnostic; only schema-described Info/Verbose are benign.
+                level=levels.get(record.get('severity'))
+                text=str(record.get('text',record))
+                lost=re.search(r'data.{0,20}lost|dropped.{0,15}events|not all.{0,20}events.{0,30}collected',text,re.I)
+                if level not in ['Info','Verbose'] or lost:issues.append(dict(table=table,record=record))
+        return dict(kernels=rows,diagnostics=diagnostics,diagnostic_issues=issues,
+            scope='Executed kernel symbols only; no executed instruction counters or speedup claim. Profile includes all probe methods.')
+
+
+def run(output,seconds,scale=False,fused=False,compensated=False,lt=False,profile=False,wmma=False):
+    if wmma and not (lt and fused):raise ValueError('WMMA requires Lt/fused comparators')
     if lt and compensated:raise ValueError('Lt and compensated are separate experiments')
+    if profile and not lt:raise ValueError('Trace requires isolated Lt experiment')
     if compensated and not fused:raise ValueError('Compensated screen requires --fused comparator')
     if not 30<=seconds<=120:raise ValueError('Probe requires30..120s deadline')
     dev.require_host_memory();manifest=verified();settings=dev.read(dev.SETTINGS)
@@ -199,6 +241,14 @@ def run(output,seconds,scale=False,fused=False,compensated=False,lt=False):
     name='palace-ceed-tensor-'+dev.sha(HERE/'ceed_tensor_probe.cpp')[:10]
     if subprocess.run(['podman','container','exists',name]).returncode==0:
         raise ValueError('Prior probe exists; inspect terminal state before retry')
+    profiler=ram=None
+    if profile:
+        import nsight_window as profiler
+        tool=profiler.verified_tool()
+        if shutil.disk_usage('/dev/shm').free<1024**3:raise ValueError('Trace requires1GiB free RAM filesystem')
+        ram=Path(tempfile.mkdtemp(prefix='palace-lt-trace-',dir='/dev/shm'));(ram/'tmp').mkdir()
+        dev.write(output/'profile-input.json',dict(tool=tool,ram_directory=str(ram),capture='whole bounded probe',
+            scope='Kernel instruction research; profiled timings must not be used as performance benchmark.'))
     args=['podman','run','--name',name,'--network=none','--read-only','--timeout',str(seconds),
         '--ulimit','core=0:0','--stop-timeout','3','--memory','6g','--memory-swap','6g','--cpus','4',
         '--security-opt=label=disable','--device','nvidia.com/gpu=all',
@@ -206,12 +256,20 @@ def run(output,seconds,scale=False,fused=False,compensated=False,lt=False):
         '--unsetenv','NVIDIA_TF32_OVERRIDE','-e','OMP_NUM_THREADS=2','-e','OPENBLAS_NUM_THREADS=1',
         '-e','LD_LIBRARY_PATH=/native:/opt/palace-cudss/lib:/opt/view/lib:/opt/view/lib64:/opt/cudss/lib:/usr/local/cuda/lib64',
         '-v',f'{output}:/work','-v',f'{PROGRAM}:/native/ceed-tensor-probe:ro',
-        '-v',f'{dev.BUILD/"native/libpalace.so"}:/native/libpalace.so:ro',
-        '--entrypoint','/native/ceed-tensor-probe',settings['runtime_image'],'/work/case.json']
+        '-v',f'{dev.BUILD/"native/libpalace.so"}:/native/libpalace.so:ro']
+    if profile:
+        args.extend(['-v',f'{profiler.TOOL}:/profile-tools:ro','-v',f'{ram}:/profile',
+            '-e','TMPDIR=/profile/tmp','--unsetenv','LD_PRELOAD','--entrypoint','/profile-tools/'+profiler.BINARY,
+            settings['runtime_image'],'profile','--trace=cuda-sw','--sample=none','--cpuctxsw=none',
+            '--cuda-trace-all-apis=true','--cuda-um-cpu-page-faults=false','--cuda-um-gpu-page-faults=false',
+            '--capture-range=none','--kill=none','--wait=all','--export=sqlite','--output=/profile/window',
+            '--force-overwrite=false','/native/ceed-tensor-probe','/work/case.json'])
+    else:args.extend(['--entrypoint','/native/ceed-tensor-probe',settings['runtime_image'],'/work/case.json'])
     if scale:args.append('scale')
     if fused:args.append('fused')
     if compensated:args.append('compensated')
     if lt:args.append('lt')
+    if wmma:args.append('wmma')
     dev.write(output/'command.json',dict(argv=args,manifest=manifest,gpu_before=gpu,runner_sha256=dev.sha(Path(__file__))))
     started=time.monotonic();code=None
     try:
@@ -222,14 +280,33 @@ def run(output,seconds,scale=False,fused=False,compensated=False,lt=False):
             subprocess.run(['podman','stop','--time','3',name],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             dev.write(output/'container-state.json',dev.read_output(['podman','inspect',name])[0]['State'])
             dev.command(['podman','rm',name],stdout=subprocess.DEVNULL)
+        if ram is not None:
+            report=dict(complete=False,files={})
+            try:
+                messages='\n'.join((output/name).read_text(errors='replace') for name in ['stdout.log','stderr.log'])
+                loss=re.compile(r'data.{0,20}lost|dropped.{0,15}events|not all.{0,20}events.{0,30}collected|incompatibility.{0,30}driver|older version.{0,20}cupti|unsupported cuda|does not support cuda',re.I)
+                report['warnings']=[line for line in messages.splitlines() if loss.search(line)]
+                for suffix in ['sqlite','nsys-rep']:
+                    source=ram/('window.'+suffix)
+                    if not source.is_file() or not 0<source.stat().st_size<=64*1024**2:
+                        raise ValueError('Trace missing or exceeds64MiB/result')
+                    target=output/('profile.'+suffix);shutil.copy2(source,target)
+                    report['files'][target.name]=dict(bytes=target.stat().st_size,sha256=dev.sha(target))
+                report['summary']=trace_summary(output/'profile.sqlite')
+                report['complete']=not report['warnings'] and not report['summary']['diagnostic_issues']
+            except (ValueError,OSError,sqlite3.Error) as error:report['error']=str(error)
+            finally:
+                dev.write(output/'profile.json',report);shutil.rmtree(ram)
     state=dev.read(output/'container-state.json')
-    complete=bool(code==0 and state['ExitCode']==0 and not state['OOMKilled'] and (output/'case.json').exists())
+    complete=bool(code==0 and state['ExitCode']==0 and not state['OOMKilled'] and (output/'case.json').exists()
+                  and (not profile or dev.read(output/'profile.json')['complete']))
     error=None
     if complete:
         try:validate_case(dev.read(output/'case.json'))
         except (ValueError,KeyError,TypeError) as e:complete=False;error=str(e)
     dev.write(output/'result.json',dict(complete=complete,exit_code=code,validation_error=error,
-        elapsed_seconds=time.monotonic()-started,scope='Execution/action-control only. Mixed precision numerical acceptance separate; no RF/TC/solver speedup qualification.'))
+        elapsed_seconds=time.monotonic()-started,profiled=profile,
+        scope='Execution/action-control only. Profiled timings are not benchmarks. Mixed precision numerical acceptance separate; no RF/TC/solver speedup qualification.'))
     print('CEED tensor probe terminal: '+('complete; inspect accuracy/timings' if complete else 'FAILED'))
     if not complete:raise ValueError('Probe incomplete; inspect bounded logs')
 
@@ -241,8 +318,10 @@ if __name__=='__main__':
     parser.add_argument('--fused',action='store_true',help='Also screen fused FP32-register action without intermediate vector buffers')
     parser.add_argument('--compensated',action='store_true',help='Forward compensated mixed-register dot and small basis linearity controls; requires --fused')
     parser.add_argument('--lt',action='store_true',help='ND2/Q14 only: checked cuBLASLt TF32 tensor-op heuristic, <=64MiB workspace')
+    parser.add_argument('--wmma',action='store_true',help='Forward-only P20/Q14/QC3 fused TF32 WMMA research, requires --lt --fused')
+    parser.add_argument('--profile-lt',action='store_true',help='Pinned Nsight CUDA activity in RAM; separate diagnostic, never a performance benchmark')
     parser.add_argument('--seconds',type=int,default=120);args=parser.parse_args()
     if args.action=='build':build()
     elif args.action=='check':print('CEED tensor probe verified' if verified() else 'invalid')
     elif args.output is None:parser.error('run requires new output directory')
-    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated,args.lt)
+    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated,args.lt,args.profile_lt,args.wmma)

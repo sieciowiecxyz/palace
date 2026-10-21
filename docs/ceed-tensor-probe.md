@@ -222,3 +222,13 @@ wszystkie precision/range/linearity flags oraz commandmanifest przeciw aktualnej
 binarce/recipe (SHA9c874f98…8957a294). 152pinnedtestsPASS.
 Następne: osobna opt-in integracja PC Hcurl forward z contentcache/cleanup,
 tiny→mediumK i kosztem całego jobu; bez usuwania obecnego FP64 fallbacku.
+
+## Aktualizacja EXP167–175
+
+[cuBLASLt assessment](cublaslt-assessment.md): --lt screen/scale wykonane,
+obecna biblioteczna ścieżka wolniejsza od FP32 przyactualN, niepromowana.
+[Scalony WMMA](tf32-wmma.md): --wmma forward z własnym kernelem,
+3procesowe mediany~1.20ms vsfusedFP32~1.337ms, większy błąd~3e-4.
+Dynamic exactsymbol+SM120SASS potwierdza TCinstructionpath tylkoWMMA.
+Dotychczasowe NOT RUN dla nowych ścieżek powyżej opisują stan historyczny;
+aktualny PC/FEMquality/netgain WMMA nadal NOT RUN/HOLD.

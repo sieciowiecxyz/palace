@@ -1,6 +1,8 @@
 import copy
 import importlib.util
 from pathlib import Path
+import sqlite3
+import tempfile
 import unittest
 
 spec=importlib.util.spec_from_file_location('tensor_probe',Path(__file__).parents[1]/'experiments/ceed_tensor_probe.py')
@@ -53,6 +55,32 @@ def compensated_case(bits=False):
 
 
 class TensorProbeTests(unittest.TestCase):
+    def test_trace_symbols_require_actual_nonempty_kernel_activity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'trace.sqlite'
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE StringIds (id INTEGER,value TEXT)')
+                db.execute('CREATE TABLE CUPTI_ACTIVITY_KIND_KERNEL (demangledName INTEGER,mangledName INTEGER,start INTEGER,end INTEGER)')
+                db.executemany('INSERT INTO StringIds VALUES (?,?)',[(1,'kernel(float*)'),(2,'_Z6kernelPf')])
+            with self.assertRaises(ValueError):probe.trace_summary(path)
+            with sqlite3.connect(path) as db:db.execute('INSERT INTO CUPTI_ACTIVITY_KIND_KERNEL VALUES (1,2,100,200)')
+            result=probe.trace_summary(path)
+            self.assertEqual(result['kernels'][0]['mangled'],'_Z6kernelPf')
+            self.assertEqual(result['kernels'][0]['calls'],1)
+            with sqlite3.connect(path) as db:
+                db.execute('CREATE TABLE ENUM_DIAGNOSTIC_SEVERITY_LEVEL (id INTEGER,name TEXT,label TEXT)')
+                db.executemany('INSERT INTO ENUM_DIAGNOSTIC_SEVERITY_LEVEL VALUES (?,?,?)',[(1,'Info','Info'),(2,'Warning','Warning')])
+                db.execute('CREATE TABLE DIAGNOSTIC_EVENT (severity INTEGER,text TEXT)')
+                db.execute('INSERT INTO DIAGNOSTIC_EVENT VALUES (1,"Profiling has started.")')
+            self.assertEqual(probe.trace_summary(path)['diagnostic_issues'],[])
+            with sqlite3.connect(path) as db:db.execute('INSERT INTO DIAGNOSTIC_EVENT VALUES (2,"Missing CUDA events")')
+            self.assertEqual(len(probe.trace_summary(path)['diagnostic_issues']),1)
+            with sqlite3.connect(path) as db:db.execute('UPDATE DIAGNOSTIC_EVENT SET severity=1,text="Dropped CUDA events"')
+            self.assertEqual(len(probe.trace_summary(path)['diagnostic_issues']),2)
+            with sqlite3.connect(path) as db:db.execute('UPDATE CUPTI_ACTIVITY_KIND_KERNEL SET end=100')
+            with self.assertRaises(ValueError):probe.trace_summary(path)
+        with self.assertRaises(ValueError):probe.run(Path('/unused'),120,profile=True)
+
     def test_lt_checked_plan_and_unsupported_coverage(self):
         data=case();data['lt']=True
         data['rows']=[r for r in data['rows'] if r['family']==0 and r['Q']==14 and r['components']==1]
@@ -66,6 +94,16 @@ class TensorProbeTests(unittest.TestCase):
                 extra_fp32_workspace_bytes=(row['N']*(row['Q']*row['q_components']+row['P'])+row['P']*row['Q']*row['q_components'])*4)
             row['methods'].append(method)
         self.assertEqual(len(data['rows']),12);self.assertTrue(probe.validate_case(data))
+        wmma=copy.deepcopy(data);wmma.update(wmma=True,fused=True)
+        for row in wmma['rows']:
+            method=copy.deepcopy(row['methods'][1]);method.update(precision='FP32_fused',extra_fp32_workspace_bytes=row['P']*row['Q']*row['q_components']*4)
+            row['methods'].insert(3,method)
+            if not row['transpose']:
+                method=copy.deepcopy(row['methods'][2]);method.update(precision='TF32_WMMA_fused',extra_fp32_workspace_bytes=row['P']*row['Q']*row['q_components']*4,shared_bytes_per_block=18432)
+                row['methods'].append(method)
+        self.assertTrue(probe.validate_case(wmma))
+        wmma['rows'][0]['methods'][-1]['shared_bytes_per_block']=0
+        with self.assertRaises(ValueError):probe.validate_case(wmma)
         for key,value in [('impl_flags',0),('check_state',1),('workspace_bytes',65*1024*1024)]:
             bad=copy.deepcopy(data);bad['rows'][0]['methods'][-1]['plans'][0]['candidates'][0][key]=value
             with self.assertRaises(ValueError):probe.validate_case(bad)

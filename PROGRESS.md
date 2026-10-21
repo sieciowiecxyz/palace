@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-21. Mode: goal, Active: M6 (EXP167 cuBLASLt built; GPU preflight declined, user will signal availability; TC-proof open; M6.6 assessment complete). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-21. Mode: goal, Active: M6 (EXP167–175 Lt assessed, fusedWMMA instructionproof+microgain PASS; W.1/PC assessment NEXT, M6.6 complete). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -3593,3 +3593,131 @@ PASS, root reviewed diff and first-success heuristic state guard. Local commit
 contains experimental probe/research only; numerical execution/instruction
 proof remain NOT RUN. Await explicit user signal before GPU test; no active
 GPU simulation handle or paid resource. Goal remains M6, not complete.
+
+EXP167 resumed after explicit user authorization to unload local strata.
+Root used its authenticated /unload API (HTTP200/unloaded), retained serving
+process/config; no forced kill. GPU13693MiB free/0%, host78GiB available/no swap.
+SameLuna screen executed8.98s/exit0; root strict12-row validationPASS,
+all original/FP64layout/independentCPU/canaries PASS. Lt supported12/12,
+algorithm23/implflags262658, maxrelativeL2=3.3063933575848534e-4,
+maxscaled=6.372e-4; allLt actionfilter2e-3PASS. Screen only, not RF/TC proof.
+AtN131071 Lt0.190–0.224ms vsnative0.297–0.337ms; forward fused~0.118ms
+still better, FP32pedantic generally better/equal toLt. SmallN Lt slower
+thannative. Exact artifacts: artifacts/m6-lt-screen-20261021.
+
+EXP168 prereg: identicalcachedprobe --lt --fused --scale,42actions/7sizes
+throughactualN1601320; same120s/6GiB/no swap. No native rebuild/physics/default
+change. Root will compare completeapply (inclconversions), errors/setup/workspace,
+then separately assess instruction proof; no fullantenna based onmetadata alone.
+
+EXP168 rootreview PASS42actions/allLt supported/CPU+FP64layout+canarycontrols,
+20.21s. MaxLt relativeL2=3.3162791037778463e-4/scaled6.79161435784748e-4.
+ActualN1601320: forward original3.478/3.484ms, FP32pedantic2.588/2.586,
+fused1.337/1.337, Lt3.600/3.580ms. Transpose original3.637–3.884,
+FP32pedantic2.914–3.513, Lt3.308–3.714ms; Lt slowerthanFP32all6actualactions.
+Medianper-actionLt/native ratio0.9612, not wholejob speedup. Workspace actually
+selected<=327360B acrossladder;64MiB is ceiling/allocation in isolatedprobe.
+Lt metadata23/262658 consistent; first8heuristics notexhaustive tuning.
+Negative performancefilter forPC integration, not universalTC rejection.
+Artifacts artifacts/m6-lt-scale-20261021; no default/physics/native change.
+
+EXP169 prereg: separate pinnedNsightSystems CUDAactivity trace of exactLt
+scaleprobe,120s/6GiB/no swap. Add --profile-lt to same Pythonrunner only;
+no C++/solver rebuild. Hot trace in/dev/shm, copy finalsqlite/nsys-rep only
+if each<=64MiB, recordbytes/hash, remove privateRAMdirectory on terminal.
+Traceincludesallprobe methods; profiledtimes notbenchmarks. Capture actually
+launchedmangledsymbols, checkcollectorwarnings/schema/nonemptykernels before
+staticcuobjdump onexactSM/function. No driverpermission change/counterclaim.
+
+EXP169 root: process/42action controlsPASS, initialreceiptFAIL due parser
+classifying enum tables and Info diagnostics as failures. Original receipts
+retained. Reanalysis uses actual severity enum names, retainsallrows and
+rejectsWarning/Error/unknown or lostdata evenatInfo. Addedregressiontest.
+Offline root-reanalysis.json PASS/zeroissues/5052kernelcalls/29symbols,
+SQLite2.42MB+nsys0.98MBordinaryfinalresults; hotRAMtracealreadyremoved.
+No rerun needed. CUTLASSs1688 targetmangledsymbols actuallylaunched; SASS
+stillrequired. Runtimeimage lacks cuobjdump; buildertool version invocation
+failed container-initOOM at2GiB before toolstart, noGPUwork. No repeated
+imageattempt: use hostcuobjdump13.4 for read-only audit of exactruntime12.9
+library copiedonce to/dev/shm, sourceimage/library/toolSHA recorded.
+
+EXP170 prereg: tools/experiments/ceed_lt_sass.py offline audit. Two actual
+s1688 128x256NN/TN symbols fromEXP169, exactpinnedruntimeimage/library,
+SM120-onlyfunctionSASS. Temporarylibrary inRAM/4GiBfreeguard; staticchild
+8GiBaddressspace/50CPU-seconds/60wall/16MiBoutputlimit. Recordinstructions,
+noGPUcalls/counters/permissions/globaltoolchainchange. Static evidence must
+not be misreported as executedinstructioncounter or directLtcall attribution
+(trace includes FAST_TF32 andLt methods). Root interprets branchlimitations.
+
+EXP170 negative static lookup: runtimeLt749205904B/SHA96ddf489...fc541 matches
+independent runtime hash. Both NN/TN exactsymbol absent in selectedSM120sections;
+also checked runtimecublas, no match. Preserve outputs and FAIL/NOT PROVEN.
+This does not prove noTCexecution: module/JIT identity unresolved; no counters.
+
+EXP171 prereg: after libraryfilter, test missing fusedFP64input/output+TF32
+function via native CUDA WMMA, isolated probe only. ActualbasisP20/Q14/QC3,
+nogeometryconstant;64elements/4warps, paddedsharedtiles, no globalintermediate
+floatvectors, only3360BstaticFP32basis and18432Bshared/block. Forwardonly;
+transpose retains existing comparators. Allwarps execute same fixedMMAloops,
+noearlyreturn. --wmma requires --lt --fused, defaultOFF; shape/pointerguards,
+existingCPU/original/canary/error2e-3 controls. Screen thenladder onlyifcontrols
+pass;120s/6GiB/no swap. Separate native SM120 kernel makes exact instruction
+inspection possible without attributing opaque library/JIT instructions.
+No solver/PCintegration until numerical and wholeapply costfilter passes.
+
+EXP171 firstpreflight refused due strata autoreload; no artifacts/run. Root
+respectfully followed user's no, then renewed explicit nowunload authorization.
+Authenticated /unload HTTP200;14048MiBfree GPU. SameLuna screen9.23s/exit0,
+12rows/4WMMAforward, allCPU/layout/canary/actioncontrolsPASS; WMMAmaxrelative
+3.306e-4/scaled6.372e-4. AtN131071 WMMA~0.11ms vsfusedFP32~0.12ms;
+not sufficient speedclaim, proceed to actualsize beforeintegration.
+EXP172 prereg: identicalbinary --lt --fused --wmma --scale,120s/6GiB/no swap,
+42rows/14forwardWMMA, actualN1601320; no native/physics/defaultchanges.
+
+EXP172 root strict42row/allprecision/CPU/canaryPASS,14WMMAforward rows.
+ActualN1601320 INTERP/CURL fullwall: original3.481956/3.475426ms,
+fusedFP32=1.336048/1.337738, fusedWMMA=1.204328/1.197189.
+WMMArelativeL2=2.2233351627431633e-4/3.303793142423953e-4.
+~9.86%/10.51% forward improvement vsfusedFP32, one isolatedladder/3timings
+peraction, no netFEMclaim. AdditionalglobalFP32basis3360B, shared18432B/block;
+comparisonprocess stillallocatesalloldlibrarybuffers, notglobalpeakVRAMsaving.
+
+EXP173 prereg: exactcurrentverifiedSM120binary staticSASS finds48unpredicated
+HMMA.1684.F32.TF32 instructions in palace_probe_wmma_forward; noearlyEXIT
+beforefirstHMMA, sourceloops have nofallback/earlyreturn andallwarps participate.
+Retainbinary/toolSHA/argv/SASS in artifacts/m6-wmma-instructions-20261021.
+Need dynamicmangledkernel trace tobindexecution explicitly: same --wmma
+scaleprobe --profile-lt120s, noGPUcounters/permission changes. CorrectedInfo
+severitygate, separateprofiletimesnotbenchmarks, RAMtrace/finalbytes limits.
+
+EXP173 root dynamic+static instructionpath PASS, strictly scoped ownWMMA.
+Profiler complete/exit0/23.41s/noissues, exact _Z25palace_probe_wmma_forwardPKfPKdPdi
+70calls. Tracecommand binarySHA matches EXP172 and staticSASS receipt.
+48staticunpredicatedHMMA.1684.F32.TF32 instructions; firstbeforeanyEXIT,
+loaderbranches onlyloopback; source no earlyreturn/fallback in launchedkernel.
+This is proof of executedTCinstructionpath, not countercount/utilization;
+no hardwarecounters/adminchanges. Opaque cuBLAS/Lt exactkernel ownership/JIT
+lookup remains unresolved and separate, not used as proof. TracefinalSQLite
+~2.45MB/nsys~0.99MB; hotRAMremoved. No solver/PCnumericalpromotion.
+EXP174–175 prereg: two more independently started samecached --wmma --lt
+--fused --scale probes,120s/6GiB each, identicaloperator/actioncontrols.
+Assess spread of per-action3timingmedians across3processes includingEXP172;
+noFEM/medianwholejob claim. If preflight fails, stop/report, no usermodelkill.
+
+EXP174–175 root strictactioncontrols/identicalmanifestPASS. Threeprocess
+median-of-medians actualN: INTERP original3.474027/fusedFP32 1.336048/
+WMMA1.204269ms (−9.863%vsfused); CURL3.475426/1.337738/1.201059ms
+(−10.217%). WMMAprocessranges1.202709–1.204328/1.197189–1.205038ms.
+NoRF/wholePC/UVM/peakclaim. Rootsummary artifacts/m6-wmma-root-analysis-20261021.json.
+M6.3 instructionproof scopedPASS, M6 remainsactive for W.1/PC assessment.
+Research/docs and exactlimits: docs/tf32-wmma.md. No active GPUjobs left.
+
+EXP175 checkpoint:172Python tests/8shell/docschecker/diffPASS. SameLuna
+read-only docs-gardenPASS; root reviewed currentdiff and numerical/instruction
+receipts. Cached addon binary tested; native Palace/dependencies unchanged,
+all new paths opt-in/defaultOFF. NoGPUjobs/containerslive. W.1 WMMA linearity/
+range/fallback then justifiedPC assessment remain open; wholegoal/M7 notdone.
+Usermodel unloaded viaAPI under renewed explicitauthorization; APIserver
+retained (subsequent userrequest mayreload). No secrets recorded. Localcommit
+only, no upstream push. Newhotworkspaces allRAM/VRAM, ordinarytrace/results
+bytes recorded; no swap/diskbasis.

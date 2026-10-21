@@ -42,7 +42,10 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP107–116 biblioteka, fused FP32 i compensated bit-split, actual N/linearity/range/crossover; mikrooperacje bez promocji RF/UVM/TC.
 - [M6.3: cuBLASLt i dowód Tensor Cores](cublaslt-assessment.md)
   - Czytaj gdy: wznawiasz EXP167 po zwolnieniu GPU albo oceniasz metadata kontra wykonane instrukcje
-  - Opis: Cached opt-in Lt/64MiB/alignment, research i rachunek intensywności; build PASS, GPU execution NOT RUN po odmowie preflight.
+  - Opis: EXP167–170 wykonane; Lt bez korzyści vs FP32, trace i nierozstrzygnięty librarySASS lookup; bez promocji.
+- [M6.3: scalony TF32 WMMA](tf32-wmma.md)
+  - Czytaj gdy: oceniasz faktyczne TC, powtarzalność zysku operatora albo planujesz W.1/PC
+  - Opis: EXP171–175, potwierdzony instructionpath, trzy procesowe mediany ~10% vs fusedFP32; większy błąd, RF/PC/UVM niezakwalifikowane.
 - [M6.4: eksperymentalny PC-only mixed forward](pc-basis-fp32.md)
   - Czytaj gdy: oceniasz scope/cache albo wpływ niższej precyzji PC na GMRES i raw residual
   - Opis: EXP112–119 FP32 i compensated tiny/medium3,55PASS jakościowo; compensated zachowałiteracje, nadal brak netgain/HOLD przedW3, cachecleanup i rawchecks.
