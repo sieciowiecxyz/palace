@@ -19,7 +19,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP102 M5.5 strict late30:2 profile PASS: UVM251,125→186,635GB (−25,68%) w dwóch iteracjach; okno12,944→10,530s. To nie pełny migrationtotal ani nowy RFsolve; docs/mixed-coarse-profile.md.
 - EXP104: actual exportSHA powiązany z mesh audit; PCBbbox72mm, wybrany PCB/feedsubset91,676×72×47,750mm. SingleHSG0,1mm wymaga36,144GBbase. Publicnesting odrzucony; directportgprMaxREJECT bez nowego sprzęgania/subcell. SolverNOTRUN po resource/API gate, nie blanketFDTDrejection. Audyt M5.1–M5.6 w docs/milestones/M5.md.
 - EXP105–106 M6.1 PASS: host audit tiny i pełny W.3,108grup/14627calls/zeroerrors; raw/pola/S/energy PASS. W.3 272,718s/35iter (kontrola audytu, nie nowy speedup). Actual Hcurl P20/Q14/qcomp3/N1601320; wymagane bytes osobno od długości workspace. docs/ceed-basis-audit.md.
-- Następne M6.2: mały biblioteczny FP32/TF32 basis prototype z rzeczywistymi kształtami, FP64 reference, konwersjami/packing/transpose/add i workspace. Prosty convert→GEMM→convert może podwoić logiczny ruch; mierzyć całość. M6.6 sweep/M7.5 geometria NOT RUN; M6/M7/W.4/W.5/3powtórzenia nadal otwarte.
+- EXP107–108 M6.2 filtrPASS:96screen+42size-ladder (tylko6actualN1601320), FP32actionerror≤1,054e-7, TF32requested≤4,973e-4. ActualN FP32+konwersje2,598–3,223ms vsoriginal3,473–3,744ms; TF32wolniejszyodFP32, małeNmixedwolniejsze. To nie UVM/solver/RF/TCproof. docs/ceed-tensor-probe.md.
+- Następne: fused FP32 register-conversion basis filter bez dodatkowego397MB scratch/pack/unpack. Potem jawny scopePC z zachowanym niezależnym FP64A/rawresidual iK/W1→W3 przedpromocją. M6.3TCinstructionproof/M6.4integration/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/3powtórzenia otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2521,3 +2522,64 @@ SameLuna read-only docs-garden PASS; minor table/derivedreceipt wording clarifie
 Root reviewed code/logs/CSVs/fieldhashes and honest auditlimits; no newnative
 rebuild needed forPythonparser/docs. M6.1 PASScurrentfixture, M6.2 next;
 M6/M7/sweeps/W4/W5/median/generalization remainOPEN. No paidcompute/swap/appsclosing.
+
+EXP107 prereg M6.2: isolated cached two-TU probe, currentlibpalace MFEM
+InitBasisFromRule +pinnedMAGMA original as GPUcontrol; independentlongdouble
+CPUloop small257elements. FamiliesND2tet(P20),RT1tet(P15),H1P2tet(P10),
+ND2triangle(P8); Q6/14, interp/curl/div/grad,transpose/ApplyAdd,odd257/131071
+sizes, additional2components forNDtetQ14. 96actions; FP64librarycontrol,
+FP32pedantic and requestedTF32 cuBLASGemmEx beforecustomTC/CUTLASS work.
+Frozen action gates FP64 1e-11, FP32 2e-6, TF32 2e-3 relativeL2/scaledmax;
+these arefiltergates, notrelaxedRFcriteria. Canary+faultdetector, conversionin/
+out included inapply, staticbasispackcostseparate, FP64callerbuffersretained.
+GPUresidentboundedbatches, noUVM/solver/TCinstructionclaim. FP64originalouter
+operator/residual untouched. 120s build/run limits,6GiB/no swap, no paidcompute.
+Native/dependencies untouched; build/m6-ceed-tensor cache/manifest.
+
+EXP107 firstbuildFAIL: missing publicbackend header for
+CeedBasisGetNumQuadratureComponents. No runtime performed. Root added
+<ceed/backend.h> consistent withpinnedactualaudit TU; preservedbuild-v1log,
+no dependency/nativechange. Retrynewrecipe onlyafterthissourcefix.
+
+EXP107v2 addonbuildPASS4.326s, runFAIL1.016s noOOM/noactions: Q6 notfound
+amongMFEMtetvolumerules. Preserved originalartifact unchanged. Source indicates
+arbitraryfixedmappedface bases useInitCachedBasisFromRule; metadata alonecannot
+identifyexacttracepoints. Correctedprototype Q6tet usesrepresentative mapped
+triangle6pointz0trace; Q14 actualMFEMvolumerule. NotclaimingexportedactualW3
+tracecoefficients. Retainmappedrules torespect MFEM pointerkeyedtabulationcache.
+Retryv3newrecipe/newartifact only; no changes tophysicalsolver/fixture.
+
+EXP107v3 PASS: addon4.108s/run13.466s/96actions/canaries/independentCPUcontrol.
+AllactionfiltersPASS FP64maxrel2.37e-16,FP32~1.05e-7,TF32request~4.97e-4
+(scaledmax~9.61e-4); noTCproof. Root comparedactualoriginal peraction:
+large131071 FP32 faster39/48, medianratio.871; small257 slowerall48.
+NDtet20/14 large6singlecomponentactions FP32~.55–.64oforiginal; TF32usually
+slowerthanFP32 andmuchlessaccurate. No fullsolver/UVM claim. Originalfailed
+runkept; screen sources+manifest savedbuild/m6-ceed-tensor/exp107-screen.
+
+EXP108 prereg: extend identicalaction code --scale,42NDtetQ14actions incl
+257/1023/4099/16383/65537/131071/actual1601320, interp/curl,forward/trans/Add.
+SmallCPUcontrol retained, allsizecandidatevsexactoriginal; samefrozengates,
+conversions/workspace/count/medianchecked.120s/6GiB/no swap,2GiBfreeGPUguard,
+GPUresident boundedprobe only; no larger FEMrun. Resolve crossover/scaling
+beforePCintegration/fusedkernel decision. No paidcompute/native/depsrebuild.
+
+EXP108 root review PASS:42actions across7sizes, only6 atactualN1601320
+(correctedagent shorthandthatall42wereactualN). Run18.556s/build4.224s,
+noOOM; everyoriginalCPU/FP64layout/canary/filtergatePASS. Foractual6actions
+FP32wall2.598–3.223ms vsoriginal3.473–3.744ms, medianratio.797, range.748–.863;
+TF32requested3.325–3.631ms,ratio.958, largererror. ExtraallocatedFP32scratch
+397130720B, notGPUresidency. Sizes<=4099: mixedslowerall6; no globalswitch.
+Updated strictparser rechecks numericmetrics/frozenactiontol/flags/timingmedians,
+notjustgreenbooleans. Rootverifiedoriginalscreen+scaleJSONcurrentchecker and
+hash/cache; rootreceipt artifacts/m6-ceed-tensor-root-analysis-20261021.json.
+ActualTCinstructionproofNOTRUN,noTCclaim,TF32backendnotpromoted. FP32fused
+registerconversionnext boundedhypothesis beforePCscopeintegrationandfullK.
+
+EXP107–108 checkpoint:146pinnedtests/8shell/docschecker/diffcheck PASS.
+SameLuna read-onlydocs-garden PASS; corrected42total/6actualN count confirmed.
+Root reviewed implementation/layout/math, actualcaseJSON independentCPU+GPU
+controls/currentstrictvalidator andrecipehash; native/dependencies unchanged.
+M6.2 firstlibraryfilterPASS; no solverpromotion/TCproof/UVMspeedup, no paidcompute.
+NextfusedFP32workspace-free actionfilter, thenexplicitPCscope/K/W1→W3.
+M6/M7/sweeps/generalization/W4/W5/median stillOPEN, goal remainsactive.

@@ -37,6 +37,9 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M6.1: audyt baz libCEED](ceed-basis-audit.md)
   - Czytaj gdy: wybierasz kształty prototypu FP32/TF32 lub oceniasz długości workspace
   - Opis: EXP105–106 host metadata tiny/W.3, frozen quality PASS, logiczne bytes osobno od długości buforów; brak deklaracji TC/speedupu.
+- [M6.2: biblioteczny FP32/TF32 basis probe](ceed-tensor-probe.md)
+  - Czytaj gdy: oceniasz net koszt konwersji/TC albo planujesz FP32 basis w PC
+  - Opis: EXP107–108 oryginalny MAGMA/CPU/FP64 kontra FP32/TF32 requested, rzeczywiste N, memory/accuracy/crossover; tylko mikrooperacje bez promocji RF/UVM/TC.
 - [M5: hybrid cuDSS](native-hybrid-memory.md)
   - Czytaj gdy: oceniasz actual hybrid memory lub wracasz do odrzuconego budżetu GPU
   - Opis: API i W.3P2 poprawne, ale4/6GiB bez net speedup; coarse2× szybciej, reszta PC wolniej. UVM fallback, actualminimum i granice pomiarów.

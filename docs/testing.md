@@ -195,3 +195,13 @@ FP64ABI, transpose/add/weight lengths, malformed records and oversized workspace
 vs required logical action bytes. Tiny samebuild control/audit and full W.3P2
 with audit passed raw/wholefields/S/VSWR/energy/power; this is metadata validation,
 not a new performance promotion. [Proofs and exact argv](ceed-basis-audit.md).
+
+
+## M6.2 — action precision/crossover, EXP107–108
+
+146 pinned tests PASS. Isolated GPUresident screen96 i ladder42 (tylko6actualN)
+PASS: oryginalny libCEED/independentCPU, FP64librarylayout, FP32/TF32requested
+w ustalonych action gates, canaries/perturbationdetector. Parser sprawdza
+coverage, NaN/progi/flag consistency, mediany i zachowuje negatywne mixed
+wyniki. Nie są to bramki RF/UVM/TC ani M7promocja. Błędy pierwszego buildu i
+pierwszej volumeQ6 próby zachowane. [Raport](ceed-tensor-probe.md).

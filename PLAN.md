@@ -118,9 +118,9 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M6 — gorące kernele, TF32 i przepustowość pamięci
 
-- [ ] Wybrać rzeczywisty gorący kernel i rozmiary P2 z profilu; oszacować potencjał zysku całego runu.
+- [x] M6.1 EXP105–106: rzeczywiste gorące basis actions/wymiary z profilu i host audit, zakres/Amdahl docs/milestones/M6.md oraz docs/ceed-basis-audit.md.
 - [ ] Research cuBLASLt/libCEED/MFEM; CUTLASS dopiero przy brakującej funkcji. Zapisać link, rewizję, licencję i przydatność.
-- [ ] Prototyp batchowania: FP32 vs TF32, potem ewentualna korekcja; zmierzyć także packing/scatter/workspace.
+- [x] M6.2 pierwszy biblioteczny filtr EXP107–108: oryginalny MAGMA/FP64/FP32/TF32requested, konwersje/workspace i crossover przez actualN1601320. CPU/control/canaries PASS; nie promocja solvera. docs/ceed-tensor-probe.md.
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
 - [ ] Gdy profil wskazuje koszt ruchu pamięci/launches: ocenić fuzję własnych operatorów, batching real/imag i reuse lokalnych danych, także bez Tensor Cores; policzyć narzut i cały solve.
 

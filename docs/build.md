@@ -121,3 +121,13 @@ MFEM/libCEED/hypre. Zmiana git revision może przebudować main.cpp z osadzonym
 git_describe. Po buildzie samo włączenie/wyłączenie flagi nie wymaga kompilacji.
 AuditJSON i agregaty logu małe; bez field copies/sync/dyskowego workspace.
 [Metoda, argv i kwalifikacja](ceed-basis-audit.md).
+
+
+## Izolowany basis FP32/TF32 probe — M6.2
+
+`python3 tools/experiments/ceed_tensor_probe.py build` kompiluje wyłącznie
+małe host/CUDA TU przez stały builder i ccache; cache/manifest build/m6-ceed-tensor.
+Powiązany z hashami źródeł/native/runtime/arch/flags; nie przebudowuje solvera
+ani zależności. `run NEW --seconds 120 [--scale]` ma oddzielny nowy katalog,
+6GiB/no swap/min2GiBfreeGPU/cleanup. Mały screen przed ladderem do actualN;
+[wyniki i ograniczenia](ceed-tensor-probe.md). Brak instalacji nowych bibliotek.
