@@ -12,7 +12,7 @@ import dev
 
 BASE=dev.ROOT/'build/m6-ceed-tensor'
 HERE=Path(__file__).resolve().parent
-SOURCES=[HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',HERE/'ceed_compensated.cuh',dev.ROOT/'tools/adapter/ceed_fused.cuh']
+SOURCES=[HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',dev.ROOT/'tools/adapter/ceed_compensated.cuh',dev.ROOT/'tools/adapter/ceed_fused.cuh']
 PROGRAM=BASE/'ceed-tensor-probe'
 FLAGS=['-std=c++17','-O2','-I/src/palace/palace','-I/opt/view/include',
        '-I/usr/local/cuda/include','-I/opt/cudss/include']

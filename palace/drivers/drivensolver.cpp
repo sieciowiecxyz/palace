@@ -378,7 +378,9 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         C.reset();
         M.reset();
         const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
-        if (pc_basis && std::string(pc_basis) == "1")
+        const char *pc_compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
+        if ((pc_basis && std::string(pc_basis) == "1") ||
+            (pc_compensated && std::string(pc_compensated) == "1"))
         {
           MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
           PalacePCBasisRelease();

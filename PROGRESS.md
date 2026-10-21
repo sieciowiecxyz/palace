@@ -23,7 +23,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP109–110 fusedFP32 filterPASS: 96screen/42ladder, error≤1,148e-7; actualNforward1,334–1,342ms vs3,474–3,478ms, transpose tylko2–5%zysku. Fused per-path FP32basis3360B, alecomparisonprocessnadaltrzymalibraryscratch, brakmeasuredpeak/RF/UVM/solverclaim.
 - EXP112–113 PCforward integration tiny/medium3,55K+scope/cachecleanupPASS, lecz iteracje40/42→45/45 i48/49→55/57, medium99,580→99,592s bez wykazanego zysku. Większy rawgap skorygowany restartem; HOLD, niepromowany, W3 NOTRUN. docs/pc-basis-fp32.md.
 - EXP114–116: compensateddot+bit-split actionfilter PASS (CPU/linearity/range1e-300..1e300). ActualND20/Q14/N1601320 forward3,474–3,482→3,035–3,048ms; error~6e-15. Pierwszywariantbyłwolniejszy; scalar/trace nieprzyspieszone. Nie solver/RF/UVM/TCclaim; nativebez zmian. docs/ceed-tensor-probe.md.
-- Następne: mała integracja compensated PCforward ND20/Q14 ze scope/cache/cleanup, samebuild control/K/rawresidual i całościowymczasem; dopiero potem W3. Nie przenosić mikrobenchmarkowego zysku na całą antenę. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
+- EXP117–119 compensatedPC tiny/medium3,55 quality/scope/cachePASS po naprawie envguard (pierwszy candidateFAILzachowany). Iteracje40/42 i47/49 bez wzrostu, lecz16,533→16,629s i98,577→98,546s bez netgain, HOLD/W3NOTRUN. docs/pc-basis-fp32.md.
+- Następne: M6.6 audyt existing sweep/PROM/reuse i tani plan kosztu; nie przenosić mikrobenchmarkowego zysku na antenę. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -65,10 +66,11 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-M6.4: po użytecznym filtrze EXP115–116 ocenić compensated PC-only Hcurl
-forward ND20/Q14 na tiny/medium, bez zmian A i rawresidual. Zachować cache
-według treści oraz jawny cleanup; pełny W.3 dopiero po jakości i netkoszcie.
-Kolejność docs/milestones/M6.md. M6.6 sweep/M7 nadal otwarte.
+M6.6: audyt istniejących SweepUniform/SweepAdaptive/RomOperator, kosztorys
+wielu f i wybór taniego coaxfiltra. M6.4 compensatedKtiny/mediumPASS, netgain
+niewykazany/HOLD, W3NOTRUN; brak automatycznego drogiego runu. Zachować
+oryginalnyFP64basis oraz M5mixedcoarse. Kolejność docs/milestones/sweeps.md;
+M6/M7/W4/W5/mediany/generalizacja pozostają otwarte.
 
 ## Reguły pracy
 
@@ -2732,3 +2734,56 @@ strictnegative-result preservation, recipe/currentbinary and actualN timings.
 Nativehash unchanged4e2fa56f…a4dc611; no solver/default change/promotion.
 Next bounded scopedPC ND20/Q14 integration, control/quality/netcost first.
 M6/M7/W4/W5/sweeps/medians/generalization remainOPEN; goalactive.
+
+EXP117 prereg: shared testedcompensatedheader movedtoadapter (sameprobe+PC),
+newopt-in --pc-basis-compensated-forward, exclusivewithpreviousFP32PCflag.
+OnlynonTensorP20/Q14/QC3 forward withinexistingRAII B->Mult scope; allother
+shapes/transpose/Add/outside originalFP64. CacheexactfiniteFP64coefficientcontent
++dimensions, same256entries, twohi/lotables6720B/shape, explicitcleanup.
+Arithmeticname expectedbystrictaudit/runner, conflictingmodesfail/isolatedenv.
+N>=8192 inheritedselection; tinyN13086 liesbetween4099/16383microcrossover,
+so costmustbemeasured, notinferred. Do notlowernumericKtol. No extracandidate
+largevectors orFGMRES switch. OriginalA/rawcheck remainFP64, default unchanged.
+Fallbacksavedbuild/m6-pc-compensated/pre-compensated-{native,manifest.json}.
+Cachednativebuildjobs2; thenaddonrebuild+96screen guardsharedrecipe.
+Nexttinycontrol/candidate60s each bothports/frozenK64/right/directFP32storage/
+M5mixedcoarse/reuse/deferred/fields; qualifycontrolvsM5tiny andcandidatevscontrol.
+Onlyrootreview aftertinypermitsmedium/W3.153pinnedtestsPASS. No paidcompute,
+no swap/appsclosing/depscleanup, allhotdataRAM/VRAM.
+EXP117 cachednative9.152s/addon2.607s/sharedscreen14.115sPASS. Rootstrict
+sharedheadercoverage+candidateCPU/range+currentbinary/recipePASS. Nativehash
+6bec38a0…2ad0938 (adapterchanged, libpalacesameSHA7f1d1599…15e0fda8).
+No solverqualificationyet; nextsamebuildtinycontrol/candidate aspreregistered.
+EXP117 tinycontrolPASS16.532s40/42iter; candidateprocess0/fieldsPASSbutstrict
+scopeauditFAIL: enters/mixed/release0, outsideoriginal18882. Thusno mixedPC
+executionproof, NOT numericalqualification/performanceevidence. Rootfound
+nativeApplyB/finalrelease envguards checkedoldflagonly. Fixedbothguards to
+includecompensatedflag; regressionasserts bothnativepoints. Do notloosen audit.
+EXP118 prereg: cachednativejobs2rebuild, freshsamebuildtinycontrol/candidate
+exactEXP117flags/deadlines/newartifacts. PreservefailedEXP117candidateuntouched.
+No needaddonrerun ifsharedkernelunchanged; onlynewnative2guardcode changed.
+EXP118 actualtinyPCPASS: native8.582s/hash76f1edfc…d87c775d; control16.533s
+40/42iter vs candidate16.629s40/42iter, no speedupclaim. Scope85/85/mixed3400/
+outside3582/transpose7650/cache2entries13440Ballocated=freed/live0/release1.
+Candidatecorrectedrawstop~8.46e-7/7.74e-7; initialraw~1.13e-6, no earlierFP32
+~1e-3gap. Cannotattributecausalitysolelycompensation: shapeselectionalsonarrower.
+RootindependentCSV S/VSWR/energy/powerandfieldcomparisonPASS; receipt
+artifacts/m6-pc-compensated-tiny-root-analysis-20261021.json. No fullantennaclaim.
+EXP119 prereg: samebuildmedium3.55/bothports control/candidate180s each, sameflags
+andfrozenK; nativeunchanged/no rebuild, qualifycontrolvsM5medium andcandidatevs
+samebuildcontrol. Largerbasis/costtest beforedecidingonW3; neverincreaseTol.
+EXP119 rootindependentCSV/fields/raw/auditPASS: ΔS1.228e-10/VSWR1.484e-10/
+energy1.308e-10/power1.243e-10. Both47/49iter/control98.577s/candidate98.546s,
+no fulljobgainclaim. PCexclusive5.412→5.347s, coarse1.756→1.761s; ~70sL2
+validationincludedidentically. Cgroup1.911→1.919GB notmemorysaving. Tables13440B
+releasedcorrectly. Receipt artifacts/m6-pc-compensated-medium-root-analysis-20261021.json.
+DecisionHOLD/no promotion/no automaticW3 for~12%microgain withoutnetjobbenefit.
+NextM6.6 auditexistingUniform/Adaptive/PROM/reuse, localonly; M6/M7goalopen.
+EXP117–119 checkpoint: finaladdonrecipe1.181s/sharedscreen14.184sPASS after
+nativeguardfix. Rootverified strictactionCPU/linearity/range,currentbinary+
+recipe andsamebuildidentityoftiny/mediumpairs.153pinnedtests/8shell/docschecker/
+diffcheckPASS. SameLuna read-onlydocs-gardenPASS; rootreviewed exactBscope,
+2nativeenvguards, modeexclusive/parser/cachebytes/cleanup andfailedcandidate
+retained. Newnativehash76f1edfc…d87c775d7; originalbasisdefaultunchanged.
+HOLD/nopromotion/W3NOTRUN; nextM6.6 audittocutwhole-sweepcost. M6/M7/W4/W5/
+sweeps/medians/newgeometry stillOPEN, goalactive. No paidcompute/swap/appsclosed.

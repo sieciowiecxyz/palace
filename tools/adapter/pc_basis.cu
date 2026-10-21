@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "pc_basis.hpp"
 #include "ceed_fused.cuh"
+#include "ceed_compensated.cuh"
 #include <ceed/backend.h>
 #include <algorithm>
 #include <cmath>
@@ -15,7 +16,12 @@
 #include <vector>
 
 namespace {
-bool enabled(){static const bool on=[] {auto s=std::getenv("PALACE_PC_BASIS_FP32_FORWARD");return s&&std::string_view(s)=="1";}();return on;}
+bool compensated(){static const bool on=[] {auto s=std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");return s&&std::string_view(s)=="1";}();return on;}
+bool enabled(){static const bool on=[] {auto s=std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
+  const bool fp32=s&&std::string_view(s)=="1";
+  if(fp32&&compensated()){std::fputs("PALACE_PC_BASIS_ERROR conflicting modes\n",stderr);std::abort();}
+  return fp32||compensated();}();return on;}
+int min_n(){return 8192;}
 thread_local unsigned depth=0;
 using Key=std::tuple<int,int,int,std::vector<double>>;
 struct Table {float *data;size_t bytes;};
@@ -31,6 +37,7 @@ State &state(){static auto *s=new State;return *s;}
 void check(int code){if(code)fail("libCEED metadata/vector error");}
 void cuda_check(cudaError_t error){if(error!=cudaSuccess)fail(cudaGetErrorString(error));}
 bool supported(int p,int q,int qc){return
+  compensated()?(p==20&&q==14&&qc==3):
   (p==20&&(q==6||q==14)&&qc==3)||
   ((p==15||p==10)&&(q==6||q==14)&&(qc==1||qc==3))||
   (p==8&&q==6&&(qc==1||qc==2));}
@@ -38,9 +45,9 @@ bool supported(int p,int q,int qc){return
 __attribute__((destructor)) void report(){
   if(!enabled())return;
   auto &s=state();std::lock_guard<std::mutex> lock(s.mutex);
-  std::fprintf(stderr,"PALACE_PC_BASIS_END {\"enters\":%llu,\"exits\":%llu,\"active\":%llu,\"mixed_forward\":%llu,\"pc_original\":%llu,\"outside_original\":%llu,\"transpose_original\":%llu,\"alias_original\":%llu,\"capacity_original\":%llu,\"cache_misses\":%llu,\"cache_hits\":%llu,\"allocated_bytes\":%llu,\"freed_bytes\":%llu,\"live_bytes\":%llu,\"releases\":%llu,\"closed\":%s,\"min_N\":8192,\"scalar_bytes\":8}\n",
+  std::fprintf(stderr,"PALACE_PC_BASIS_END {\"enters\":%llu,\"exits\":%llu,\"active\":%llu,\"mixed_forward\":%llu,\"pc_original\":%llu,\"outside_original\":%llu,\"transpose_original\":%llu,\"alias_original\":%llu,\"capacity_original\":%llu,\"cache_misses\":%llu,\"cache_hits\":%llu,\"allocated_bytes\":%llu,\"freed_bytes\":%llu,\"live_bytes\":%llu,\"releases\":%llu,\"closed\":%s,\"min_N\":%d,\"scalar_bytes\":8,\"arithmetic\":\"%s\"}\n",
     s.enters,s.exits,s.active,s.mixed,s.pc_original,s.outside_original,s.transpose_original,
-    s.alias_original,s.capacity_original,s.misses,s.hits,s.allocated,s.freed,s.allocated-s.freed,s.releases,s.closed?"true":"false");
+    s.alias_original,s.capacity_original,s.misses,s.hits,s.allocated,s.freed,s.allocated-s.freed,s.releases,s.closed?"true":"false",min_n(),compensated()?"compensated_bits":"fp32_fused");
 }
 }
 
@@ -74,7 +81,7 @@ extern "C" bool PalacePCBasisTryApply(CeedBasis basis,CeedInt nelem,CeedTranspos
   CeedInt p,q,c,qc;check(CeedBasisGetNumNodes(basis,&p));check(CeedBasisGetNumQuadraturePoints(basis,&q));
   check(CeedBasisGetNumComponents(basis,&c));check(CeedBasisGetNumQuadratureComponents(basis,mode,&qc));
   const long long wide_n=static_cast<long long>(nelem)*c;
-  if(!supported(p,q,qc)||wide_n<8192||wide_n>std::numeric_limits<int>::max()/std::max(p,q*qc))return original();
+  if(!supported(p,q,qc)||wide_n<min_n()||wide_n>std::numeric_limits<int>::max()/std::max(p,q*qc))return original();
   const int n=int(wide_n);const size_t ni=size_t(n)*p,no=size_t(n)*q*qc;
   CeedSize ul,vl;check(CeedVectorGetLength(u,&ul));check(CeedVectorGetLength(v,&vl));
   if(ul<0||vl<0||size_t(ul)<ni||size_t(vl)<no)fail("short basis vector");
@@ -90,6 +97,7 @@ extern "C" bool PalacePCBasisTryApply(CeedBasis basis,CeedInt nelem,CeedTranspos
   if(it==s.tables.end()){
     if(s.tables.size()>=256){++s.capacity_original;return original();}
     const auto &host=std::get<3>(key);std::vector<float> packed(host.begin(),host.end());
+    if(compensated())for(double value:host)packed.push_back(float(value-double(float(value))));
     Table table{nullptr,packed.size()*sizeof(float)};
     cuda_check(cudaMalloc(&table.data,table.bytes));
     cuda_check(cudaMemcpy(table.data,packed.data(),table.bytes,cudaMemcpyHostToDevice));
@@ -105,7 +113,8 @@ extern "C" bool PalacePCBasisTryApply(CeedBasis basis,CeedInt nelem,CeedTranspos
   }
   // Conservative cross-backend stream safety, matching synchronous basis semantics.
   cuda_check(cudaDeviceSynchronize());
-  cuda_check(palace_pc_basis::Apply(it->second.data,input,output,p,q,qc,n,false,false));
+  if(compensated())cuda_check(palace_compensated::Apply<true>(it->second.data,it->second.data+p*q*qc,input,output,p,q,qc,n));
+  else cuda_check(palace_pc_basis::Apply(it->second.data,input,output,p,q,qc,n,false,false));
   cuda_check(cudaDeviceSynchronize());
   check(CeedVectorRestoreArray(v,&output));check(CeedVectorRestoreArrayRead(u,&input));
   ++s.mixed;*result=0;return true;

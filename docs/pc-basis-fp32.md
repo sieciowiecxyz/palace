@@ -108,3 +108,69 @@ Referencje dokładności i seed to różne role. Lokalne dowody:
 artifacts/m6-pc-basis-{tiny,medium}-{control,on}-20261021 i
 artifacts/m6-pc-basis-{tiny,medium}-root-analysis-20261021.json.
 Goal/M6/M7 pozostają aktywne; te filtry nie kwalifikują produkcyjnej anteny.
+
+## EXP117–119: compensated forward, osobny opt-in
+
+2026-10-21, **quality PASS tiny/medium3,55; brak wykazanego netzysku, HOLD**.
+To kolejny eksperyment po historycznym SHA EXP112–113 powyżej, nie ponowna
+kwalifikacja tamtej binarki. Obecny sourceSHA
+`76f1edfc309e73b993d9f17e2faf987e849a1ac493847976659dd71d87c775d7`.
+
+Nowy `--pc-basis-compensated-forward` jest rozłączny z poprzednią flagą.
+Ten sam RAII scope/cache/release, jednak tylko P20/Q14/QC3 nonTensorforward,
+N≥8192; pozostałe kształty, transpose/Add i outsidePC oryginalne. Minimum
+odziedziczone z poprzedniego adaptera; tinyN13086 testuje obszar między punktami
+4099/16383 drabinki, nie dowód uniwersalnego crossoveru. Kernela z
+[EXP115–116](ceed-tensor-probe.md) używa zarówno adapter, jak i actionprobe:
+`tools/adapter/ceed_compensated.cuh`. FP32hi/lo coeff/input/accumulation,
+guarded bit-split oraz FP64 fallback dla wejść poza zakresem i recombine;
+nie pełne FP64, nie Tensor Cores. Oryginalne A/rawresidual FP64.
+
+Exact-content cache dwie tablice/shape, mode raportowany w audycie, cap256.
+Dla rzeczywistego testu2entries/13440Ballocated=freed/live0/release1. Nie dodaje
+wielkich wektorów ani nie przełącza na FGMRES. Przywrócenie: pominąć nową flagę;
+fallback sprzed zmian w build/m6-pc-compensated/pre-compensated-native oraz
+pre-compensated-manifest.json. Cached nativebuild8,582s, bez rebuilda dependencies.
+
+EXP117 wykrył błąd integracji: adapter znał nową flagę, ale native ApplyB i
+finalrelease sprawdzały tylko starą. Candidate fields PASS, lecz0scope/mixedcalls
+unieważniło run — **FAIL**, nie dowód jakości ani speedupu. Poprawiono obie
+bramki, dodano regresje, EXP118 wykonał rzeczywistą ścieżkę. Przypadek FAIL
+pozostaje w artifacts/m6-pc-compensated-tiny-on-20261021.
+
+| Same-build oba porty | Kontrola | Compensated | Iteracje |
+| --- | --- | --- | --- |
+| Tiny, EXP118 | 16,533s | 16,629s | 40/42 → 40/42 |
+| Medium3,55, EXP119 | 98,577s | 98,546s | 47/49 → 47/49 |
+
+Jedna para, nie mediana; różnica medium0,03s nie dowodzi speedupu. Native
+exclusive PCtimer5,412→5,347s, coarse1,756→1,761s. Nie sumować PC/coarse ponownie
+z Total. Około70s tego filtra pochłania dodatkowa analityczna kwadratura L2;
+wykonano ją identycznie dla obu ścieżek, bez ukrywania kosztu walidacji. Nie
+przenosić udziałów tego coax na antenę/UVM. Nie wykazano redukcji pamięci:
+cgroup tiny577,671→586,834MB/medium1910,899→1919,173MB, processGPU631,243MB
+w obu — ten licznik nie jest fizyczną rezydencją UVM.
+
+Root niezależny CSV: tiny maxΔS1,708e-9/ΔVSWR3,321e-9/relativeenergy3,322e-9/
+power3,305e-9, fieldsE/B≤1,040e-6/1,672e-8. Medium1,228e-10/1,484e-10/
+1,308e-10/1,243e-10, fields≤1,242e-7/6,889e-8. Rawfinal tiny8,46e-7/7,74e-7,
+medium9,57e-7/9,12e-7. Wcześniejsze raw-recurrencegaps medium~1,2–1,3e-5
+zbliżone do kontroli~1,3e-5, bez wcześniejszego~1e-2. To zgodne z hipotezą
+liniowości, nie izolowany dowód przyczyny: zmieniono także selekcję baz.
+
+Audyt actualtiny85/85scope/mixed3400 i medium100/100/mixed4000,
+outsideoriginal3582/4066, transposeoriginal7650/9000, cachecleanup PASS.
+153pinnedtestsPASS. Wszystkie hotbuffers RAM/VRAM, noSwap. Zwykłe zapisane
+wyniki candidate tiny8,982MB/medium85,317MB (w tym pola6,737/63,490MB),
+jednorazowe snapshoty do porównania; brak zapisu workspace w pętli.
+
+Odtwarzanie: komenda powyżej, ale zastąpić ostatnią flagę przez
+`--pc-basis-compensated-forward`; nowe katalogi wyników. Kontrola bez obu flag.
+Dowody: artifacts/m6-pc-compensated-tiny-{control-v2,on-v2}-20261021 i
+m6-pc-compensated-medium-{control,on}-20261021, root-analysis JSON dla obu.
+
+Decyzja: nie promować i nie wykonywać automatycznie drogiego W.3 dla obecnego
+~12% microzysku bez wykazanego netzysku. W.2 pozostałefreq/W.3 NOTRUN; brak
+kwalifikacji pełnej anteny. W M6 priorytet następny to audyt istniejącego sweep/
+PROM/reuse (M6.6) i rachunek całkowitego kosztu. Dotychczasowy FP64 basis
++M5mixedcoarse pozostają wariantem odniesienia. M6/M7/goal nadal otwarte.

@@ -344,7 +344,9 @@ inline void ApplyB(const Solver<OperType> *B, const VecType &x, VecType &y,
     {
       static const bool on = [] {
         const char *value = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
-        return value && std::string_view(value) == "1";
+        const char *compensated = std::getenv("PALACE_PC_BASIS_COMPENSATED_FORWARD");
+        return (value && std::string_view(value) == "1") ||
+               (compensated && std::string_view(compensated) == "1");
       }();
       enabled = on;
       if (enabled)

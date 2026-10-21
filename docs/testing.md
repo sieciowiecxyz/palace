@@ -234,3 +234,13 @@ error. Weryfikator odrzuca brak coverage/progów/stress/faultflag; negatywny
 wynik kandydata zachowuje. 152pinnedtestsPASS. 96screen/42size-ladderPASS,
 actualNND20/Q14forward~12%taniej, nie netjob/PC/RFkwalifikacja. Dokładne wyniki
 w docs/ceed-tensor-probe.md. Native/build manifest niezmienione; addoncache osobny.
+
+## M6.4 — compensated PC scope, EXP117–119
+
+Osobna rozłączna flaga `--pc-basis-compensated-forward`, tylkoP20/Q14/QC3/N≥8192.
+Root przygotowuje; ta sama Luna high uruchamia control/candidate. FrozenK/raw/
+fields/cachemode/scope/cleanup tiny i medium3,55PASS. Pierwszy candidate miał
+0scope/mixedcalls: strictaudit prawidłowoFAIL mimo fieldsPASS. Poprawione oba
+nativeenvguards i regresje, nie bramki. 153pinnedtestsPASS. Zachowane iteracje
+40/42 i47/49, brak wykazanego netgain, niepromowany/W3NOTRUN. Raport i dokładne
+SHA/argv/artefakty w docs/pc-basis-fp32.md; bez zmiany globalnych defaultów.
