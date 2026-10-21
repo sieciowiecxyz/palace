@@ -54,7 +54,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP98–101 API/W.2/W.3 PASS, jedna para W.3 −19,31% czasu/−19,01% cgroup; opt-in bez globalnej promocji, stationarity i dalsze bramki jawne.
 - [M6.6: sweepy](milestones/sweeps.md)
   - Czytaj gdy: po M5 planujesz wiele częstotliwości z reuse/PROM/recycling
-  - Opis: EXP120–127: per-f release, 3/7freq/bothports tiny/mediumPASS; 7freq medium −19,1% czasu jednej pary, bez redukcji RAM. Antena/PROM/mediany OPEN.
+  - Opis: EXP120–130: per-f release, 3/7freq coax PASS; kontrola/reuse z identyczną historią i pamięcią. W3 medium3,5/3,6GHz oba porty −8,09% czasu jednej pary, pola/raw PASS. PROM/mediany/nowa geometria OPEN.
 - [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
   - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
   - Opis: Zachowane wymagania zakończonej oceny M5.5/M5.6, koszt przed benchmarkiem i jawne negatywne rozstrzygnięcia.

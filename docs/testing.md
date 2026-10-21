@@ -265,3 +265,13 @@ kontrole kolejności/per-f release/skumulowanych solve i iteracji oraz wymagane
 pary phasebegin/end. Runner porównuje metadata TotalSolves/TotalIts z pełnym
 logiem. 156Python regresji PASS; actual tiny/medium3/7freq i stary singlefreq
 EXP127 PASS. Pełna antena tego rozszerzenia NOT RUN; patrz raport sweepów.
+
+### EXP128–130: niezależny harmonogram i właściwa antena
+
+158Python regresji: batch bez reuse oczekuje build dla każdego RHS, ten sam
+ścisły audyt historii; odrzuca singlefreq/singleport/wave/adaptive/viz/restart/AMR.
+`--frequencies` zmienia wyłącznie Samples, odrzuca NaN/inf/duplicate/unsorted i
+konflikt z coax presets. Actual tiny/medium3freq oraz W3medium3,5/3,6GHz oba
+porty PASS; replay RF/28wholefields/raw i granice w milestones/sweeps.md.
+W3 jedna para996,519→915,924s, nie mediana M7; tight independent3,6reference
+nadal NOT RUN. Guard i tolerancje bez poluzowania, defaulty bez zmian.

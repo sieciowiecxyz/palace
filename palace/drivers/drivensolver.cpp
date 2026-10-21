@@ -57,6 +57,9 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
   const auto &omega_sample = iodata.solver.driven.sample_f;
 
   bool adaptive = (iodata.solver.driven.adaptive_tol > 0.0);
+  MFEM_VERIFY(!(std::getenv("PALACE_REUSE_PORT_SETUP") ||
+                std::getenv("PALACE_FREQUENCY_PORT_BATCH")) || !adaptive,
+              "Frequency/port batching requires a uniform sweep!");
   if (adaptive && omega_sample.size() <= iodata.solver.driven.prom_indices.size() &&
       !iodata.solver.driven.adaptive_circuit_synthesis)
   {
@@ -114,22 +117,25 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   auto ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
                                                &space_op.GetH1Spaces());
   const bool reuse_port_setup = std::getenv("PALACE_REUSE_PORT_SETUP") != nullptr;
-  const bool frequency_batch = reuse_port_setup && omega_sample.size() > 1;
-  const bool setup_audit = reuse_port_setup || std::getenv("PALACE_PORT_SETUP_AUDIT");
+  const bool explicit_frequency_batch = std::getenv("PALACE_FREQUENCY_PORT_BATCH") != nullptr;
+  const bool frequency_batch = (reuse_port_setup || explicit_frequency_batch) && omega_sample.size() > 1;
+  MFEM_VERIFY(!explicit_frequency_batch || omega_sample.size() > 1,
+              "Explicit frequency batching requires more than one frequency!");
+  const bool setup_audit = reuse_port_setup || explicit_frequency_batch || std::getenv("PALACE_PORT_SETUP_AUDIT");
   const bool release_postprocess_energy = std::getenv("PALACE_RELEASE_POSTPROCESS_ENERGY") != nullptr;
   bool energy_released = false;
   MFEM_VERIFY(!release_postprocess_energy ||
                   (iodata.model.refinement.max_it == 0 && !post_op.WillWriteFields()),
               "Postprocess energy release requires fixed mesh without visualization writes!");
-  MFEM_VERIFY(!reuse_port_setup ||
+  MFEM_VERIFY(!(reuse_port_setup || frequency_batch) ||
                   ((omega_sample.size() == 1 || port_excitations.Size() == 2) && port_excitations.Size() > 1 && iodata.solver.driven.restart == 1 &&
                    iodata.model.refinement.max_it == 0 && Mpi::Size(space_op.GetComm()) == 1 &&
                    space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
               "Port setup reuse requires fixed mesh/rank1/first solve and lumped ports only; multi-frequency batches require exactly two excitations!");
   MFEM_VERIFY(!frequency_batch || !std::getenv("PALACE_INITIAL_FIELDS"),
-              "Frequency-major reuse uses per-port in-memory history, not external field seeds!");
+              "Frequency-major batching uses per-port in-memory history, not external field seeds!");
   MFEM_VERIFY(!frequency_batch || !post_op.WillWriteFields(),
-              "Frequency-major reuse does not yet support visualization writes!");
+              "Frequency-major batching does not yet support visualization writes!");
   const char *release_env = std::getenv("PALACE_RELEASE_FINAL_SOLVER");
   const bool release_final_solver = release_env && std::string(release_env) == "1";
   MFEM_VERIFY(!release_final_solver || iodata.model.refinement.max_it == 0,
@@ -141,7 +147,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                    port_excitations.Size() == 2 && iodata.solver.driven.restart == 1 &&
                    Mpi::Size(space_op.GetComm()) == 1 && !post_op.WillWriteFields() &&
                    space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0),
-              "Deferred postprocessing requires two lumped excitations, rank1, final solver release and no visualization/wave/Floquet ports; multiple frequencies require frequency-major reuse and energy release!");
+              "Deferred postprocessing requires two lumped excitations, rank1, final solver release and no visualization/wave/Floquet ports; multiple frequencies require frequency-major batching and energy release!");
 
   // Set up RHS vector for the incident field at port boundaries, and the vector for the
   // first frequency step.
@@ -277,8 +283,8 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   int deferred_excitation = 0;
   double deferred_rhs_norm = 0.0;
 
-  // Preserve the default excitation-major schedule. Reuse batches visit both
-  // RHS at each frequency before replacing its factors; never cache multiple LU's.
+  // Preserve the default excitation-major schedule. Frequency batches visit both
+  // RHS before measurements; optional reuse retains only the current LU.
   struct SweepSample { int excitation; std::size_t counter, frequency, start; };
   std::vector<SweepSample> samples;
   const auto restart_counter = ((iodata.solver.driven.restart - 1) / omega_sample.size()) + 1;

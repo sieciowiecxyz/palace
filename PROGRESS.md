@@ -26,7 +26,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP117–119 compensatedPC tiny/medium3,55 quality/scope/cachePASS po naprawie envguard (pierwszy candidateFAILzachowany). Iteracje40/42 i47/49 bez wzrostu, lecz16,533→16,629s i98,577→98,546s bez netgain, HOLD/W3NOTRUN. docs/pc-basis-fp32.md.
 - EXP120–122 M6.6 sourceaudit+frequency-major2portreuse/per-portRAMhistory: tiny12,544→11,501s i medium53,570→45,344s/6→3factorbuilds, frozenRF/raw/wholefields/TEMPASS. Jedna para, nie antena/mediana/promocja. Cgroupmedium2,255→2,304GB, nie oszczędnośćpamięci. Singlefreqreuse/deferred regressionPASS. docs/milestones/sweeps.md.
 - EXP123–127: per-f deferred release i skumulowane metadata PASS; 7freq coax medium 93,540→75,664s (jedna para −19,1%), wszystkie14 pól/raw/K PASS. Cgroup2,515→2,535GB: bez oszczędności RAM całego runu. Stary singlefreq regression9,473sPASS.
-- Następne: resourcegate i kontrola pełnej anteny z tym samym deferred release; potem symbolic/recycling/PROM/heldout. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
+- Następne: tani filtr symbolic/recycling/PROM/heldout, bez kolejnego dużego runu przed dowodem korzyści. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2925,3 +2926,82 @@ EXP127 wynik: singlefreq tiny reuse/deferred9,473s,40/42iter,2solves,
 wholefields vsM5tiny +raw/setup/energyrelease/memorymarks/metadata PASS.
 Artifact artifacts/m6-sweep-deferred-single-regression-20261021/result.json;
 postpro/palace.json2solves/82iterations. Bez nowego nativebuilda.
+
+EXP128 prereg: separate explicit --frequency-port-batch from optional equal-f
+setupreuse; control and candidate share per-port history/per-fdeferred release,
+only setupreuse differs. Existing reuse still implies batch forNF>1. Guard2ports/
+rank1/fixed/uniform/restart1/noexternal-seed/viz; native adaptive guardadded.
+Explicit --frequencies3.5 3.6 runtime Samples override leaves mesh/materials/Tol
+unchanged; no fixturemutation. Firsttiny3freq two freshfactors vsreuse, saved
+wholefields/TEM/raw/K,60seach. Then medium gate before W3. Fallback
+build/m6-frequency-batch/pre-batch-{native,manifest.json}; jobs2cachedbuild,
+no dependenciesrebuild/paidcompute/swap/appsclosing. Need nettime/memory before
+antenna2f budget1800s and cgroup60GiB/available6GiB guard. No broadpromotion.
+
+EXP128 wynik tiny3freq: fresh-factorfrequencymajor12,635→reuse11,574s,
+6→3builds, identical40/40/31/31/30/30; allmetadata/release/history/raw/fieldsPASS.
+RootCPU TEM/K PASS: ΔS1,654e-10/VSWR3,273e-10/energy3,583e-10/power3,297e-10,
+E/B≤1,615e-7/4,576e-8. Cgroup612,819→608,367MB; singlepairnotpromotion.
+Replay artifacts/m6-batch-root-analysis.py tiny, receiptm6-batch-tiny-root-analysis;
+build8,640s currentnative.158testsPASS. No changedmesh/Tol/physics.
+EXP129 prereg medium3freq samefrequencymajor/deferredhistory bothcontrols;
+onlyreuseON vsOFF,180seach. Savefields/refEXP124plainreusecontrol thenfresh
+samebuildcontrol; CPU TEMall6/raw/K +metadata/6→3factors, measuretime/cgroup.
+Rootgatebefore2fantenna, no paidcompute/swap/appsclosing/newbuild.
+
+EXP129 PASS medium3freq:53,464→45,324s (−15,22%,singlepair), identical48/48/38/
+38/38/38,6→3builds. Cgroup2,293→2,226GB, notphysicalVRAM. RootCPU TEM/K/
+fieldsPASS ΔS7,925e-11/VSWR8,743e-11/energy1,101e-10/power1,543e-10,
+E/B≤3,878e-8/7,515e-8. Replay artifacts/m6-batch-root-analysis.py medium.
+EXP130 prereg: actualW3T-Shaped medium fixedmesh, bothports3.5/3.6GHz, cold
+firstf (no external seed), per-portwarmstartsecondf, FP32basis/FP64arith+
+scaledFP32coarse/twoFP64corrections. Freshfactorfrequencymajorcontrol vsreuse,
+sameper-fdeferredenergy/solverrelease. FourfullHDMsolves each, K64/Tol1e-6
+unchanged,1800seach, cgroup60GiB/noswap/available6GiBguard. Runcontrolfirst;
+onlyafterrootinspectionstartcandidate, notautomaticexpensivepair.
+Prior W3mixed37371MBmanagedbeforefinalrelease,13348MBcuDSS; after9287MB,
+postprocess25779MB. RetainingKCM estimates~14.7GB extraoverfinalpostprocessing,
+plus3E538.5MB =>~41GBmanagedwindow, notpeakguarantee. Previouswholecgroup45.4GB,
+currenthostavailable>79GiB; resources plausibleunder60GiBcap. IfFAILstopdiagnose,
+no retryorappclosing. Save4E/Bnormaloutputs~1.68GB/run; referencefieldreadonce
+atmeasurement, noworkspaceonSSD. Raw/frozenKfourrows and comparecandidate
+wholefieldstonaturalcontrol; new3.6independentRFreference stillM7scope, notphysical
+manufacturingvalidation. Controlold3.5P2CSVcrosscheckafterrun, nofake mergedref.
+
+EXP130 freshfactorcontrolPASS996,519s/44,44,41,41iter; fourrawchecksfinalbelow
+Tol1e-6 (two earliergapchecks exceedthreshold thenreliable restart; notaccepted
+asfinal). Cgroup48,720GB;4factors/2per-frelease/metadata4/170iterationsPASS.
+CPU CSV3.5bothports vsqualifiedM4: maxΔS1.859e-08/VSWR5.429e-08PASS,
+notwholefield/new3.6independentreference. AllRFfields saved; controlwasnoseed.
+Rootgate candidate sameconfig/currentnative, setupreuseonlydifference,
+4fieldscompareenergy norm≤1%; S≤1e-3/VSWR≤.01/power-energy≤1e-3, originalraw.
+Run1800s cap60GiB/noswap6GiBguard; noappsclosing/paidcompute/retry.
+
+EXP130 candidatePASS915,924s vs996,519scontrol (−80,595s/−8,09%,onepair).
+Both44/44/41/41iter;4→2factors (onlysame-freuse), analysis~17.0–17.2s/build,
+factor2.69–4.77s. Savedanalysis+factor~39.6s; remainingdelta notassignedwithout
+newprofile. Cgroup48,720→47,660GB (−2,18%onepair, notphysicalUVMresidency),
+processGPU2,150GBboth notphysicalVRAMpeak. Actual3.5/3.6bothports finalraw
+candidate[9.193e-7,6.735e-7,9.484e-7,8.389e-7],control≤9.600e-7PASS;
+two intermediategapchecksrequired reliable restart, acceptedonlyafterfinalraw.
+RootfrozenK ΔcomplexS1.698e-8/VSWR3.133e-8/relativeenergy4.775e-8/
+portpower4.692e-9;28wholefieldcomparisons E/B≤4.146e-7/3.497e-8PASS.
+Sameactualconfig/buildSHA3cd21b14…/medium/originalA/Tol verified, CPU CSV3.5
+vspriorM4PASS; new3.6 lacksindependenttightreference/physicalvalidation. NoPROM/
+interpolationandnoallbandclaim. Outputs2.017GB/run snapshots+results, notsolver
+workspace; no swap/paidcompute/appclosing. Replay artifacts/m6-batch-antenna-
+root-analysis.py andreceiptm6-batch-antenna-root-analysis-20261021.json.
+CurrentcontrolnormalfreshfactorsbutalreadyM3/M5optimized, notupstreamFP64;
+8.09%incremental gain mustnotbesummednaivelywithpriorpercentages.
+Next cheaperalgorithmfilter: actualiterationsdominate916s, so symbolicanalysis
+alone saves~17s peradditionalf atmostfor2freqcase (notwholePCspeedup).
+AuditexistingPROM/rawfallback ormemoryboundedpredictor/recycling firstsmall;
+extra per-port2-historypredictorwouldcost~359MBW3, measurebeforeimplementation.
+No newlargerun untilcheapfilterwins. M6/M7/W4/W5/7freqantenna/median/newgeometry
+stillOPEN; globaldefaultsunchanged, goalactive.
+
+EXP130 closechunk:158Python/8shell/check.sh/diffcheckPASS; sameLuna read-only
+docs-gardenPASS after rootnumericalreview. Native sourcehash/currentartifact
+manifests match; no newnativebuildaftertests. Preserve source/config/fallback,
+commitlocal only, no pushingupstream. CurrentM6goalactive; nextactioncheap
+sweepalgorithmassessment, notanotherfullrunorclosure. No jobsleftscheduled.

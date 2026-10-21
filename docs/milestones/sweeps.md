@@ -184,16 +184,81 @@ Zwykłe snapshot outputs:49,74MB/tiny7 i466,60MB/medium7 na run; historia robocz
 pozostaje w RAM/VRAM. Fallback: pominąć opt-in; wcześniejszy native/manifest
 `build/m6-sweep-deferred/pre-deferred-{native,manifest.json}`. Defaulty bez zmian.
 
+## Kontrola z identyczną historią i pamięcią, EXP128–130
+
+`--frequency-port-batch` wybiera harmonogram frequency-major niezależnie od
+reuse. Obie drogi mają te same per-port previous E i per-f deferred release;
+kontrola buduje faktory dla każdego RHS, kandydat tylko raz dla jednej f.
+`--port-setup-reuse` nadal sam implikuje batch przy NF>1. Zachowane ograniczenia:
+2lumped excitations, rank1, fixed/uniform, Restart1, bez external seed/viz.
+Native odrzuca adaptive przed wyborem ścieżki. `--frequencies 3.5 3.6` jawnie
+nadpisuje tylko runtime Samples, bez zmiany fixture/mesh/materials/Tol.
+
+Build8,640s bez dependencies rebuild, source SHA
+`3cd21b1418d6dab06c641f47f1ba8e06f234876074d6fbd1983120a113262590`.
+158Python regresji PASS. Tanie filtry z identycznymi iteracjami i frozenK/polami/TEM:
+- EXP128 tiny3freq12,635→11,574s,6→3builds;
+- EXP129 medium3freq53,464→45,324s,6→3builds.
+Replay `artifacts/m6-batch-root-analysis.py tiny medium`, receipts
+`artifacts/m6-batch-{tiny,medium}-root-analysis-20261021.json`.
+
+### EXP130: właściwa antena T-Shaped medium
+
+| Pomiar | Fresh-factor control | Reuse |
+| --- | ---: | ---: |
+| Częstotliwości i porty |3,5/3,6GHz × P1/P2|identyczne|
+| Czas całego runu |996,519s|915,924s|
+| Iteracje w kolejności wykonania |44/44/41/41|44/44/41/41|
+| Faktoryzacje |4|2|
+| Cgroup peak |48,720GB|47,660GB|
+| Process GPU counter |2,150GB|2,150GB|
+
+**Jedna para: −8,09% czasu, −2,18% cgroup.** Nie mediana, nie fizyczna
+rezydencja VRAM/UVM, nie wynik siedmiu częstotliwości anteny. Pierwsze f cold,
+następne z własną historią portu. Obie drogi już używają FP32 storage bazy z
+arytmetyką FP64 i M5 scaled FP32 LU +2 korekcje FP64; to przyrost nad tymi
+optymalizacjami, nie porównanie z upstream i nie suma poprzednich procentów.
+Analiza17,0–17,2s/factor, faktoryzacja2,69–4,77s; same analysis+factor wyjaśniają
+około39,6s zaoszczędzonej pracy. Reszty80,6s delty nie przypisujemy bez profilu.
+
+Wszystkie4 original raw końcowe≤9,600e-7; wcześniejsze niezaakceptowane gapchecks
+wymagały reliable restart (P2 każdej f). FrozenK maxΔS1,698e-8, ΔVSWR3,133e-8,
+relativeenergy4,775e-8, portpower4,692e-9.28 porównań wholefield normą energii:
+E/B≤4,146e-7/3,497e-8. History/release/metadata/precision i source/config PASS.
+Stary kwalifikowany3,5GHz M4 CSV: ΔS1,859e-8/VSWR5,429e-8; to nie kontrola
+całego pola ani niezależna tight reference nowego3,6GHz/kwalifikacja produkcji.
+
+Odtworzenie (najpierw kontrola, root gate, potem kandydat):
+
+```sh
+python3 tools/dev.py run tshaped-medium artifacts/NEW-control \
+  --seconds 1800 --basis fp32 --direct-basis --pc-side right --krylov-size 64 \
+  --native-complex-coarse --native-coarse-fp32 --hypre-pool-mib 256 \
+  --memory-marks --release-gmres-basis --release-final-solver --setup-audit \
+  --release-postprocess-energy --save-fields --frequency-port-batch \
+  --defer-postprocessing --both-ports --frequencies 3.5 3.6
+```
+
+Kandydat: nowy output +`--port-setup-reuse --field-reference artifacts/NEW-control`.
+60GiB cap, bez swapu, host6GiB guard i1800s deadline. Nie uruchamiać jeśli host
+nie ma wystarczającego zapasu; zmiana mesh/materials wymaga nowej referencji.
+Wyjścia2,017GB/run to snapshoty i wyniki, nie working set na SSD. Dwie historie
+358,999MB +przejściowe E179,500MB w RAM/VRAM. Fallback: pominąć nowe opcje;
+`build/m6-frequency-batch/pre-batch-{native,manifest.json}` przed rozszerzeniem.
+
+Dowody: `artifacts/m6-batch-antenna-{control,on}-20261021`, replay
+`artifacts/m6-batch-antenna-root-analysis.py` i receipt
+`artifacts/m6-batch-antenna-root-analysis-20261021.json`.
+
 ### Następne bramki
 
-1. Przed W3 przygotować kontrolę, która też zwalnia solver przed pomiarem;
-   uniknąć ponownego OOM dużego monolitycznego wariantu. Rozdzielić harmonogram
-   frequency-major od reuse, aby porównać świeże faktory/reuse z identyczną
-   polityką pamięci. Najpierw tani filtr, potem2f właściwej anteny po resourcegate.
-2. Zmierzyć rzeczywisty cały koszt anteny/UVM, cold start i peak; nie przenosić
-   automatycznie wyniku coax na antenę. Wszystkie punkty zachowują frozenK.
-3. Odrębna ocena adaptive/PROM z held-out point i oryginalnym residual, symbolic
-   reuse i recycling z policzonym workspace. Obecne filtry nie zaliczają ich.
-4. Antena/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
+1. Tani filtr dalszych algorytmów sweep: symbolic reuse/recycling lub istniejący
+   adaptive/PROM z oryginalnym residual, fallback i held-out point. Obecny reuse
+   nie zalicza tych hipotez. Iteracje nadal dominują cały koszt; sam analysis
+   reuse może oszczędzić około17s na dodatkowym f, nie setki sekund solve.
+2. Ocenić bounded predictor per-port na małym sweepie przed pełną anteną;
+   dwie poprzednie historie zamiast jednej kosztowałyby dodatkowo~359MB W3.
+   Nie wdrażać bez pomiaru total time/quality. Kolejne drogie runy dopiero po zysku.
+3. Antena7freq/W4/W5/nowa geometria/repeats/finalpackage w M7 pozostają otwarte.
 
-M6.6, M6 i goal nadal otwarte. Nie generalizować dwóch coax na każdą geometrię.
+M6.6, M6 i goal nadal otwarte. Brak globalnej promocji na podstawie jednej pary.

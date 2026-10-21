@@ -611,7 +611,21 @@ def basis_prefetch_applied(log, solves):
     return solves > 0 and len(markers) == solves and all(int(c) > 0 and int(b) >= 4*int(c) for c, b in markers)
 
 
-def port_batch_config(config, both_ports=False, reuse=False, excitation=None):
+def point_sweep_config(config, frequencies):
+    if (not isinstance(frequencies,(list,tuple)) or len(frequencies)<2
+            or not all(isinstance(f,(int,float)) and not isinstance(f,bool) and math.isfinite(f) and f>0 for f in frequencies)
+            or list(frequencies)!=sorted(set(frequencies))):
+        raise ValueError('Frequency override requires at least two sorted distinct positive finite GHz values')
+    driven=config['Solver']['Driven']
+    if (driven.get('AdaptiveTol',0)>0 or driven.get('Restart',1)!=1
+            or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0)!=0):
+        raise ValueError('Frequency override requires a fixed mesh, uniform sweep and first solve')
+    config=json.loads(json.dumps(config))
+    config['Solver']['Driven']['Samples']=[{'Type':'Point','Freq':list(frequencies)}]
+    return config
+
+
+def port_batch_config(config, both_ports=False, reuse=False, excitation=None, frequency_batch=False):
     config = json.loads(json.dumps(config))
     ports = config['Boundaries']['LumpedPort']
     if excitation is not None:
@@ -624,27 +638,28 @@ def port_batch_config(config, both_ports=False, reuse=False, excitation=None):
             raise ValueError('Both ports requires exactly two distinct lumped ports')
         for p in ports:
             p['Excitation'] = p['Index']
-    if reuse:
+    if reuse or frequency_batch:
         samples = config['Solver']['Driven']['Samples']
         excitations = {p.get('Excitation') for p in ports if p.get('Excitation')}
         frequencies=[f for s in samples for f in s.get('Freq',[])]
         if (not samples or any(s.get('Type')!='Point' for s in samples) or not frequencies
                 or not all(isinstance(f,(int,float)) and not isinstance(f,bool) and math.isfinite(f) and f>0 for f in frequencies)
-                or frequencies!=sorted(set(frequencies)) or (len(frequencies)>1 and len(excitations)!=2)
+                or frequencies!=sorted(set(frequencies)) or (frequency_batch and len(frequencies)<2)
+                or (len(frequencies)>1 and len(excitations)!=2)
                 or len(excitations) < 2 or any(isinstance(e,bool) or not isinstance(e,int) or e <= 0 for e in excitations)
                 or config['Boundaries'].get('WavePort') or config['Boundaries'].get('FloquetPort')
                 or config['Solver']['Driven'].get('AdaptiveTol',0)>0
                 or (len(frequencies)>1 and (config['Solver']['Driven'].get('Save') or any(s.get('Save') for s in samples)))
                 or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0
                 or config['Solver']['Driven'].get('Restart',1) != 1):
-            raise ValueError('Port setup reuse requires sorted distinct point frequencies, fixed mesh, distinct lumped excitations, no wave/Floquet ports and first solve; sweeps require two excitations')
+            raise ValueError('Port setup reuse/batching requires sorted distinct point frequencies, fixed mesh, distinct lumped excitations, no wave/Floquet ports and first solve; sweeps require two excitations')
     return config
 
 
-def port_setup_audit(log, config, reuse=False):
+def port_setup_audit(log, config, reuse=False, frequency_batch=False):
     excitations = sorted({int(p['Excitation']) for p in config['Boundaries']['LumpedPort'] if p.get('Excitation')})
     frequencies = sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
-    frequency_major=reuse and frequencies>1
+    frequency_major=(reuse or frequency_batch) and frequencies>1
     order=[(i,e,f) for i,e in enumerate(excitations) for f in range(frequencies)]
     if frequency_major:order.sort(key=lambda x:x[2])
     expected = [('reuse' if reuse and i else 'build', str(e), str(f)) for i,e,f in order]
@@ -719,7 +734,7 @@ def validate_deferred_postprocessing(config, release_final_solver,frequency_majo
             or driven.get('Restart', 1) != 1 or driven.get('Save')
             or config.get('Model', {}).get('Refinement', {}).get('MaxIts', 0) != 0
             or boundaries.get('WavePort') or boundaries.get('FloquetPort')):
-        raise ValueError('Deferred postprocessing requires two lumped excitations, fixed mesh/final solver release without visualization/wave/Floquet ports; multiple frequencies require frequency-major reuse and energy release')
+        raise ValueError('Deferred postprocessing requires two lumped excitations, fixed mesh/final solver release without visualization/wave/Floquet ports; multiple frequencies require frequency-major batching and energy release')
 
 
 def deferred_postprocessing_applied(log, config,frequency_major=False):
@@ -764,7 +779,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False):
+        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None):
     if pc_basis_fp32_forward and pc_basis_compensated_forward:
         raise ValueError('Choose exactly one experimental PC basis arithmetic')
     pc_basis_mixed=pc_basis_fp32_forward or pc_basis_compensated_forward
@@ -779,7 +794,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         raise ValueError('Direct basis requires FP32 storage')
     if basis_prefetch and (basis != 'fp32' or not direct_basis or cpu_reference):
         raise ValueError('Basis prefetch requires direct FP32 CUDA')
-    if (setup_audit or port_setup_reuse) and (not native_complex_coarse or nsys_window is not None):
+    if (setup_audit or port_setup_reuse or frequency_port_batch) and (not native_complex_coarse or nsys_window is not None):
         raise ValueError('Port setup audit/reuse requires native complex coarse without partial profiler')
     if partial_initial_fields and not initial_fields:
         raise ValueError('Partial initial fields requires an explicit verified source')
@@ -787,6 +802,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         raise ValueError('Coax sweep requires coax fields/L2 on a coax fixture')
     if coax_frequency is not None and (name not in ['coax-tiny','coax-medium'] or not (coax_fields or coax_l2) or coax_sweep):
         raise ValueError('Coax frequency requires coax fields/L2 and no simultaneous sweep')
+    if frequencies is not None and (coax_sweep or coax_frequency is not None):
+        raise ValueError('Frequency override conflicts with coax sweep/frequency presets')
     profiler = profile = None
     if nsys_window is not None:
         if (basis != 'fp64' and not (basis == 'fp32' and direct_basis)) or cpu_reference or ceed_qpool or save_fields or field_reference or coax_l2:
@@ -814,11 +831,13 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                native_complex_coarse, coax_sweep, coax_frequency)
     if ams_cycles is not None:
         config = ams_config(config, ams_cycles)
-    config = port_batch_config(config, both_ports, port_setup_reuse, excitation)
+    if frequencies is not None:
+        config = point_sweep_config(config, frequencies)
+    config = port_batch_config(config, both_ports, port_setup_reuse, excitation, frequency_port_batch)
     frequency_count=sum(len(s['Freq']) for s in config['Solver']['Driven']['Samples'])
-    frequency_major=port_setup_reuse and frequency_count>1
+    frequency_major=(port_setup_reuse or frequency_port_batch) and frequency_count>1
     if frequency_major and initial_fields:
-        raise ValueError('Frequency-major reuse uses per-port RAM/VRAM history, not external field seeds')
+        raise ValueError('Frequency-major batching uses per-port RAM/VRAM history, not external field seeds')
     if release_postprocess_energy and (len(expected_field_files(config)) < 4 or config['Solver']['Driven'].get('Save')
             or config.get('Model',{}).get('Refinement',{}).get('MaxIts',0) != 0):
         raise ValueError('Energy release requires multiple solves, fixed mesh and no visualization saves')
@@ -888,8 +907,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         flags['PALACE_GMRES_FP32_DIRECT'] = '1'
     if basis_prefetch:
         flags['PALACE_GMRES_BASIS_PREFETCH'] = '1'
-    if setup_audit or port_setup_reuse:
+    if setup_audit or port_setup_reuse or frequency_port_batch:
         flags['PALACE_PORT_SETUP_AUDIT'] = '1'
+    if frequency_port_batch:
+        flags['PALACE_FREQUENCY_PORT_BATCH'] = '1'
     if port_setup_reuse:
         flags['PALACE_REUSE_PORT_SETUP'] = '1'
     if release_postprocess_energy:
@@ -986,7 +1007,9 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                                    'basis_audit': basis_audit,
                                    'pc_basis_fp32_forward': pc_basis_fp32_forward,
                                    'pc_basis_compensated_forward': pc_basis_compensated_forward,
-                                   'frequency_major_reuse': frequency_major,
+                                   'frequency_major_reuse': frequency_major and port_setup_reuse,
+                                   'frequency_major_batch': frequency_major,
+                                   'frequency_override_ghz': frequencies,
                                    'nsys_window': nsys_window,
                                    'cpu_reference': cpu_reference,
                                    'phase_trace': phase_trace,
@@ -1082,8 +1105,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             write(output/'pc-basis-audit.json',audit)
             status['pc_basis_compensated_forward_passed' if pc_basis_compensated_forward else 'pc_basis_fp32_forward_passed'] = audit['passed']
             status['complete'] = status['complete'] and audit['passed']
-        if setup_audit or port_setup_reuse:
-            audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse)
+        if setup_audit or port_setup_reuse or frequency_port_batch:
+            audit = port_setup_audit((output/'palace.log').read_text(), config, port_setup_reuse, frequency_port_batch)
             write(output/'port-setup-audit.json',audit)
             status['port_setup_audit_passed'] = audit['passed']
             status['complete'] = status['complete'] and audit['passed']
@@ -1216,6 +1239,8 @@ def main():
     r.add_argument('--defer-postprocessing', action='store_true', help='Opt-in cache first E field in RAM/VRAM and measure both ports after final solver release')
     r.add_argument('--release-postprocess-energy', action='store_true', help='Opt-in free energy operators between solves and rebuild before measurements; no visualization writes')
     r.add_argument('--coax-sweep',nargs='?',const='fixture',default=False,choices=['fixture','n78'],help='Keep fixture frequencies or explicitly select n78 preset 3.3..3.9GHz/0.1GHz with coax field diagnostics')
+    r.add_argument('--frequency-port-batch', action='store_true', help='Two-port frequency-major schedule with per-port history, independent of optional setup reuse')
+    r.add_argument('--frequencies',nargs='+',type=float,help='Explicit sorted GHz point sweep; preserves frozen fixture mesh/materials/Tol, conflicts with coax presets')
     r.add_argument('--coax-frequency', type=float, help='Run one existing coax fixture frequency with fields/L2; both ports and medium mesh unchanged')
     r.add_argument('--release-final-solver', action='store_true', help='Release final fixed-mesh solver and system operators before postprocessing')
     r.add_argument('--hypre-pool-mib', type=int, help='Experimental initial Umpire device reservation, 16..4096 MiB; not a hard cap')
@@ -1281,7 +1306,7 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward)
+            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

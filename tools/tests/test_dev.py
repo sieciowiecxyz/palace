@@ -289,6 +289,57 @@ class ToolRegressionTests(unittest.TestCase):
             with self.assertRaises(ValueError):dev.port_batch_config(bad,reuse=True)
         with self.assertRaises(ValueError):dev.validate_deferred_postprocessing(config,True)
 
+    def test_frequency_major_fresh_factors_preserves_history_but_never_reuses(self):
+        _,_,base=dev.fixture('coax-tiny')
+        config=dev.port_batch_config(base,frequency_batch=True)
+        csr='PALACE_COARSE_CSR: algorithm=fnv1a64 structure=0123456789abcdef values=0123456789abcdef\n'
+        phase='PALACE_COARSE_SETUP: analysis_s=0.01 factor_s=0.02\n'
+        text=''
+        for f in range(3):
+            for e in [1,2]:
+                text+=csr+phase+f'PALACE_PORT_SETUP: action=build excitation={e} frequency_index={f}\n'
+                text+=f'PALACE_SWEEP_SEED: action={"zero" if f==0 else "restore"} excitation={e} frequency_index={f}\n'
+                text+=f'PALACE_SWEEP_SEED: action={"store" if f<2 else "release"} excitation={e} frequency_index={f}'+(' logical_bytes=1024' if f<2 else '')+'\n'
+        audit=dev.port_setup_audit(text,config,False,True)
+        self.assertTrue(audit['passed']);self.assertEqual(audit['expected_builds'],6)
+        self.assertEqual(audit['history']['logical_history_capacity_bytes'],2048)
+        self.assertFalse(dev.port_setup_audit(text,config,False,False)['passed'])
+        for bad in [text.replace('action=build','action=reuse',1),text.replace(csr,'',1),
+                    text.replace('action=restore','action=zero',1)]:
+            self.assertFalse(dev.port_setup_audit(bad,config,False,True)['passed'])
+        for which in ['onefreq','singleport','wave','adaptive','save','restart','amr']:
+            bad=json.loads(json.dumps(config))
+            if which=='onefreq':bad['Solver']['Driven']['Samples']=[{'Type':'Point','Freq':[3.55]}]
+            if which=='singleport':bad['Boundaries']['LumpedPort'][1]['Excitation']=False
+            if which=='wave':bad['Boundaries']['WavePort']=[{}]
+            if which=='adaptive':bad['Solver']['Driven']['AdaptiveTol']=0.001
+            if which=='save':bad['Solver']['Driven']['Save']=True
+            if which=='restart':bad['Solver']['Driven']['Restart']=2
+            if which=='amr':bad.setdefault('Model',{}).setdefault('Refinement',{})['MaxIts']=1
+            with self.assertRaises(ValueError):dev.port_batch_config(bad,frequency_batch=True)
+        with patch.object(dev,'require_host_memory') as host:
+            for flags in [dict(frequency_port_batch=True),
+                          dict(frequency_port_batch=True,native_complex_coarse=True,nsys_window='0:2'),
+                          dict(frequencies=[3.5,3.6],coax_sweep=True,coax_fields=True)]:
+                with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**flags)
+            host.assert_not_called()
+
+    def test_explicit_point_sweep_changes_only_samples(self):
+        _,_,base=dev.fixture('tshaped-medium')
+        changed=dev.point_sweep_config(base,[3.5,3.6])
+        self.assertEqual(changed['Solver']['Driven']['Samples'],[{'Type':'Point','Freq':[3.5,3.6]}])
+        expected=json.loads(json.dumps(base));expected['Solver']['Driven']['Samples']=changed['Solver']['Driven']['Samples']
+        self.assertEqual(changed,expected)
+        self.assertNotEqual(changed['Solver']['Driven']['Samples'],base['Solver']['Driven']['Samples'])
+        for freqs in [[],[3.5],[3.6,3.5],[3.5,3.5],[3.5,float('nan')],[3.5,float('inf')],
+                      [True,3.5],[0,3.5],[-1,3.5],'3.5,3.6']:
+            with self.assertRaises(ValueError):dev.point_sweep_config(base,freqs)
+        for which in ['AdaptiveTol','Restart','amr']:
+            bad=json.loads(json.dumps(base))
+            if which=='amr':bad.setdefault('Model',{}).setdefault('Refinement',{})['MaxIts']=1
+            else:bad['Solver']['Driven'][which]=2
+            with self.assertRaises(ValueError):dev.point_sweep_config(bad,[3.5,3.6])
+
     def test_multifrequency_energy_release_tracks_frequency_major_measurements(self):
         _,_,config=dev.fixture('coax-tiny');order=[(e,f) for f in range(3) for e in [1,2]]
         log=''.join(f'PALACE_POSTPROCESS_ENERGY_RELEASED: excitation={e} frequency_index={f}\n' for e,f in order[:-1])

@@ -124,7 +124,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
 - [ ] EXP109–110 fusedFP32 actionfilter PASS; EXP112–113 PCforwardtiny/medium poprawne lecz więcejiteracji/brak wykazanego speedupu, HOLD przedW3. EXP114–116 compensated/bit-split actionfilterPASS, actualNforward~12%taniej/przybłędzie~6e-15, scalar/tracewolniejsze. EXP117–119 scopedPCtiny/mediumKPASS, iteracjebezwzrostu ale netgain niewykazany/HOLD, W3NOTRUN. Następnie audytM6.6 sweep/PROM/reuse; W3/UVM przedpromocją M6.4/M6.5. docs/pc-basis-fp32.md.
 
-- [ ] M6.6 — ACTIVE: EXP120–127 audyt, frequency-major reuse, per-port history i per-f deferred release; 3/7freq coax tiny/medium PASS. Siedem punktów medium 93,540→75,664s (jedna para −19,1%), cgroup +20,4MB, nie memory saving. Następne: kontrola anteny mieszcząca się w limicie, resourcegate i pomiar UVM; symbolic/recycling/PROM z held-out i M7 pozostają otwarte. docs/milestones/sweeps.md.
+- [ ] M6.6 — ACTIVE: EXP120–130 frequency-major reuse, per-port history i per-f deferred release; coax3/7freq oraz W3medium3,5/3,6GHz oba porty PASS. Antena996,519→915,924s (jedna para −8,09%), cgroup48,720→47,660GB; pola/raw/frozenK PASS. Następne: tani filtr algorytmów sweep (symbolic/recycling/PROM z held-out), potem W4/W5/mediany/nowa geometria i pakiet M7. docs/milestones/sweeps.md.
 
 ### M7 — utrwalić najlepszy zaakceptowany wariant
 
