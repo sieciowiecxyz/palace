@@ -29,6 +29,7 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
 - EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
 - EXP135–138 complex projection: math96/coax7freq PASS, lecz W3 mixed coarse2IR FAIL przyP2/3,7GHz (1,460e-3>1e-3). Tylko5/6solve, nie speedup/pełnaRFkwalifikacja; nowy wariant defaultOFF/HOLD.
+- EXP153–154 actual3,3GHz/oba porty cold fullFP64 vscombineddirectFP32storage/mixed2IR/reuse PASS:752,534→549,512s end-to-end (−26,98%), cgroup60,692→46,357GB (−23,62%), frozenS/VSWR/power/energy/raw/14fieldsPASS. Pierwszyz7punktów, nie mediana/globalpromotion; docs/milestones/antenna-sweep-qualification.md.
 - EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. EXP143–147: fixed3 coax PASS/singleP2 executionPASS, pełny sweep deadlineFAIL5/6, niepromowany. EXP148–152: PROM4 held-outPASS, lecz +19,77%czasu/+11,77%cgroup vsbestuniform; REJECT promocji. Symbolic upperbound~2,2%, full recycling niepromowany. Następne: pełny7f anteny wbounded chunks, potem końcowa kwalifikacja. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
@@ -3401,3 +3402,44 @@ garden agrees source/actualofflinevsheldout/limits. Rootverifiedcurrentbuild
 normalpathEXP152 too. No depsrebuild/cloud/swap/appsclosing. Localcommitonly,
 M6active, no liveGPUjobs. Next actualsevenfreqantenna qualification with
 explicitboundedchunksandaggregatecost; no fakeglobalpromotion fromcoax.
+
+EXP153 prereg actualantenna7pointboundedqualificationstarts3,3GHzbothports.
+Reference fullFP64basis/arithmetic/nativeFP64complexcoarse/cold/noportreuse,
+RIGHT/K64/Tol1e-6/mediumOrder2/frozenmesh; defer+energy/finalrelease inboth
+strategies.1800s/60GiBnoSwap/6GiBguard. Hostavailable78,62GiB/GPU1,775MiB
+observedbefore dispatch, userappsuntouched. Root validatedsinglefrequency
+bothport/deferredconfigbeforeGPU. No oldseed/PROM/predictor.
+Aftercomplete2raw/fullfieldinventory, rootgate then samebuildcandidate
+FP32directbasis/scaledFP32coarse/default2IR/equalfrequencysetupreuse against
+thisFP64reference. IfreferenceFAIL preserveanddiagnose,noautomaticretry.
+Sevenpoints3,3..3,9/0,1 toqualifybothports inindependentfrequencychunks; report
+sumallsetup/IO/fulltimes, notmonolithic7f orcross-chunkwarmstartproof. Prior
+2freqW3sharing/historyproofseparate. ThisqualificationdoesnotreplaceW4/W5/
+medians/newgeometry/package. No paidcompute/swap/appsclosing/tolerancechange.
+
+EXP153 referencePASS3,3GHzbothports coldFP64basis/coarse:43/44iterations,
+2originalraw≤9,50e-7,4verifiedE/Bsnapshots,2freshsetups,nativeFP64/cleanup/
+energydeferPASS/noOOM. Elapsed752,180/end-to-end752,534s, cgroup60,692GB
+(notreportedprocessGPU2GiBphysicalresidency). Rootsource/config/bytes/native
+precision/gates independentlychecked, root-reference-check.json saved.
+EXP154 prereg samebuild/configphysics candidate3,3bothports directFP32basis/
+scaledFP32coarse/default2IR/portsetupreuse,1800s. AgainstactualEXP153fullFP64
+fieldreference, allraw/fields7regionsperport/RFenergyfrozenK. No externalseed/
+predictor/PROM/tolerancechange. Rootgatebeforeanynextfrequency.
+
+EXP154 candidatePASS3,3bothports:44/45iter/raw≤8,19e-7/coarse≤1,30e-4,
+1build+1reuse,14wholefieldrowsPASS. Samebuild/config/mesh/source/fullinventory
+verifiedroot, RFenergymaxΔS1,1852e-8/VSWR3,8873e-8/relativeenergy5,9247e-8/
+power5,0239e-9, E/B≤1,2978e-7/1,1365e-7. End-to-end549,512s vsFP64ref
+752,534s (−26,98%),cgroup46,357vs60,692GB (−23,62%). Combinedflags/cold
+onepair notmedian ormonolithicsweep/physicalmeasurementproof. Raw/fields
+provenancepreserved rootreceipt/replaym6-qualified-root-analysis.py330.
+Qualificationmatrix docs/milestones/antenna-sweep-qualification.md,6points
+NOTRUN; next3,4fullFP64reference thenrootgate/candidate. No newhypotheses.
+GoalM6active, W4/W5/medians/newgeometry/package remainrequired.
+
+EXP153–154 docs-onlyclosechunk: sameLunaread-onlygarden/check/diffPASS
+againstactualnewqualificationartifacts. MatchedfullFP64referenceandcombined
+candidateprovefirst3,3point only. Localcommit, no newnativebuild; cached
+sourceSHAunchangeda6ec732f...187c3338. No GPUjobsleft; nextreference3,4
+thenrootgate/candidate, no newresearchdetour. GoalM6active.

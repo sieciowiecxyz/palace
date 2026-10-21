@@ -330,3 +330,11 @@ wolniejszy i większy niż same-build bestuniform EXP152, więc niepromowany.
 Native build19,360s po poprawieniu błędu kompilacji; normalna ścieżka EXP152
 14raw/28fields/metadata/release/count PASS. Brak kwalifikacji anteny z coax.
 Komendy i dokładne ograniczenia: raport sweepów.
+
+### EXP153–154: actual antenna3,3GHz, oba porty
+
+Nowa cold fullFP64 referencja ukończona i source/config/inventory/raw/native
+sprawdzone. Samebuild candidateFP32storage/mixed2IR/reuse przechodzi14regional
+E/B i RF/S/VSWR/power/energy/raw. Jedna para, pierwszyz7punktów;6f NOTRUN.
+Nie używać jako dowodu całego pasma, monolitycznego sweepu lub mediany M7.
+Dokładneargv i receipt w [macierzy kwalifikacji](milestones/antenna-sweep-qualification.md).
