@@ -4,10 +4,12 @@
 #include "drivensolver.hpp"
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <vector>
 #include <complex>
 #include <cmath>
+#include <sstream>
 #include <cstdlib>
 #include <cstddef>
 #include <iostream>
@@ -61,7 +63,8 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
   bool adaptive = (iodata.solver.driven.adaptive_tol > 0.0);
   MFEM_VERIFY(!(std::getenv("PALACE_REUSE_PORT_SETUP") ||
                 std::getenv("PALACE_FREQUENCY_PORT_BATCH") ||
-                std::getenv("PALACE_SWEEP_PREDICTOR")) || !adaptive,
+                std::getenv("PALACE_SWEEP_PREDICTOR") ||
+                std::getenv("PALACE_HISTORY_FIELDS")) || !adaptive,
               "Frequency/port batching requires a uniform sweep!");
   if (adaptive && omega_sample.size() <= iodata.solver.driven.prom_indices.size() &&
       !iodata.solver.driven.adaptive_circuit_synthesis)
@@ -129,9 +132,35 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   const bool project_sweep = predictor_env && std::string(predictor_env) == "projected";
   MFEM_VERIFY(!sweep_predictor || project_sweep || std::string(predictor_env) == "1" ||
                   std::string(predictor_env) == "linear", "Unknown sweep predictor mode!");
-  MFEM_VERIFY(!sweep_predictor ||
+  const char *history_source = std::getenv("PALACE_HISTORY_FIELDS");
+  std::array<int, 2> history_indices{};
+  std::array<double, 2> history_frequencies{};
+  if (history_source)
+  {
+    MFEM_VERIFY(sweep_predictor && omega_sample.size() == 1 && !frequency_batch &&
+                    iodata.solver.linear.initial_guess && iodata.solver.driven.restart == 1 &&
+                    iodata.model.refinement.max_it == 0 && Mpi::Size(space_op.GetComm()) == 1 &&
+                    !post_op.WillWriteFields() && !std::getenv("PALACE_INITIAL_FIELDS") &&
+                    space_op.GetWavePortOp().Size() == 0 && space_op.GetFloquetPortOp().Size() == 0,
+                "History replay requires a single-frequency uniform rank1 fixed-mesh lumped solve with predictor/InitialGuess, no external seed/viz!");
+    const char *indices = std::getenv("PALACE_HISTORY_INDICES");
+    const char *frequencies = std::getenv("PALACE_HISTORY_FREQUENCIES");
+    MFEM_VERIFY(indices && frequencies, "Missing history frequency/index map!");
+    std::istringstream ii(indices), ff(frequencies);
+    char comma_i = 0, comma_f = 0, extra = 0;
+    MFEM_VERIFY((ii >> history_indices[0] >> comma_i >> history_indices[1]) &&
+                    comma_i == ',' && !(ii >> extra) && history_indices[0] >= 0 &&
+                    history_indices[1] > history_indices[0], "Invalid history indices!");
+    MFEM_VERIFY((ff >> history_frequencies[0] >> comma_f >> history_frequencies[1]) &&
+                    comma_f == ',' && !(ff >> extra) && std::isfinite(history_frequencies[0]) &&
+                    std::isfinite(history_frequencies[1]) && history_frequencies[0] > 0.0 &&
+                    history_frequencies[1] > history_frequencies[0], "Invalid history frequencies!");
+    const double target = iodata.units.Dimensionalize<Units::ValueType::FREQUENCY>(omega_sample[0]) / (2 * M_PI);
+    MFEM_VERIFY(target > history_frequencies[1], "History must precede the target frequency!");
+  }
+  MFEM_VERIFY(!sweep_predictor || history_source ||
                   (frequency_batch && omega_sample.size() >= 3 && iodata.solver.linear.initial_guess),
-              "Sweep predictor requires frequency-major batching, >=3 frequencies and InitialGuess=true!");
+              "Sweep predictor requires >=3 batch frequencies or explicit verified history!");
   const bool setup_audit = reuse_port_setup || explicit_frequency_batch || std::getenv("PALACE_PORT_SETUP_AUDIT");
   const bool release_postprocess_energy = std::getenv("PALACE_RELEASE_POSTPROCESS_ENERGY") != nullptr;
   bool energy_released = false;
@@ -366,6 +395,26 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                           omega_sample.size() * port_excitations.Size())
             : "");
 
+    if (history_source)
+    {
+      // Read each immutable source snapshot once. They are inputs, not disk workspace.
+      GridFunction field(space_op.GetNDSpace(), true);
+      for (int h = 0; h < 2; ++h)
+      {
+        const auto stem = "s" + std::to_string(excitation_idx) + "-f" +
+                          std::to_string(history_indices[h]) + "-E.bin";
+        FieldSnapshot(std::filesystem::path(history_source) / stem, field, false);
+        auto &destination = h == 0 ? sweep_older[excitation_idx] : sweep_history[excitation_idx];
+        destination = std::make_unique<ComplexVector>(E.Size());
+        destination->UseDevice(true);
+        field.Real().GetTrueDofs(destination->Real());
+        field.Imag().GetTrueDofs(destination->Imag());
+      }
+      E = *sweep_history.at(excitation_idx);
+      Mpi::Print("PALACE_HISTORY_SEED: excitation={} frequency_index=0 source_indices={},{} source_frequencies={:.17e},{:.17e} logical_bytes_per_field={}\n",
+                 excitation_idx, history_indices[0], history_indices[1], history_frequencies[0],
+                 history_frequencies[1], 2LL * sizeof(double) * E.Size());
+    }
     // Per-port continuation must not seed port 1 with the last port 2 field.
     if (frequency_batch && iodata.solver.linear.initial_guess)
     {
@@ -402,7 +451,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
     }
 
-    if (sweep_predictor && omega_i >= 2)
+    if (sweep_predictor && (history_source || omega_i >= 2))
     {
       // Only the initial approximation changes. Compare both starts against the current
       // original FP64 A(f), not the preconditioner, before releasing temporary workspace.
@@ -410,8 +459,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       {
         const auto &previous = *sweep_history.at(excitation_idx);
         const auto &older = *sweep_older.at(excitation_idx);
-        const double ratio = (omega_sample[omega_i] - omega_sample[omega_i - 1]) /
-                             (omega_sample[omega_i - 1] - omega_sample[omega_i - 2]);
+        const double target = iodata.units.Dimensionalize<Units::ValueType::FREQUENCY>(omega) / (2 * M_PI);
+        const double ratio = history_source
+            ? (target - history_frequencies[1]) / (history_frequencies[1] - history_frequencies[0])
+            : (omega_sample[omega_i] - omega_sample[omega_i - 1]) /
+              (omega_sample[omega_i - 1] - omega_sample[omega_i - 2]);
         MFEM_VERIFY(std::isfinite(ratio) && ratio > 0.0,
                     "Sweep predictor requires increasing distinct frequencies!");
         const auto &original_A = *(reuse_port_setup ? retained_A : A);
@@ -506,6 +558,13 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         Mpi::Print("PALACE_SWEEP_SEED: action=release excitation={} frequency_index={}\n",
                    excitation_idx, omega_i);
       }
+    }
+
+    if (history_source)
+    {
+      sweep_history.erase(excitation_idx);
+      sweep_older.erase(excitation_idx);
+      Mpi::Print("PALACE_HISTORY_RELEASE: excitation={} frequency_index=0\n", excitation_idx);
     }
 
     // Release current factors before deferred measurements; K/C/M remain for the next f.

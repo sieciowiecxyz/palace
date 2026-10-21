@@ -294,3 +294,15 @@ linear, jawne `projected` ma oddzielny scalar/applies/mode audit. EXP138 kontrol
 całej anteny PASS, kandydat FAIL mixed coarse gate1e-3 przyP2/3,7GHz; nie outer
 raw gate1e-6 i nie OOM. 28 field rows/5outer zakończeń nie są pełną kwalifikacją.
 Nie przestawiać complete/passed ani liczyć speedupu z częściowego czasu.
+
+### EXP139–142: verified history input
+
+162 Python regressions cover single-frequency selection, completed immutable source,
+full inventory, physics/FEspace/port identity, source index mapping and native
+history lifetime/mode/alpha/applies audit. Coax tiny/medium single3,8GHz history
+runs pass TEM, frozen RF/energy/raw and wholefields. Medium end-to-end29,035→26,235s,
+not an antenna speed qualification. Legacy seven-frequency/two-port current-native
+regression EXP142 passes14raw/28fieldrows plus TEM/setup/metadata/release.
+EXP141 antennaP2/3,7GHz is an expected diagnostic FAIL at coarse1e-3 gate,
+not a valid full solve. Do not relax thresholds or relabel partial results.
+Commands, provenance, I/O/timing limits and artifacts: [sweep report](milestones/sweeps.md).

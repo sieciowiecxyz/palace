@@ -29,7 +29,7 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP128–130: fresh-factor i reuse mają identyczny harmonogram/historię/deferred release. W3medium3,5/3,6GHz oba porty996,519→915,924s (−8,09%, jedna para), cgroup48,720→47,660GB. Pola/raw/frozenK PASS; bez mediana/defaultpromotion.
 - EXP131–133 linear predictor: coax7freq czas −6,45%/−9,54%, ale W3 1312,606→1317,834s, obie próby fallback. Quality PASS, antena speedup REJECT/default OFF. Ten sam memory/precision scope, bez promocji z małego modelu.
 - EXP135–138 complex projection: math96/coax7freq PASS, lecz W3 mixed coarse2IR FAIL przyP2/3,7GHz (1,460e-3>1e-3). Tylko5/6solve, nie speedup/pełnaRFkwalifikacja; nowy wariant defaultOFF/HOLD.
-- Następne: tani verified history/current-f replay pierwszego PC apply bez rozwiązywania pierwszych4 układów; dopiero stabilność fixed refinement i symbolic/recycling/PROM/heldout. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
+- EXP139–142: verified history single-f/coax+legacy PASS; antena odtwarza klasę coarse2IR failure w121s zamiast1159s, nie identyczny bitowo RHS. Następne: stałe3korekcje bez zmiany progów, symbolic/recycling/PROM/heldout. Bez ponawiania drogiej pary bez nowej informacji. M6.3TCproof/M7.5geometria NOTRUN; M6/M7/W4/W5/mediany otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -3184,3 +3184,76 @@ read-onlygarden foundonehistoricalnext-stepstale inM6checkpoint; rootcorrected
 chronologytoEXP135–138 andrerandocscheck. Newheader+hostprobeincludedinlocal
 commit, rawartifactsnotGit. No new paidcompute/swap/appsclosing/livejobs.
 GoalactiveM6; failure/incomplete remainexplicit, qualifiedbaselinepreserved.
+
+EXP139 prereg: explicit --initial-history completedSOURCE --history-frequencies
+f0 f1 withonefuturetargetfrequency. Verifywholeoriginalsourcecompletion/config/
+fullinventory+mesh/materials/physicalports/deps; onlyexplicitfrequencyand
+excitationselectionallowed. Bytechecks/sourceindexmap/provenance saved,
+read-onlymount; initialapproxnotaccuracyreference/nofakecompletedresults.
+Native2sourceEreadsonceperport, sameFEspaceheader/GetTrueDofs, originalcurrentA
+projection; releasesbothhistoryEafteroneouter solve; nohotdiskworkspace.
+--frequencies nowsupportsonepoint; --frequency-port-batch stillrequires>=2.
+162PythonregressionsPASS includingwrongphysics/headerbytes/unfinishedsource/
+mode/pairs/map/lifetime/applies/ratio; no sourcefixturemutation.
+Firstcachedbuildjobs2 then tiny3.8GHzbothports freshcontrolvsread-onlyhistory
+3.6/3.7fromEXP136tiny7control,60seach andwholefields/TEM/raw(K)referencefresh.
+Fullsourceverification~49.7MB, selectedhistoryE~5.7MB tiny; no statementofantenna
+reproducibilityuntilactualrun. Later W3P2only3.7 source3.5/3.6,300s bound,
+no repeatfirst4systems. FailedcoarseRHSnotcapturedpreviously; inputsource E and
+CSRmaynotbitmatcholdrun, verifyquantities notclaimexactreproductionblindly.
+Fallbackbuild/m6-history/pre-history-{native,manifest.json}; no dependency
+rebuild/paidcompute/swap/appsclosing. Rootgateaftereachcase beforelarger.
+
+EXP139 tiny singlef3.8history replayPASS: control9,457s/81iter, replay9,479s/
+22iter; no netwholetimeclaim.2sourcef3.6/3.7 selectedindices3/4oforiginal7,
+originalfullinventory/physics/provenancechecked. Raw/setup/defer/metadata/
+historyrelease/predictorPASS; rootTEM/K E/B≤7,094e-7/4,300e-7,
+ΔS1,714e-9/VSWR2,463e-9. Replayartifacts/m6-history-root-analysis.py tiny.
+Nativebuild9,386s; rootmatchedbuild/controlconfig. Normalinputreadsnotworkspace.
+Addedrunnerpreparation_seconds/end_to_end_seconds alongsideexistingelapsed;
+sourcehash/inputverificationandcontainercreationoccurbeforeoldelapsedclock,
+so reportseparatelyratherthanhidehistoryI/O. Olderresultsareunchangedandlack
+thisextraend-to-endmeasurement; donotretroactivelyinferit. Pythononlynorebuild.
+EXP140 prereg: medium3.8bothports freshcontrolvsverified3.6/3.7history from
+EXP137control,180seach. Allfields/TEM/raw/K+bytephysics+modehistoryaudits,
+end-to-end/preparation/nativeelapsed; rootgatebeforeonefreqW3P2repro300s.
+No paidcompute/swap/appsclosing/autoexpensiveretry/newnativebuild.
+
+EXP140 mediumsingle3.8bothports historyPASS:47/49→22/22iterations, native+cleanup
+28,939→25,771s, preparation0,095→0,465s, end-to-end29,035→26,235s.
+Onepairnotantenna/globalpromotion;4wholefieldE/B≤8,146e-8/1,280e-7,
+ΔS1,533e-9/VSWR6,633e-10/TEM/rawPASS. Rootreplaym6-history-root-analysis.py.
+EXP141 prereg diagnosticactualW3P2only3.7GHz, sourcecompletedEXP138control
+f3.5/3.6 indices0/1, verifiedsourceinput2.521GB+selectedE358.999MBonce; source
+bytes/physics/nativeFEspace matched, no artificialreference. OriginalTol1e-6,
+currentA3.7/M5mixed2IR/K64/right/directstorage unchanged,300s bound60GiB/noSwap/
+6GiBguard. No fieldreference(currentgoalreprofirstPC), savesnapshotsonlyif
+successfulsolve. Coarse1e-3 gatekept, expectedfailureclassorcompletedsolve/
+deadline recordedhonestly; sourcehistories/CSRmaydifferbitwisefromoldcandidate.
+Do notclaimexactRHSreplayunlessproven. Nore-solvesfirst4systems, no auto retry/
+paidcompute/appsclosing. Rootgatebeforefixed3IR/FP64assessment.
+
+EXP141 diagnosticclassREPRODUCED in119,816s native/main+1,373sprep=121,189s
+end-to-end, notcompletedRF. FirstcoarseP2at3.7failed1,474358e-3>1e-3,
+outerGMRES0iterations/notconverged/completefalse; noOOM/hostdeadline.
+Actualprojectedinitialraw0,5565711099vsold0,5565711229 (reldiff2.339e-08),
+CSRstructuresmatch/valuesbitsdifferent; noclaimexactRHSorCSRidentity. Original
+fullcandidatefailedafter1159s/first4solves; newdiagnosticavoidsre-solvingthem.
+Assessment artifacts/m6-history-antenna-p2-20261021/diagnostic-assessment.json;
+sourcebyte/provenance history-source.json, resultcompletefalsepreserved.
+Nextfixed3IRassessmentscheduledonlyaftercommittingverifiedreproducer; no
+adaptiveinnercountorlooseninggates. Userhardware/simulationgoalunchanged.
+EXP142 prereg legacytiny7frequency-majorreuse/deferredbaseline regression60s
+currentnative(nohistory/nopredictor), fields vsEXP136control.16sestimate,
+all14raw/fields/TEM/setup/history/metadata, then docs/rootreview/localcommit.
+
+EXP142 legacy7freq/2ports PASS exit0/completetrue,14raw≤9,920e-7,28fieldrows,
+TEM/energy/setup/deferred/metadata/release PASS. Elapsed15,681s+prep0,103s=
+end-to-end15,784s;412iter. Cgroup637468672B/GPUprocess631242752B, notphysicalUVM.
+CurrentEXP139nativeSHA3ecd595dd0aa87454d29f3fec73e70371581ef9c1b2a17dcf5f0869d455fcb8e;
+manifestfalse/globalqualificationunchanged. NewinputreplayisnotanRFreference.
+
+EXP139–142 closechunk:162Python+8shell+docscheck/diffPASS; sameLuna read-only
+docs-garden identifiedone stalefuture replaylineM6, rootfixedchronology.
+Verifiedcurrentnative/legacyTEM/raw28fields; localcommit only, no paidcompute.
+GoalactiveM6. Nextfixed3IRtiny/mediumgatebeforetargetedW3, originalfailpreserved.

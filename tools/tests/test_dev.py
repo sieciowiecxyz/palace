@@ -401,7 +401,8 @@ class ToolRegressionTests(unittest.TestCase):
         expected=json.loads(json.dumps(base));expected['Solver']['Driven']['Samples']=changed['Solver']['Driven']['Samples']
         self.assertEqual(changed,expected)
         self.assertNotEqual(changed['Solver']['Driven']['Samples'],base['Solver']['Driven']['Samples'])
-        for freqs in [[],[3.5],[3.6,3.5],[3.5,3.5],[3.5,float('nan')],[3.5,float('inf')],
+        self.assertEqual(dev.point_sweep_config(base,[3.7])['Solver']['Driven']['Samples'],[{'Type':'Point','Freq':[3.7]}])
+        for freqs in [[],[3.6,3.5],[3.5,3.5],[3.5,float('nan')],[3.5,float('inf')],
                       [True,3.5],[0,3.5],[-1,3.5],'3.5,3.6']:
             with self.assertRaises(ValueError):dev.point_sweep_config(base,freqs)
         for which in ['AdaptiveTol','Restart','amr']:
@@ -738,6 +739,64 @@ class ToolRegressionTests(unittest.TestCase):
             (root/'memory.current').write_text('invalid')
             self.assertEqual(dev.cgroup_memory(root), {})
         self.assertEqual(dev.cgroup_memory(None), {})
+
+    def test_history_inputs_verify_original_run_then_only_allow_explicit_frequency_excitation_change(self):
+        _,info,source=dev.fixture('coax-tiny')
+        build={'runtime_base_id':'runtime','builder_image_id':'builder'}
+        target=dev.port_batch_config(dev.point_sweep_config(source,[3.8]),excitation=2)
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);(root/'fields').mkdir()
+            for name in dev.expected_field_files(source):
+                (root/'fields'/name).write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,1.,0.))
+            for name,value in [('config.json',source),('fixture.json',info),('build-manifest.json',build),('result.json',{'complete':True})]:
+                dev.write(root/name,value)
+            dev.write(root/'command.json',{'actual_config_sha256':dev.sha(root/'config.json')})
+            dev.write(root/'fields.json',{'identity':dev.field_identity(source,info,build),'complete':True,
+                'files':dev.field_inventory(root/'fields',dev.expected_field_files(source))})
+            h=dev.verified_history_source(root,target,info,build,[3.3,3.55])
+            self.assertEqual(h['source_indices'],[0,1]);self.assertEqual(h['target_frequency_ghz'],3.8)
+            self.assertEqual(set(h['selected_fields']),{'s2-f0-E.bin','s2-f1-E.bin'})
+            self.assertEqual(h['selected_input_bytes'],64);self.assertEqual(h['verified_input_bytes'],384)
+            with self.assertRaises(ValueError):dev.verified_field_reference(root,target,info,build)
+            for freqs in [[],[3.3],[3.55,3.3],[3.3,3.3],[3.3,3.8],[3.4,3.55],[3.3,float('nan')],[True,3.55]]:
+                with self.assertRaises(ValueError):dev.verified_history_source(root,target,info,build,freqs)
+            for change in ['material','port','order']:
+                bad=json.loads(json.dumps(target))
+                if change=='material':bad['Domains']['Materials'][0]['Permittivity']=4.4
+                if change=='port':bad['Boundaries']['LumpedPort'][0]['R']=75
+                if change=='order':bad['Solver']['Order']=1
+                with self.assertRaises(ValueError):dev.verified_history_source(root,bad,info,build,[3.3,3.55])
+            with self.assertRaises(ValueError):dev.verified_history_source(root,target,dict(info,mesh_sha256='changed'),build,[3.3,3.55])
+            with self.assertRaises(ValueError):dev.verified_history_source(root,target,info,dict(build,runtime_base_id='new'),[3.3,3.55])
+            dev.write(root/'result.json',{'complete':False})
+            with self.assertRaises(ValueError):dev.verified_history_source(root,target,info,build,[3.3,3.55])
+            dev.write(root/'result.json',{'complete':True,'field_accuracy_passed':False})
+            self.assertEqual(dev.verified_history_source(root,target,info,build,[3.3,3.55])['source_indices'],[0,1])
+            (root/'fields'/'s2-f0-E.bin').write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,2.,0.))
+            with self.assertRaises(ValueError):dev.verified_history_source(root,target,info,build,[3.3,3.55])
+
+    def test_history_replay_predictor_audit_single_target_has_explicit_lifetime_and_source_map(self):
+        _,_,config=dev.fixture('coax-tiny');config=dev.port_batch_config(dev.point_sweep_config(config,[3.8]),excitation=2)
+        history={'source_indices':[0,1],'source_frequencies_ghz':[3.3,3.55]}
+        dev.validate_sweep_predictor(config,False,history=True)
+        with self.assertRaises(ValueError):dev.validate_sweep_predictor(config,False)
+        text='PALACE_HISTORY_SEED: excitation=2 frequency_index=0 source_indices=0,1 source_frequencies=3.3,3.55 logical_bytes_per_field=1024\n'
+        text+='PALACE_SWEEP_PROJECTION: excitation=2 frequency_index=0 image_norm=2 dot_real=2 dot_imag=-1 alpha_real=1 alpha_imag=-0.5 usable=1 operator_applies=3\n'
+        text+='PALACE_SWEEP_PREDICTOR: action=accept excitation=2 frequency_index=0 ratio=1 baseline_residual=1 candidate_residual=0.1\n'
+        text+='GMRES solver converged in 12 iterations\nPALACE_HISTORY_RELEASE: excitation=2 frequency_index=0\n'
+        audit=dev.sweep_predictor_audit(text,config,'projected',history)
+        self.assertTrue(audit['passed']);self.assertTrue(audit['history_replay']);self.assertEqual(audit['logical_older_capacity_bytes'],1024)
+        self.assertFalse(dev.sweep_predictor_audit(text,config,'projected')['passed'])
+        for bad in [text.replace('source_indices=0,1','source_indices=1,2'),text.replace('source_frequencies=3.3,3.55','source_frequencies=3.4,3.55'),
+                    text.replace('PALACE_HISTORY_RELEASE: excitation=2 frequency_index=0\n',''),text.replace('logical_bytes_per_field=1024','logical_bytes_per_field=0'),
+                    text.replace('GMRES solver converged in 12 iterations\n',''),text.replace('alpha_imag=-0.5','alpha_imag=0.5'),text+'PALACE_HISTORY_SEED: malformed\n']:
+            self.assertFalse(dev.sweep_predictor_audit(bad,config,'projected',history)['passed'])
+        with patch.object(dev,'require_host_memory') as host:
+            for kwargs in [dict(initial_history='source'),dict(history_frequencies=[3.3,3.55]),
+                dict(initial_history='source',history_frequencies=[3.3,3.55]),
+                dict(initial_history='source',history_frequencies=[3.3,3.55],sweep_predictor='projected',frequency_port_batch=True)]:
+                with self.assertRaises(ValueError):dev.run('coax-tiny','/unused',60,**kwargs)
+            host.assert_not_called()
 
     def test_field_reference_rejects_wrong_physics_corruption_and_unfinished_run(self):
         _, info, config = dev.fixture('coax-tiny')

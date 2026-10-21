@@ -436,3 +436,50 @@ cache/dependencies. Nie wykonywano kolejnego pełnego retry ani płatnego comput
 
 M6.6, M6 i goal nadal otwarte. Zachowany działający wariant M5/reuse bez predyktora
 w jego dotychczasowym zakresie. Nowa ścieżka nie jest globalnie zakwalifikowana.
+
+## EXP139–142 — verified history i pojedyncza częstotliwość
+
+Cel: diagnozować problem P2/3,7GHz bez ponownego rozwiązywania pierwszych
+czterech układów. `--initial-history SOURCE --history-frequencies F0 F1`
+wymaga predictora i jednej f>F1>F0. Pełne oryginalne completion/config/inventory
+są sprawdzane przed uruchomieniem. Mesh, materiały, fizyczne porty, FEspace i
+dependencies muszą pasować; wyłącznie jawna selekcja f/excitation jest dozwolona.
+`history-source.json` zapisuje mapę indeksów i hashe. Historia jest read-only
+przybliżeniem startowym, nie referencją ani udawanym ukończonym targetem.
+Dwa E na aktywny port są czytane raz i zwalniane po solve; brak hot disk workspace.
+
+| Przypadek | Kontrola → history | Iteracje | Decyzja |
+| --- | --- | --- | --- |
+| tiny3,8/oba porty | elapsed9,457→9,479s | 81→22 | jakość PASS, bez zysku czasu |
+| medium3,8/oba porty | end-to-end29,035→26,235s | 96→44 | jakość PASS, jedna para |
+| antena3,7/P2 | end-to-end121,189s | 0 outer | diagnostyczny FAIL, nie RF |
+| legacytiny7freq/oba porty | end-to-end15,784s | 412 | 14raw/28fieldrows/TEM PASS |
+
+Medium: elapsed28,939→25,771s, preparation0,095→0,465s. ΔS≤1,533e-9,
+ΔVSWR≤6,633e-10, E/B≤8,146e-8/1,280e-7. Preparation obejmuje walidację inputów
+oraz create kontenera; dotychczasowy elapsed pozostaje bez zmian. Nowy end-to-end
+nie zawiera startu Pythona i końcowego zapisu JSON. Stare runy nie miały tego timera.
+
+Antena: pierwsze coarse apply daje1,474358e-3>1e-3 po dwóch stałych korekcjach,
+zero zakończonych outer iterations, bez OOM/deadline. Stary pełny kandydat
+zatrzymał się po1159s. Ten skrót jest zyskiem workflow diagnostycznego, nie
+przyspieszeniem ukończonego RF. Projekcja poprawiła initialraw do0,5565711099
+(stare0,5565711229, rel.delta2,339e-8); CSR struktury równe, valuehash różne.
+Nie jest to identyczny bitowo RHS/macierz ani dowód jedynej przyczyny błędu.
+Zweryfikowany sourceinventory2,521GB; dwa wybrane E358,999MB czytane jako input.
+
+Odtworzenie (limit300s, target nie ma fałszywej field-reference):
+
+```sh
+python3 tools/dev.py run tshaped-medium artifacts/m6-history-antenna-p2-20261021   --seconds 300 --basis fp32 --direct-basis --pc-side right --krylov-size 64   --native-complex-coarse --native-coarse-fp32 --hypre-pool-mib 256   --memory-marks --release-gmres-basis --release-final-solver --setup-audit   --save-fields --excitation 2 --frequencies 3.7 --sweep-predictor projected   --initial-history artifacts/m6-projection-antenna-control-20261021   --history-frequencies 3.5 3.6
+```
+
+Artefakty `artifacts/m6-history-{tiny,medium}-{control,on}-20261021`,
+`artifacts/m6-history-root-analysis.py tiny medium` i receipts;
+`artifacts/m6-history-antenna-p2-20261021/diagnostic-assessment.json`;
+`artifacts/m6-history-legacy-regression-20261021/root-analysis.json`.
+SourceSHA3ecd595dd0aa87454d29f3fec73e70371581ef9c1b2a17dcf5f0869d455fcb8e,
+cachedbuild9,386s,162Python regressions. Fallback
+`build/m6-history/pre-history-native` i `pre-history-manifest.json` zachowane.
+Następne: osobny opt-in fixed3IR przy niezmienionych progach, mały filtr przed
+anteną; żadne adaptive inner count/fallback wewnątrz zwykłego GMRES. M6/M7 otwarte.
