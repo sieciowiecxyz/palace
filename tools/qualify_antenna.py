@@ -31,7 +31,10 @@ def read_csv(path):
     return header,rows
 
 
-def rf_metrics(sref, scand, eref, ecand, frequencies):
+def rf_metrics(sref, scand, eref, ecand, frequencies, protocol='matched'):
+    require(protocol in ('matched','antiresonance'), 'Unknown RF protocol')
+    require(protocol!='antiresonance' or frequencies==[2.9],
+            'Antiresonance protocol is restricted to preregistered 2.900 GHz')
     require(sref[0]==scand[0] and len(sref[0])==9, 'S headers/2-port coverage differ')
     for i,port in enumerate(['1][1','2][1','1][2','2][2']):
         require(sref[0][2*i+1]==f'|S[{port}]| (dB)' and
@@ -39,25 +42,44 @@ def rf_metrics(sref, scand, eref, ecand, frequencies):
     require(eref[0]==ecand[0], 'Energy headers differ')
     require(all([r[0] for r in table[1]]==frequencies for table in [sref,scand,eref,ecand]),
             'CSV frequency coverage/order differs')
-    ds=dv=dp=de=0.0
+    ds=dv=dp=de=excess=0.0
+    impedance=[]
     for a,b in zip(sref[1],scand[1],strict=True):
         values=lambda row:[10**(row[i]/20)*cmath.exp(1j*math.radians(row[i+1])) for i in range(1,9,2)]
         x,y=values(a),values(b)
         ds=max(ds,max(abs(u-v) for u,v in zip(x,y,strict=True)))
         for k in [0,3]:
-            require(abs(x[k])<1 and abs(y[k])<1, 'VSWR undefined/nonpassive reflection; use a separate antiresonance protocol')
-            dv=max(dv,abs((1+abs(x[k]))/(1-abs(x[k]))-(1+abs(y[k]))/(1-abs(y[k]))))
+            if protocol=='matched':
+                require(abs(x[k])<1 and abs(y[k])<1, 'VSWR undefined/nonpassive reflection; use a separate antiresonance protocol')
+                dv=max(dv,abs((1+abs(x[k]))/(1-abs(x[k]))-(1+abs(y[k]))/(1-abs(y[k]))))
+            else:
+                row=dict(port=1 if k==0 else 2)
+                for label,s in [('reference',x[k]),('candidate',y[k])]:
+                    distance=abs(1-s)
+                    z=50*(1+s)/(1-s) if distance>1e-12 else None
+                    row[label]=dict(gamma=[s.real,s.imag],
+                        input_z_ohm=[z.real,z.imag] if z is not None else None,
+                        distance_to_z_pole=distance,
+                        delta_z_bound_at_S_gate_ohm=100*1e-3/(distance*(distance-1e-3)) if distance>1e-3 else None)
+                impedance.append(row)
         for cols in [(0,1),(2,3)]:
             dp=max(dp,abs(sum(abs(x[k])**2 for k in cols)-sum(abs(y[k])**2 for k in cols)))
+            excess=max(excess,*(sum(abs(v[k])**2 for k in cols)-1 for v in [x,y]))
     for a,b in zip(eref[1],ecand[1],strict=True):
         for x,y in zip(a[1:],b[1:],strict=True):
             require(x!=0 or y==0, 'Nonzero candidate energy in an exactly zero reference column')
             if x:de=max(de,abs(y-x)/abs(x))
-    return dict(max_delta_S=ds,max_delta_vswr=dv,max_delta_power=dp,max_relative_energy=de,
-                passed=ds<=1e-3 and dv<=.01 and dp<=1e-3 and de<=1e-3)
+    result=dict(max_delta_S=ds,max_delta_vswr=dv if protocol=='matched' else None,
+                max_delta_power=dp,max_relative_energy=de,
+                passed=ds<=1e-3 and (dv<=.01 if protocol=='matched' else excess<=1e-3) and dp<=1e-3 and de<=1e-3)
+    if protocol=='antiresonance':
+        result.update(input_impedance=impedance,max_port_power_excess=excess,
+            scope='2.900 GHz complex S/power/energy gates; matched-other-port input Z is diagnostic, not open-circuit Z matrix. VSWR not a gate; poles/bounds explicit.')
+    return result
 
 
-def qualify(reference,candidate,corrections=2):
+def qualify(reference,candidate,corrections=2,protocol='matched'):
+    require(protocol in ('matched','antiresonance'), 'Unknown RF protocol')
     require(isinstance(corrections,int) and not isinstance(corrections,bool) and corrections in (2,3,4),
             'Require explicit fixed correction count2/3/4')
     paths=[Path(reference).resolve(),Path(candidate).resolve()]
@@ -69,6 +91,10 @@ def qualify(reference,candidate,corrections=2):
     frequencies=[f for s in cfg['Solver']['Driven']['Samples'] for f in s['Freq']]
     require(len(frequencies)==1 and cfg['Solver']['Driven'].get('AdaptiveTol',0)==0,
             'This qualification protocol is single-frequency/uniform')
+    if protocol=='antiresonance':
+        require(frequencies==[2.9], 'Antiresonance protocol is restricted to preregistered 2.900 GHz')
+        require(all(p.get('R')==50 and not p.get('L',0) and not p.get('C',0)
+                    for p in cfg['Boundaries']['LumpedPort']), 'Input Z diagnostics require real 50 ohm ports')
     require(sorted(p['Index'] for p in cfg['Boundaries']['LumpedPort'])==[1,2] and
             sorted(p['Excitation'] for p in cfg['Boundaries']['LumpedPort'])==[1,2], 'Require both physical ports/excitations1/2')
     require(all(r.get('complete') and r.get('exit_code')==0 for r in results), 'Incomplete reference or candidate')
@@ -100,12 +126,12 @@ def qualify(reference,candidate,corrections=2):
     fields=dev.field_comparisons(paths[1],cfg)
     post=[p/cfg['Problem']['Output'] for p in paths]
     metrics=rf_metrics(*(read_csv(p/'port-S.csv') for p in post),
-                       *(read_csv(p/'domain-E.csv') for p in post),frequencies)
+                       *(read_csv(p/'domain-E.csv') for p in post),frequencies,protocol=protocol)
     normalized=json.loads(json.dumps(cfg))
     for sample in normalized['Solver']['Driven']['Samples']:sample['Freq']=[0]
     normalized['Model']['Mesh']=dev.read(paths[0]/'fixture.json')['mesh_sha256']
     case_id=hashlib.sha256(json.dumps(normalized,sort_keys=True).encode()).hexdigest()
-    return dict(passed=metrics['passed'] and fields['passed'],frequency_ghz=frequencies[0],coarse_corrections=corrections,raw=raws,fields=fields,
+    return dict(passed=metrics['passed'] and fields['passed'],protocol=protocol,frequency_ghz=frequencies[0],coarse_corrections=corrections,raw=raws,fields=fields,
                 metrics=metrics,reference=results[0],candidate=results[1],
                 time_saving_percent=100*(1-results[1]['end_to_end_seconds']/results[0]['end_to_end_seconds']),
                 cgroup_saving_percent=100*(1-results[1]['cgroup_memory_peak_bytes']/results[0]['cgroup_memory_peak_bytes']),
@@ -118,6 +144,8 @@ def qualify(reference,candidate,corrections=2):
 
 
 def summarize(receipts,expected):
+    require(all(r.get('protocol','matched')=='matched' for r in receipts),
+            'Matched-band summary cannot mix in the separate antiresonance protocol')
     require(expected and expected==sorted(set(expected)), 'Expected frequencies must be distinct/increasing')
     receipts=sorted(receipts,key=lambda r:r['frequency_ghz'])
     require([r['frequency_ghz'] for r in receipts]==expected, 'Summary frequency coverage/duplicates differ')
@@ -161,15 +189,22 @@ if __name__=='__main__':
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--corrections',type=int,choices=[2,3,4],default=2,
                         help='Required fixed correction policy, validated in environment and native summaries; default two')
+    parser.add_argument('--protocol',choices=['matched','antiresonance'],default='matched',
+                        help='Separate preregistered 2.900 GHz S/Z protocol; never part of a matched-band summary')
     args=parser.parse_args()
     if args.summary:
+        if args.protocol!='matched':
+            parser.error('--summary requires the matched-band protocol')
         if args.reference or args.candidate or not args.expected_frequencies:
             parser.error('--summary requires --expected-frequencies and no pair positional arguments')
-        receipt=summarize([qualify(*dev.read(p)['input_paths'],corrections=args.corrections) for p in args.summary],args.expected_frequencies)
+        inputs=[dev.read(p) for p in args.summary]
+        require(all(r.get('protocol','matched')=='matched' for r in inputs),
+                'Matched-band summary cannot mix in the separate antiresonance protocol')
+        receipt=summarize([qualify(*r['input_paths'],corrections=args.corrections) for r in inputs],args.expected_frequencies)
     else:
         if not args.reference or not args.candidate or args.expected_frequencies:
             parser.error('Specify reference and candidate, or --summary with expected frequencies')
-        receipt=qualify(args.reference,args.candidate,corrections=args.corrections)
+        receipt=qualify(args.reference,args.candidate,corrections=args.corrections,protocol=args.protocol)
     dev.write(args.output,receipt)
     keys=(['passed','coarse_corrections','frequencies_ghz','reference_end_to_end_seconds','candidate_end_to_end_seconds',
            'time_saving_percent','max_cgroup_saving_percent','maxima','total_field_rows'] if args.summary else

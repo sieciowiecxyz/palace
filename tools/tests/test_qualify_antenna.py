@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 
@@ -43,6 +44,52 @@ class QualificationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):q.read_csv(p)
             p.write_text('f,x\n3.3,1\n')
             self.assertEqual(q.read_csv(p),(['f','x'],[[3.3,1.]]))
+
+    def test_antiresonance_keeps_S_power_and_energy_gates_without_VSWR(self):
+        s,e=self.tables()
+        s=json.loads(json.dumps(s));s[1][0][0]=2.9
+        e=(e[0],[[2.9,1.,2.]])
+        # Perfect reflection with zero transmission: Z has a pole, S is finite.
+        s[1][0][1:]=[0,0,-8000,0,-8000,0,0,180]
+        r=q.rf_metrics(s,s,e,e,[2.9],protocol='antiresonance')
+        self.assertTrue(r['passed']);self.assertIsNone(r['max_delta_vswr'])
+        self.assertIsNone(r['input_impedance'][0]['reference']['input_z_ohm'])
+        self.assertIsNone(r['input_impedance'][0]['reference']['delta_z_bound_at_S_gate_ohm'])
+        self.assertAlmostEqual(abs(complex(*r['input_impedance'][1]['reference']['input_z_ohm'])),0)
+        bad=json.loads(json.dumps(s));bad[1][0][2]=1
+        self.assertFalse(q.rf_metrics(s,bad,e,e,[2.9],protocol='antiresonance')['passed'])
+        bad_energy=(e[0],[[2.9,1.,2.1]])
+        self.assertFalse(q.rf_metrics(s,s,e,bad_energy,[2.9],protocol='antiresonance')['passed'])
+        nonpassive=json.loads(json.dumps(s));nonpassive[1][0][1]=.1
+        self.assertFalse(q.rf_metrics(nonpassive,nonpassive,e,e,[2.9],protocol='antiresonance')['passed'])
+        with self.assertRaisesRegex(ValueError,'VSWR'):q.rf_metrics(s,s,e,e,[2.9])
+        with self.assertRaisesRegex(ValueError,'2.900'):q.rf_metrics(s,s,e,e,[3.3],protocol='antiresonance')
+        with self.assertRaisesRegex(ValueError,'Unknown'):q.rf_metrics(s,s,e,e,[2.9],protocol='other')
+
+    def test_antiresonance_Z_uncertainty_bound_and_summary_separation(self):
+        s,e=self.tables();s=json.loads(json.dumps(s));s[1][0][0]=2.9
+        e=(e[0],[[2.9,1.,2.]])
+        r=q.rf_metrics(s,s,e,e,[2.9],protocol='antiresonance')
+        row=r['input_impedance'][0]['reference']
+        z=complex(*row['input_z_ohm'])
+        self.assertAlmostEqual(z.real,50*1.1/.9)
+        # Exact Cayley identity bounds every complex perturbation |dS| <= 1e-3.
+        import cmath
+        for angle in [0,.3,1.,2.,3.]:
+            sp=.1+1e-3*cmath.exp(1j*angle)
+            self.assertLessEqual(abs(50*(1+sp)/(1-sp)-z),row['delta_z_bound_at_S_gate_ohm']+1e-12)
+        a=self.receipt(3.3,100,50,1000,500);a['protocol']='antiresonance'
+        with self.assertRaisesRegex(ValueError,'antiresonance'):q.summarize([a],[3.3])
+
+    def test_CLI_rejects_antiresonance_receipt_before_matched_requalification(self):
+        with tempfile.TemporaryDirectory() as td:
+            receipt=Path(td)/'anti.json';output=Path(td)/'summary.json'
+            receipt.write_text(json.dumps(dict(protocol='antiresonance',input_paths=['/unused','/unused'])))
+            r=subprocess.run([sys.executable,str(Path(q.__file__)), '--summary',str(receipt),
+                '--expected-frequencies','2.9','--corrections','3','--output',str(output)],capture_output=True,text=True)
+            self.assertNotEqual(r.returncode,0)
+            self.assertIn('Matched-band summary cannot mix',r.stderr)
+            self.assertFalse(output.exists())
 
     def test_incomplete_artifacts_never_qualify(self):
         cfg={'Solver':{'Driven':{'Samples':[{'Freq':[3.3]}]}},

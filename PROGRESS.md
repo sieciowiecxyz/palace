@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-21. Mode: goal, Active: M7 (M6 assessment complete EXP176: directWMMA W.1FAIL/REJECT, not RFpromotion). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [M7](docs/milestones/M7.md).
+Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176: directWMMA W.1FAIL/REJECT, not RFpromotion). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [M7](docs/milestones/M7.md).
 
 ## Wymóg użytkownika
 
@@ -8,7 +8,14 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M7 (M6 assessment complete EXP176:
 
 ## Bieżący checkpoint
 
-- Active M6. M0–M5 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci, M4 pełna para EXP94 PASS, M5 mixed opt-in PASS/directgprMax REJECT; bez zmiany globalnych defaultów.
+- Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 cztery punkty1.71/2.69/3.3/3.8GHz oba porty PASS,56regionalnychwierszy pól; suma czasu+3.37%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/całe pasmo/produkcja. Receipt artifacts/m7-four-fixed3-summary-20261022.json.
+- EXP183/184: współczesny2IR→3IR przy3.3GHz +10.74%całego czasu; koszt wcoarse, wpływ tła GPU confounds starsze dane. Dwa krótkie profile PASS, nie RFkwalifikacja. UVM migruje wielokrotnie w badanym oknie; bez deklaracji unikalnego wolumenu lub fizycznej rezydencji zGPUprocesspeak.
+- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. **Następne:** brakujące11punktówW.5. Trzyparymediany3.5GHz/nowageometria/pakiet otwarte.
+- Native SHAa6ec732f…187c3338 bez zmian, cache zachowany; Python qualifier i docs nie wymagają rebuilda. Bez płatnego compute, swapu lub hotworkspace SSD. Globalne defaulty niepromowane.
+
+## Wcześniejsze etapy — historia wyników
+
+- M0–M6 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci, M4 pełna para EXP94 PASS, M5 mixed opt-in PASS/directgprMax REJECT; M6 directWMMA W.1FAIL/REJECT. Bez zmiany globalnych defaultów.
 - EXP94 T-Shaped medium3,50GHz/oba porty, samebuild/config: control681,698s → reuse602,944s,44/35iter. Jedna para −11,55%, nie mediana/promocja M7. Raw ||Ax−b||/||b|| ≤8,357e−7.
 - Deferred postprocessing: managedpeak65,353→53,084GB (−18,77%) i controlcgroup60,525→56,830GB (−6,11%); reuse sam nie zmienia tego peaku. Jeden dodatkowy E179,5MB w RAM/VRAM. Fizycznej rezydencji VRAM nie utożsamiać z alokacjami.
 - Wholefields/S/VSWR/power/energy PASS, W.2 trzyfreq/oba porty i tiny normalpathPASS. EXP92 OOM i EXP93 inline-reference OOM pozostają FAIL. Receipt artifacts/m4-deferred-antenna-root-analysis-20261020.json; dowody docs/milestones/M4.md.
@@ -3806,3 +3813,139 @@ withnewqualifier,21.095%time/23.825%cgroup unchanged; separatecohortreceipt
 artifacts/m7-rechecked-seven-fixed2-summary-20261021.json. No nativebuild/
 physics/defaultchange. M7active, globalpolicyselectionandremainingcoverage
 stillopen. No paidresources/GPUjobsleft; all3runhandlesconfirmedterminal.
+
+## EXP180 prereg — M7/W.4 2.690GHz reference
+
+Previous goal turn progressed throughEXP176–179/commits070e2f2+0552afd,
+qualifiedfixed3at1.71 and retained2IRfailure. Now cold2.690GHz/bothports
+fullFP64reference, samemedium/config exceptf/native manifest verifiedunchanged.
+RIGHT/K64/Tol1e-6, freshFP64coarse setupbothports, deferredenergy+solver
+release/snapshots,1800s/60GiBcgroup/no swap/6GiBhostguard. GPU13205MiBfree,
+host76GiBavailable. No TC/PCbasis experiments, seeds/PROM/profiler/cloud.
+Rootchecksreference beforecandidatefixed3EXP181; qualitygates unchanged.
+EXP180 rootreferencePASS: endtoend782.739s/46+47iter,
+cgroup61227782144B. Actualoriginalraw<=8.868e-7, twofreshFP64coarsesetups,
+fieldinventory/finiteS+energy/nativeidentityPASS/fourE+B snapshots. Stored
+root-reference-check.json inclactualbytes. No candidate outcome inferred.
+EXP181 prereg: same2.690GHz/bothports/medium/config/native, directFP32storage/
+scalednativeFP32LU+3fixedFP64IR/reuse, fieldreferenceEXP180. Same1800s/
+60GiB/no swap/6GiBhostguard/frozenK; noTCexperimentalflags, no globalpromotion.
+EXP181 root fullpairfixed3 KPASS2.690GHz: ref782.739s/61227782144B,
+candidate796.089s/46630957056B,47/48iter, originalraw<=9.458e-7,
+coarsemax1.987243e-4,14fieldrowsPASS. Exact RF/energy/time/memorymetrics
+in artifacts/m7-2690-fixed3-qualification-20261021.json. Time+1.706% and
+cgroup−23.840% approximately; no speedupclaim. Actualbytes inreceipt.
+EXP182 prereg: fixed3candidate3.300GHz/2ports/samemedium/native/cold,
+existingfullFP64referenceEXP153revalidated native/mesh/inventory/raw before
+reuse. Compareseparately withreference and existing2IRcandidateEXP154 for
+fixedcorrectioncost; same1800s/60GiB/no swap/hostguard/frozenK. No seeds/PROM/
+TC/profiler/globalpromotion. Reference is compatible; do not rerun it.
+EXP182 rootfixed3KPASS3.300GHz: endtoend753.834s/cgroup46143578112B,
+44/45iter, originalraw<=8.001e-7/coarsemax7.64124e-5,
+14fieldrowsPASS. Ref752.534s/60692480000B, time+0.173%/cgroup−23.972%.
+Relative2IRold549.512s is+37.18%, but not isolated causalcountcomparison:
+telemetryinitialGPUusedold1613MiB vsnew2394MiB (~781MiBbackgrounddifference).
+Timers: coarse101.439→295.050s, setup50.015→50.148, restPC249.128→256.165,
+outerlinear62.259→63.428, IO19.625→19.511. Coarsephase explainsobservedtime
+increase, but UVM/placement/bandwidth cause notproven withoutcontrolledprobe.
+Threefixed3pairs1.71/2.69/3.3 requalifiedasonecountcohort, totals~3.66%slower,
+maxcgroup−23.840%; artifacts/m7-three-fixed3-summary-20261021.json.
+
+EXP183 prereg: repeatcoldfixed2at3.300GHz in currentdesktopGPUstate, same
+flags/config/native/ref asold2IR andnew3IR exceptcount2. Existing2IRsamepoint
+qualityPASS, no blanketretry of1.71failure. Need matchedconditions before
+attributing37% tooneextraIR orchoosingglobalM7policy. 1800s/60GiB/no swap/
+6GiBhostguard, no userappchanges. Recordtelemetryinitialbackground andphase
+costs; ifconditionsdiffer,labelcomparisonconditional. No fullsweepuntilcost
+reasoningupdated. This is diagnosticonepoint, notthreefullpairedmedians.
+
+EXP183 rootqualificationKPASS fixed2/currentdesktop3.300GHz:680.730s,
+cgroup46146531328B,44/45iter/raw<=8.266e-7/coarsemax1.303e-4.14fieldrowsPASS;
+receipt artifacts/m7-330-fixed2-repeat-qualification-20261022.json. Compared
+old2IR549.512s and current2IR680.730s (+23.88%), coarse101.439→221.662s;
+other PC249.128→256.241s. Current3IR753.834s/current2IR680.730s (+10.74%),
+coarse295.050/221.662s, restPC256.165/256.241s. InitialGPUbackground
+1613(old2)/2392(current2)/2394(current3)MiB; desktopstateconfoundsoldvsnew.
+No proofthatUVMcausedallregression, and neither historicalreference nor
+currentcandidateisthreepairedmedians. Current2numericalqualityPASSdoesnot
+repair1.71fixed2FAIL.
+
+## EXP184 prereg — bounded coarse cost profiles, fixed2 vs fixed3
+
+Rootsourceconfirmedexisting profiler0:2 cleanstop/2preconditionerapplies and
+mixedcountsupported. Two sequential3.300GHz/P2-only directFP32storage native
+scaledFP32LU runs with2vs3fixedIR, sameRIGHT/K64/Tol1e-6/hypre256MiB/release.
+CaptureFIRST0 COUNT2,600s each/60GiB/no swap/hostguard; nofields/portreuse/
+setupaudit/RFqualification. AlreadycachedNsight12.9-compatible tool/hottrace
+in/dev/shm, finaldiagnosticfile<=64MiB. Keepnativehash/cacheunchanged.
+Goal: attributeelapsedCUDAkernels/UVMcopy byhostphase, not pretendprofile
+isunprofiledfullruntime. BackgroundGPUinitialsamplesretained.
+Userunloadauthorized2026-10-22: API200 statusnotloaded, noforcedappkills.
+
+EXP184 rootprofilesPASS: fixed2/3 sampled2coarsecalls7.277/9.450s,
+restPCinclusive-minuscoarse7.338/7.308s, ortho0.0314/0.0314s. Coarselaunched
+CUDAkernel9228/12300records,sum6.448/8.610s. ActualwindowUMcopyrecords
+coherence10.630/12.333GB, speculativeprefetch125.101/148.357GB,
+eviction139.351/163.395GB perNsightenum; overlappingcumulativerecordbytes,
+notuniqueworkingset/SSDIO orallunprofiledPCIebandwidth. No causeattribution
+ofallUMcopiestocoarsewithoutcopyphasemapping; samplecontainswholePC/A/ortho.
+Two-windowcostsupportsadditionalcoarsework, not2IR/3IRstationarityproof or
+RFqualification. Artifacts m7-coarse-cost-fixed{2,3}-profile-20261022.
+
+## EXP185 prereg — M7/W.4 fixed3 at3.800GHz
+
+Revalidatedexistingm6-qualified-380-reference-20261021 currentnative/mesh/
+fieldsinventory/freshFP64setup2/originalrawPASS; referenceunchanged, reuse.
+Candidate3IR/directFP32storage/FP64arithmetic/scaledFP32LU/reuse,
+RIGHT/K64/Tol1e-6,bothports, samefrozenK. Snapshots/energy/defer/release,
+1800s/60GiB/no swap/6GiBhostguard. NoTF/PCexperimentalflags/seeds/PROM/
+profiler. Preregisterglobalfixed3asM7memoryfinalistpendingremainingW4/W5/
+medians/geometry/package; keepfixed2historicalpointsscope,separatevariant.
+No timespeedguarantee, noautomatic2to3fallback, no promotionyet.
+
+EXP185 rootKPASS3.800GHzfixed3:754.772s/46325145600B vs
+736.468s/61047599104B, +2.485%time/−24.116%cgroup.45/46iter,
+raw<=9.569e-7,coarsemax3.753e-5,14fieldsPASS. Receipt
+artifacts/m7-380-fixed3-qualification-20261022.json;4fixed3W4pairsrechecked
+asonepolicy,56fieldrowsPASS,maxΔS3.430e-8/maxΔVSWR6.965e-8,
+sum+3.368%time/maxcgroup−23.840%. No3medians/generalhardwaretimeclaim.
+
+## EXP186 prereg — 2.900GHz antiresonance reference
+
+Separateprotocol writtenbeforedata in docs/milestones/antiresonance-qualification.md.
+Qualifieropt-inanti restrictedexact2.9/real50ohmports; keepscomplexS1e-3,
+power1e-3,energy1e-3,E/B1%,originalraw1e-6/coarse1e-3/inventory/build.
+Passivityportpower<=1.001 addedforanti; VSWRgateonlyomittedinthisseparate
+antipoint, matcheddefaultunchanged/summariescannotmixanti. Zofmatchedother
+portisdiagnosticwithCayleydeltaZbound/polehandling,noadhoctolerance.
+175PythoncontrolsPASS includingpole,phase/energy/passivityFAIL,scopeguards,
+summarymixguardandanalyticalbound. Nativeunchanged/no rebuildneeded.
+Cold2.900/bothportsFP64reference first:RIGHT/K64/Tol1e-6/freshFP64coarse2,
+defer/energy/release/snapshots,1800s/60GiB/no swap/hostguard. Rootaudits
+referencebeforecandidate. No seeds/PROM/TC/profiler/globalpromotion.
+
+EXP186 rootreferencePASS2.900GHz:869.128s,62654750720B,54/55iter,
+originalraw<=8.703e-7/nativeFP64fresh2setup/inventory4snapshots/currentnative
+identity/finiteS+energy+passivityPASS. root-reference-check.json includes
+Zdiagnosticsandactualwrittenbytes; no candidatequalityclaimyet.
+EXP187 prereg: same2.900GHzmedium/bothports/native/physics, directFP32
+storage/scaledFP32LU+3fixedFP64IR/reuse/defer/energy/release/snapshots.
+1800s/60GiB/no swap/hostguard, no seeds/PROM/TC/profiler. CompareEXP186
+usingseparatepreregisteredantiS/Zprotocol; defaultmatchedKunchanged.
+
+EXP187 rootantiKPASS:903.918s/47362490368B vs869.128s/62654750720B,
++4.003%time/−24.407%cgroup.55/56iter versus54/55; secondsolveoriginal
+KSPcheck2.468e-6causedreliablecontinuation/restart, finalraw8.1771e-7/
+9.6502e-7. Allcostincluded,norelaxation.115coarseapply/max1.08534e-4,
+14fieldrowsmaxE4.4331e-7/B4.4879e-7. maxΔS7.7524e-8,Δpower8.4628e-8,
+energy1.9953e-7,ΔZ3.00083e-6ohm; no poleatthisspecificf. Receipt
+artifacts/m7-2900-fixed3-antiresonance-qualification-20261022.json.
+Antiresultkeptoutofmatchedsummary; CLIguardsoriginalreceiptprotocolbefore
+requalification,176Pythoncontrols. Fullfixed3W5still11pointsNOTRUN, M7active.
+No nativebuild/defaultchange/paidsessions. Normalartifacts~1.177GB/job,
+no diskhotworkspace. Nextaudit/docscommit, thenW5point1.785GHz.
+EXP187 checkpoint:176Python/8shell/checker/diffPASS, sameLunareadonly
+docs-gardenPASS/rootdiffreview. CLIantireceipt-to-matchedsummarynegative
+controlPASS; fourfixed3pairsrecheckedwithfinalqualifierPASS. No native
+rebuildorunrelatedappchanges. Allsimulations/profilehandlesterminal, M7active
+with11W5points/3pairedmedians/newgeometry/packagepending.

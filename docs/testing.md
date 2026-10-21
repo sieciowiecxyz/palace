@@ -350,3 +350,14 @@ EXP153–166 siedem punktów/oba porty przechodzi98fieldrows/frozenK/raw; raport
 antenna-sweep-qualification.md. To pojedyncze pary; M7median/newgeometry nadal
 NOTRUN, M6.3actualTCproof/cuBLASLtresearch pozostają otwarte. Native source
 SHAa6ec732f...187c3338 nie zmienił się przy dodaniu Pythonqualifiera.
+
+### EXP180–187: M7/W.4 i osobny protokół antyrezonansu
+
+Fixed3 W.4 cztery pary1.71/2.69/3.3/3.8GHz/oba porty PASS,56fieldrows.
+Polityki2/3IR i różne warunki tła GPU pozostają jawne w [M7](milestones/M7.md).
+176Python testsPASS po dodaniu osobnego protokołu2.900GHz: biegunZ, skończona
+granica Cayleya, zła fazaS/energia/passivity FAIL, nieprawidłowa f/protokół i
+mieszanie z matched-summary odrzucane. Standardowy VSWRgate pozostaje.
+Przed obliczeniem2.9 spisano [prereg](milestones/antiresonance-qualification.md).
+EXP186–187 para antyrezonansu również PASS:14fieldrows, maxΔS7.753e-8,
+maxΔZ3.001e-6Ω. Szczegółowe wyniki i ograniczenia w prereg/raporcie.

@@ -129,7 +129,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. EXP177–1791.710GHz:2IRFAIL,3IR KPASS z−23.72%cgroup/+9.72%czasu; polityka globalnegofinalisty nieustalona. Następnie2.690GHz fixed3 i3.300GHz porównanie kosztu dofixed2. Bez przebudowy native lub luźniejszych progów.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. EXP179–185 cztery punktyW.4 oba porty PASS, maxcgroup−23.84%, suma czasu+3.37% (nie mediana). EXP183/184 rozdzielają koszt korekcji od części wpływu tłaGPU; brak gwarancji speedupu. EXP186–187 osobny antyrezonans2.900GHz S/Z/pola/rawPASS. Następne11punktówW.5/mediany/nowageometria/pakiet. Bez przebudowy native lub luźniejszych progów pasmowych.
 
 - [ ] Wykonać kwalifikację częstotliwości/portów według MILESTONES, trzy pomiary finalisty bez profilera.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.
