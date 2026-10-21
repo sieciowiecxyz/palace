@@ -158,5 +158,6 @@ nie commitowane; pakiet przenośny i odtwarzanie referencji należą do M7.
 
 **Decyzja:** zachować obiecujący opt-in. W.4/W.5, trzy powtórzenia/mediana,
 drugi port pełnej anteny, nowa geometria i M6 sweep/TC nadal NOT RUN.
-M5.5 zmierzone później w EXP102; M5.6 FDTD nadal otwarte, M5 nie jest zakończony.
+M5.5 zmierzone później w EXP102; ocenę M5.6 FDTD zamknięto negatywnie w EXP104
+na resource/API gate. Zakończenie oceny M5 nie zalicza globalnej promocji M7.
 Bufory RAM/VRAM, bez swap/SSD workspace; limity i cache zachowane.

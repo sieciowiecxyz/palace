@@ -2,9 +2,9 @@
 
 Polityka SSD doprecyzowana przez użytkownika (2026-10-19): gorące dane solvera w RAM/VRAM; UVM GPU↔RAM. Zwykłe wejścia/wyniki, cache i sporadyczny odczyt SSD są dozwolone. Niewielkie zapisy wymagają pomiaru wolumenu i częstotliwości I/O; nie deklarować zerowego zużycia dysku. Bez swapowania zadania i intensywnego przepisywania bazy/macierzowych workspace na SSD w pętli solvera. Obecny disk basis pozostaje usunięty; dawne wyniki z nim nie stają się przez tę korektę zakwalifikowanym baseline. Nową metodę używającą dysku oceniać po zmierzonym I/O, czasie i dokładności.
 Mode: goal
-Active: M5
+Active: M6
 
-Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji, aktualnym audycie pamięci i profilu; ocena M2 zamknięta negatywnie dla obecnej integracji, M3 zamknięty po ocenie pamięci i prefetchu; M4 zamknięty po pełnej parze EXP94; aktywny M5: preconditioner. Compute lokalny; bez najmu chmury.
+Stan: goal aktywowany 2026-10-18 na polecenie użytkownika. M1 ukończony po referencji/profilu; M2 integracja REJECT, M3 pamięć/prefetch ocenione, M4 pełna para EXP94, M5 ocena PC/mixed/FDTD zakończona EXP104. Aktywny M6: gorące kernele i sweepy. Compute lokalny; bez najmu chmury.
 
 ## Cel
 
@@ -26,8 +26,8 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 - [x] M2 — ocena FEM–BEM/MoM zakończona REJECT obecnej integracji; bramki promocji pozostają FAIL/niekompletne. docs/milestones/M2-decision.md.
 - [x] M3 — FP32direct memory gain i ocena prefetchu; W.1/W.2/W.3 PASS, bez globalnej promocji; docs/milestones/M3.md.
 - [x] M4 — reuse setup i deferred postprocessing; pełna para EXP94 PASS, docs/milestones/M4.md.
-- [ ] M5 — ACTIVE: preconditioner, mixed precision oraz ograniczony research FDTD/CUDA; docs/milestones/M5.md.
-- [ ] M6 — Gorące kernele CUDA: fuzja/batching oraz Tensor Cores/TF32/BF16 tam, gdzie pomagają.
+- [x] M5 — ocena PC/mixed/FDTD zakończona EXP104; mixed W.2/W.3 PASS jako opt-in, hybrid/AMS/directgprMax REJECT; docs/milestones/M5.md.
+- [ ] M6 — ACTIVE: gorące kernele CUDA, fuzja/batching, Tensor Cores/TF32/BF16 i sweepy; docs/milestones/M6.md.
 - [ ] M7 — Kwalifikacja najlepszego wariantu na jednej 5070 Ti i pakiet do użycia.
 
 Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmuje jakość i porównywalne pomiary. Negatywna ocena prototypu może zamknąć hipotezę z dowodami; nie wymuszać integracji wolniejszego solvera. Brak poprawności lub brak wykonania wymaganego testu nie zalicza bramki. Plan i numeracja zastępują wcześniejszą kolejkę z obowiązkowym multi-GPU.
@@ -112,8 +112,7 @@ powyżej; nie oznacza zaliczenia M2.2/M2.3 jakości. docs/milestones/M2-decision
 - [x] EXP98–101: native complex FP32/scaling/dwie FP64 CUDA korekcje, fail-closed i FP64 fallback; API/W.2/W.3 PASS. Jedna para W.3 −19,31% czasu/−19,01% cgroup, bez globalnej promocji; docs/milestones/mixed-coarse-plan.md. Zmienna liczba korekt/FGMRES pozostaje osobną hipotezą.
 
 - [x] EXP100/102: pełne wyłączne timery + strict late CUDA/UVM profile;251,125→186,635GB w dwóch iteracjach, bez ekstrapolacji na całą symulację. Limit zysku coarse i zakres dowodów: docs/mixed-coarse-profile.md.
-- [ ] M5.6 — research jednego konkurenta FDTD/CUDA (najpierw gprMax): koszt siatki/CFL/zaniku, porty i kilka częstotliwości z jednego przebiegu; mały test tylko po pozytywnej ocenie zasobów.
-  - EXP103: pinned gprMax CUDA/HSG, rzeczywisty bbox/feed i odtwarzalny budżet; uniform wymaga zbyt wiele pamięci przy małych szczelinach. Następnie sprawdzić kilka ROI HSG bez przerwania feedu; docs/fdtd-budget.md. Solver NOT RUN, ocena wciąż otwarta.
+- [x] M5.6 — EXP103–104 gprMax CUDA/HSG resource/API assessment: samefreq/bothports/timewindow, actualgeometry/hash, publicnesting i36,144GB minimumsinglebox. Directport REJECT; mały solverbenchmark NOT RUN po nieprzejściu resource/API gate. Bez uniwersalnego odrzucania FDTD; docs/fdtd-budget.md.
 
 Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jest ograniczony; negatywna ocena z dowodami kończy hipotezę, nie wymusza migracji backendu.
 

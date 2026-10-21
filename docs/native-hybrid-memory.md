@@ -1,7 +1,8 @@
 # M5 — cuDSS hybrid memory, EXP95–96
 
 Stan2026-10-21: implementacja opt-in poprawna numerycznie, **REJECT jako obecny
-wariant przyspieszający**. UVM/FP64 pozostaje preferowaną referencją. M5 nadal ACTIVE.
+wariant przyspieszający**. UVM/FP64 pozostaje referencją. Aktualne zamknięcie
+oceny M5 i późniejszy mixed opt-in opisuje docs/milestones/M5.md.
 Wyniki to benchmark obecnej geometrii na5070Ti, nie uniwersalny ranking trybów.
 
 ## Przypięty stos i tryby

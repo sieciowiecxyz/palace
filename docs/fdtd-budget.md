@@ -1,14 +1,14 @@
 # M5.6 — koszt gprMax przed portem anteny
 
-EXP103,2026-10-21. **Ocena częściowa**, solver gprMax NOT RUN. Nie jest to
-benchmark szybkości ani dowód błędu FDTD. Uniform grid ma konkretny problem
-zasobów/geometrii; wieloregionowe HSG wymaga dalszej oceny, więc M5.6 pozostaje
-otwarte. Nie instalujemy zależności ani nie przepisujemy CAD przed tym filtrem.
+EXP103–104,2026-10-21. **Ocena zakończona: REJECT prostego przeniesienia do
+gprMax uniform/single-HSG**, solver gprMax NOT RUN po nieprzejściu filtra zasobów
+i API. Nie jest to benchmark szybkości ani dowód błędu FDTD. Nie instalowano
+zależności i nie zmieniono CAD/fizyki, by zmieścić uproszczoną antenę.
 
 ## Źródła, możliwości i granice
 
 Sprawdzony upstream `gprMax/gprMax`, master commit
-`d068a023265c1337982940efb41ef05a04f064a7`, GPLv3. Źródła są pobrane wyłącznie
+`d068a023265c1337982940efb41ef05a04f064a7`, GPLv3-or-later. Źródła są pobrane wyłącznie
 do ignorowanego `build/gprmax-research`, nie importowane do Palace.
 
 - [CUDAGrid](https://github.com/gprMax/gprMax/blob/d068a023265c1337982940efb41ef05a04f064a7/gprMax/grid/cuda_grid.py):
@@ -41,10 +41,12 @@ Streaming read w3,04s potwierdził bbox299,943×299,953×300mm, L0=0,001.
 To obwiednia istniejącej domeny FEM, nie zoptymalizowany prostopadłościan FDTD/PML.
 Przy zmianie domeny należy osobno sprawdzić granice i zbieżność.
 
-Odczytane archiwalne parametry tej samej geometrii: PCB55mm, laminat0,762mm,
+Odczytane archiwalne parametry tej samej geometrii: board_mm55, laminat0,762mm,
 miedź0,035mm, launch gap0,2mm, coax pin radius0,14351mm, dielectric radius0,4699mm,
 coax body do z=−40,303mm, barrel wall0,04mm. To benchmark z kablem/obudową,
 nie najlepszy model produkcyjny. Źródło parametrów i jego SHA są w receipt.
+Późniejszy EXP104 sprawdził rzeczywiste bounding boxes eksportu: sam parametr
+55mm nie opisuje całego laminatu/zasilania (patrz niżej).
 Nie używać najmniejszej krawędzi tetra jako automatycznego wymogu dla FDTD.
 
 ## Odtwarzalny rachunek
@@ -101,12 +103,50 @@ PCB i długi feed55³mm przekracza16GiB już samymi tablicami. Cienki HSG slab
 mieści tablice, ale nie rozwiązuje geometrii coaxu poza slabem; nie jest gotowym
 zamiennikiem badanego modelu. Drobniejszy slab0,05mm znów przekracza VRAM.
 
-M5.6 **pozostaje otwarte**: sprawdzić ograniczenia styku/rozłączności/nestingu
-HSG i czy da się zachować ciągły feed przez kilka małych ROI. Jeśli da się
-zmieścić wiarygodny model wraz z kontrolą rozdzielczości, wykonać mały rzeczywisty
-CUDA/TEM test przed portowaniem anteny. Jeśli nie, zamknąć ocenę konkretną
-przeszkodą zasobów/API. Brak twierdzenia, że wszelkie FDTD jest niemożliwe
-lub zawsze wolniejsze. Nie zmieniono fizyki/mesh/Tol referencji Palace.
+## EXP104 — rzeczywisty feed i hierarchia HSG
+
+Odczytano `source/input/export/freecad_parts.json` z tego samego archiwalnego
+case. Jego SHA zgadza się z `mesh-audit.json: export_manifest_sha256`, a ponownie
+policzony SHA źródłowego mesh jest identyczny z fixture Palace. To mocniejszy
+dowód niż domyślne parametry generatora. Żadnego ponownego tworzenia CAD.
+
+Laminat ma bbox72×72×0,762mm. Coaxy prowadzą do złączy x≈±45mm; sygnały i PTFE
+sięgają z=−46,803mm, a sygnał na PCB do0,947mm. Już wybrany podzbiór geometrii
+(substrate +dwa signal nets +dwa PTFE, bez całego common return/directora)
+wymaga working box co najmniej91,676×72×47,750mm. Source receipt przechowuje
+każdy bbox/trasę i SHA eksportu. Wcześniejsze55³mm było ilustracją budżetu,
+nie dokładnym obrysem anteny; teraz mamy pomiar rzeczywistego eksportu.
+
+Po parent alignment i paddingu standardowy HSG main1,1mm/fine0,1mm wymaga
+**36,144GB samych pól/IDs**. Fine0,05mm z main0,55mm to235,753GB; z main1,05mm
+i ratio21 to265,216GB. Nie uwzględniono jeszcze wszystkich dodatkowych tablic
+ani pełnego reflektora/obudowy w fine box. Nawet ten podzbiór przekracza16GiB.
+
+Sprawdzono przypięte
+[SubGridBase.add/setup](https://github.com/gprMax/gprMax/blob/d068a023265c1337982940efb41ef05a04f064a7/gprMax/subgrids/user_objects.py#L54)
+oraz [CUDA updaters](https://github.com/gprMax/gprMax/blob/d068a023265c1337982940efb41ef05a04f064a7/gprMax/subgrids/cuda_subgrid_updates.py#L288).
+Audyt AST potwierdził, że SubGridHSG jest ModelUserObject, a publiczne `add`
+przyjmuje tylko geometry/grid/output children i odrzuca zagnieżdżony subgrid.
+`sg.parent_grid=model.G`; CUDA precursors/interface każdego dziecka używają
+tej samej siatki głównej. Nie ma w sprawdzonym API zagnieżdżonej hierarchii
+lub zweryfikowanego bezpośredniego interfejsu fine-fine.
+
+Nie znaleziono w tych validatorach gwarancji poprawności dotykających się lub
+nakładających sibling ROI. **Nie twierdzimy, że każde takie ustawienie jest
+błędne**. Nie wystarczy jednak przyjąć, że API, które zaakceptuje deklarację,
+zachowa cienki ciągły coax między regionami. Main1,1mm jest grubszy niż średnica
+żyły0,287mm; zastąpienie przejścia thin-wire/lumped źródłem lub nowe sprzęganie
+fine-fine wymaga własnej implementacji i testów zbieżności/portów.
+
+**Decyzja M5.6:** zasoby/API nie pozwalają wykazać wiarygodnego bezpośredniego
+portu obecnego modelu w16GB bez nowego projektu sprzęgania lub uproszczenia
+feedu. Warunek uruchomienia małego CUDA/TEM benchmarku nie został spełniony;
+pozostaje NOT RUN. Zamykamy ograniczoną ocenę gprMax negatywnie i kontynuujemy
+Palace. Custom multi-ROI/subcell, inne implementacje FDTD i ich możliwe korzyści
+pozostają nieocenione — brak uniwersalnego twierdzenia, że FDTD jest niemożliwe
+lub wolniejsze. Nie zmieniono wymagań K ani fizyki referencji.
 
 Dowody: `artifacts/m5-fdtd-domain-20261021.json`,
 `artifacts/m5-fdtd-budget-20261021.json`, pinned source cache/sources.json.
+EXP104: `artifacts/m5-fdtd-actual-feed-20261021.json`,
+`artifacts/m5-fdtd-hsg-source-audit-20261021.json` (source/API, nie runtime test).

@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
 
 ## Wymóg użytkownika
 
@@ -8,7 +8,7 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 
 ## Bieżący checkpoint
 
-- Active M5. M0–M4 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci; M4 pełna para EXP94 PASS, bez zmiany globalnych defaultów.
+- Active M6. M0–M5 ocenione; M2 integracja REJECT, M3 użyteczny zysk pamięci, M4 pełna para EXP94 PASS, M5 mixed opt-in PASS/directgprMax REJECT; bez zmiany globalnych defaultów.
 - EXP94 T-Shaped medium3,50GHz/oba porty, samebuild/config: control681,698s → reuse602,944s,44/35iter. Jedna para −11,55%, nie mediana/promocja M7. Raw ||Ax−b||/||b|| ≤8,357e−7.
 - Deferred postprocessing: managedpeak65,353→53,084GB (−18,77%) i controlcgroup60,525→56,830GB (−6,11%); reuse sam nie zmienia tego peaku. Jeden dodatkowy E179,5MB w RAM/VRAM. Fizycznej rezydencji VRAM nie utożsamiać z alokacjami.
 - Wholefields/S/VSWR/power/energy PASS, W.2 trzyfreq/oba porty i tiny normalpathPASS. EXP92 OOM i EXP93 inline-reference OOM pozostają FAIL. Receipt artifacts/m4-deferred-antenna-root-analysis-20261020.json; dowody docs/milestones/M4.md.
@@ -17,7 +17,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M5. [PLAN](PLAN.md), [MILESTONES](
 - EXP97 AMS: tiny/mediumquality i CUDAprofilePASS, W3P2deadline900sFAIL (iter264/recurrence1,501e−3, brak rawfinal/pól); REJECT obecnegoC2. Partialcgroup29,32GB nie kwalifikuje oszczędności anteny.
 - EXP98–101 scaled native complexFP32/dwie FP64 CUDA korekcje: API/W.2 trzyfreq/oba porty i W.3P2 PASS. Jedna para W.3 339,362→273,843s (−19,31%),35/35iter; cgroup56,027→45,376GB (−19,01%). Pola/S/VSWR/energia/raw PASS; opt-in bez nowego defaultu. Raport docs/milestones/mixed-coarse-plan.md; build18,615s, fallback build/m5-mixed/pre-mixed-native.
 - EXP102 M5.5 strict late30:2 profile PASS: UVM251,125→186,635GB (−25,68%) w dwóch iteracjach; okno12,944→10,530s. To nie pełny migrationtotal ani nowy RFsolve; docs/mixed-coarse-profile.md.
-- Następne: M5.6 ocena wielu ROI HSG po source-based EXP103. Uniform gprMax0,2mm wymaga162GB samych tablic; cienki subgrid nie obejmuje feedu. SolverNOTRUN, M5 nadalACTIVE. M6.6 sweep3,3–3,9GHz i M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode. M6/M7/W.4/W.5/3powtórzenia nadal otwarte; Rust/FieldCraft/GUI/CAD poza zakresem.
+- EXP104: actual exportSHA powiązany z mesh audit; PCBbbox72mm, wybrany PCB/feedsubset91,676×72×47,750mm. SingleHSG0,1mm wymaga36,144GBbase. Publicnesting odrzucony; directportgprMaxREJECT bez nowego sprzęgania/subcell. SolverNOTRUN po resource/API gate, nie blanketFDTDrejection. Audyt M5.1–M5.6 w docs/milestones/M5.md.
+- Następne M6.1: actual P/Q/N/q_comp dla MAGMA basis/apply; sourcecustombranch≤40 zweryfikowana z pinem, samecuBLASmathmode nie obejmie tych kerneli. M6.6 sweep3,3–3,9GHz/M7.5 nowa geometria NOT RUN. Priorytet5070Ti16GB/96GBRAM, bez geometryhardcode; M6/M7/W.4/W.5/3powtórzenia nadal otwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2436,3 +2437,40 @@ read-only docs-garden PASS; root reviewed actualprofiles/enums/receipts and sour
 math, native verified unchanged sourceSHA8692e80d926a58a74f38bff9c643b578810a94d35d4d534a2c027215fd11607f.
 No native/dependency rebuild needed, no paidcompute or runningjob. M5 ACTIVE,
 M5.5 evaluated; M5.6 remains OPEN with explicit nextHSG feasibility action.
+
+EXP104 source/API +actualgeometry assessment (no GPU/FDTD simulation). Archived
+freecad_parts.json SHA matches samecase mesh-audit exportmanifest; source mesh
+SHA rechecked identical to localfixture. Actual substrate bbox72×72×.762mm,
+signal+PTFE selectedsubset union91.676×72×47.750mm, coaxportsx±45/z−46.803.
+Old55mm parameter notwholephysicalboard; docs corrected, oldillustrativebudget
+retained withscope. HSG1.1/.1mm parentaligned+paddedbase36,144,022,896B already
+over16GiB withoutallreturn/director/PMLaux; .05mm235.753/265.216GB. Receipts
+m5-fdtd-actual-feed-20261021.json and m5-fdtd-hsg-source-audit-20261021.json.
+Pinned gprMax AST/source audit: SubGridHSG isModelUserObject, publicadd accepts
+onlygeometry/grid/output, nestingrejected; sg.parent_grid=model.G andCUDAall
+precursors/interfacesusemodel.G. No verifieddirectfinefineinterface; no claim
+alloverlappingsiblingsinvalid. Thincoaxdetail belowmainstep cannotjustbeassumed
+preserved. Directuniform/singleHSG workflow REJECT resource/API; benchmarkNOTRUN
+afterfailedgate, customnewcoupling/subcell remainsunassessed. LimitedM5.6assessment
+completed without changingK/physics or pretendingFDTDspeed/qualitywasmeasured.
+
+Root completionaudit M5.1–M5.6: compatibility/API/budgets, AMS actualGPU+negative
+W3, scaledfixed2coarse+FP64fallback, W2/W3/K/speed/memory, currentstrictUVMprofile,
+andFDTDresource/APInegativeassessmentallhaveexplicitreceipts/limits. Assessment
+M5COMPLETE, notgoal/globalpromotion. M6checkpoint created/INDEXlinked before
+ActiveM6; noM7/W4/W5/medianclaim. No paidcompute/appsclosing/swap/depsrebuild.
+
+M6 initialread-onlysourcework: copiedexistingMAGMAbackend fromstoppedbuilder,
+notstarted/recompiled. libCEED basis source SHA0c41d35fde4470965b7b2beb6d1801aef526fea1c4c53e32f62bce7cdd1357ff
+matches GitHub pin cbd49027b0ae891f0c8efd9d9cf05bc82385a388. Profilenamesandcode
+showcustominterp/derivbranch P,Q<=40, notgenericGEMM; N=nelem*ncomp, curl/div
+sharederivbranch, transpose/addmustpreserveaccumulation. Sourcecache+selection
+receipt artifacts/m6-kernel-selection-20261021.json. ActualP/Q/N/qcompNOTYET
+measured; M6.1 stillOPEN. Nextsmallopt-inaudit beforeTF32prototype, avoidglobal
+operatorreplacementthatwouldcorruptindependentoriginalFP64residual.
+
+EXP104/M5→M6 checkpoint:139pinnedtests/8shell/docschecker/gitdiffcheck PASS.
+Root rechecked current W2/W3/profile/source receipts +unchangednative manifest.
+SameLuna read-only criticaldocs-garden PASS includingconditionalM5.6benchmark
+gate andlimitations. No runtime/performanceclaim fromsourceaudit. M6.1actual
+dimensionaudit isnext; fullgoal/W4/W5/M7 remainOPEN.

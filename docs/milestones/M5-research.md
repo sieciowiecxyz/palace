@@ -1,6 +1,8 @@
 # M5 — research maksymalnej wydajności na jednej 5070 Ti
 
-Status: część **ACTIVE M5**, M5.5 ocenione w EXP102, M5.6 nadal otwarte.
+Status: **assessment zakończone**: M5.5 EXP102 PASS pomiaru, M5.6 EXP103–104
+directgprMax REJECT na resource/API gate. Solver gprMax NOT RUN; nie jest to
+uniwersalne odrzucenie FDTD. Poniższe wymagania pozostają historycznym kontraktem.
 Checkpoint i kolejność całego etapu: [M5](M5.md).
 Aktualne dowody: [profil mixed coarse](../mixed-coarse-profile.md),
 [zasoby gprMax](../fdtd-budget.md). Poniższe kroki zachowują wymagania badania.

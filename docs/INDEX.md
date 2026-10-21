@@ -29,8 +29,11 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Czytaj gdy: sprawdzasz zamknięcie audytu setup i pamięci między portami
   - Opis: EXP94 pełna para obu portów PASS; jedna faktoryzacja, pomiary po zwolnieniu solvera, zysk czasu i pamięci z jawnym zakresem.
 - [M5: preconditioner](milestones/M5.md)
-  - Czytaj gdy: wznawiasz aktywny etap PC i mixed precision
-  - Opis: Punkt wyjścia EXP94, audyt istniejących trybów cuDSS/AMS oraz kolejność małych prób przed pełnym modelem.
+  - Czytaj gdy: sprawdzasz dowody zamknięcia oceny PC i mixed precision
+  - Opis: M5.1–M5.6 assessment; mixed W.2/W.3 PASS jako opt-in, hybrid/AMS/directgprMax REJECT, bez globalnej promocji.
+- [M6: kernele CUDA i sweepy](milestones/M6.md)
+  - Czytaj gdy: wznawiasz aktywny etap kernel/batching/TF32 oraz planujesz rzeczywiste wymiary operatorów
+  - Opis: Aktualny profil i source MAGMA custom branch≤40, kolejność pomiarów P/Q/N i W.1→W.3; brak deklaracji TC lub nowego speedupu.
 - [M5: hybrid cuDSS](native-hybrid-memory.md)
   - Czytaj gdy: oceniasz actual hybrid memory lub wracasz do odrzuconego budżetu GPU
   - Opis: API i W.3P2 poprawne, ale4/6GiB bez net speedup; coarse2× szybciej, reszta PC wolniej. UVM fallback, actualminimum i granice pomiarów.
@@ -45,13 +48,13 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: Cel3,3–3,9GHz/oba porty; kontrola całego kosztu, pamięci i błędu bez ślepego reuse faktorów.
 - [M5: research wydajności i FDTD/CUDA](milestones/M5-research.md)
   - Czytaj gdy: po M4 oceniasz koszt PC i alternatywny algorytm obliczeń na 5070 Ti
-  - Opis: Ocena kosztu siatki/CFL i wielu częstotliwości przed benchmarkiem; tylko przyspieszanie obliczeń, bez Rust/GUI/CAD.
+  - Opis: Zachowane wymagania zakończonej oceny M5.5/M5.6, koszt przed benchmarkiem i jawne negatywne rozstrzygnięcia.
 - [M5.5: UVM po mixed coarse](mixed-coarse-profile.md)
   - Czytaj gdy: sprawdzasz zmierzony ruch pamięci po FP32 faktorach lub planujesz następny kernel
   - Opis: EXP102 strict late profile PASS, −25,68% UVM w dwóch iteracjach; osobno pełny koszt EXP100 i granice wnioskowania.
 - [M5.6: budżet FDTD](fdtd-budget.md)
   - Czytaj gdy: oceniasz zasoby gprMax CUDA/HSG przed budowaniem nowego modelu
-  - Opis: EXP103 source pin, rzeczywisty bbox, tablice/CFL/czas/porty; uniform niekwalifikowany, HSG i mały solver test nadal otwarte.
+  - Opis: EXP103–104 actualexport/hash,36,144GB HSG subset i brak publicnesting; directgprMax REJECT na resource/API gate, solver NOT RUN.
 - [M3: actual API i walidacja medium](mixed-basis-validation.md)
   - Czytaj gdy: oceniasz aktualny wariant FP32direct lub planujesz politykę migracji
   - Opis: EXP80–85 W.1/W.2/W.3 PASS,−2,87GB cgroup na T-Shaped; bez speedup/defaultpromotion, W.4/W.5 otwarte.

@@ -69,4 +69,5 @@ końcowy rep<=64MiB jest zwykłym wynikiem. Mechanizm: [profilowanie](profiling-
 
 Dowody: `artifacts/m5-mixed-profile-antenna-{control,on}-20261021/`,
 `artifacts/m5-mixed-profile-root-analysis-20261021.json`. M5.5 ocenione,
-M5.6 FDTD wciąż otwarte, bez globalnej promocji mixed.
+M5.6 zostało później ocenione negatywnie w EXP104 na resource/API gate;
+[decyzja](fdtd-budget.md). Bez globalnej promocji mixed.
