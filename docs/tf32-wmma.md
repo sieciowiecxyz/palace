@@ -106,3 +106,14 @@ python3 tools/experiments/ceed_tensor_probe.py run NEW_TRACE --lt --fused --wmma
 
 Nowe katalogi, wolny GPU/minimum2048MiB,6GiB cgroup/no swap. Zwykły build
 probe to cached2TUs; nie budować Palace/MFEM dla zmiany samego runnera/docs.
+
+## EXP176 — zakończony filtr W.1
+
+`--wmma-checks` (tylko screen z --wmma) dodał homogeneity/superposition
+przy2e-6 oraz11skal1e-300…1e300. Original/FP64PASS1e-11, WMMAlinearity
+2.33–3.59e-4FAIL; underflowerror1 i nonfiniteoverflow jawniezapisane.
+To kompletna negatywna ocena prostej podmiany do aktualnego PC, bez
+pełnegoFEM i bez zmianyraw/RFgate. [Decyzja i źródłaFGMRES](milestones/M6-decision.md).
+Poprzednia sekcja następnejbramki opisuje prereg: jejpunkt1wykonany,
+punkty2–3 niewykonane po negatywnym filtrze. Nie twierdzimy, że wszystkie
+warianty TC/FGMRES nie mogą się opłacić. Dalej kwalifikacja innego finalistyM7.

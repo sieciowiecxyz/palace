@@ -73,6 +73,9 @@ def build():
 def validate_case(case):
     lt=case.get('lt',False)
     wmma=case.get('wmma',False)
+    wmma_checks=case.get('wmma_checks',False)
+    if not isinstance(wmma_checks,bool) or wmma_checks and (not wmma or case.get('suite')=='scale'):
+        raise ValueError('Invalid WMMA control scope')
     if not isinstance(wmma,bool) or wmma and not (lt and case.get('fused')):raise ValueError('Missing WMMA comparators')
     compensated=case.get('compensated',False)
     if not isinstance(lt,bool) or lt and compensated:raise ValueError('Invalid Lt experiment scope')
@@ -114,6 +117,19 @@ def validate_case(case):
             accuracy(check[key],tol)
             if required and check[key]['passed'] is not True:
                 raise ValueError('Original/FP64 basis linearity control failed')
+    def finite_range(items,tol,length,required=False):
+        scales=[1e-300,1e-80,2.**-75,2.**-74,1e-30,1.,1e30,2.**100,2.**101,1e80,1e300]
+        if not isinstance(items,list) or [item.get('scale') for item in items]!=scales:
+            raise ValueError('Missing finite-range coverage')
+        for item in items:
+            count=item.get('nonfinite_outputs')
+            if not isinstance(count,int) or isinstance(count,bool) or not 0<=count<=length or item.get('finite_output') is not (count==0):
+                raise ValueError('Invalid finite-output accounting')
+            if count:
+                if item.get('accuracy') is not None or required:raise ValueError('Invalid nonfinite reference/result')
+            else:
+                accuracy(item['accuracy'],tol)
+                if required and not item['accuracy']['passed']:raise ValueError('Independent original range control failed')
     for row in case['rows']:
         key=tuple(row[k] for k in ['family','Q','components','eval','elements','transpose','add'])
         if key in seen:raise ValueError('Duplicate action')
@@ -128,6 +144,9 @@ def validate_case(case):
                 raise ValueError('Original vs independent reference failed')
         if compensated and row['elements']==257 and not row['transpose']:
             linearity(row['original_linearity'],1e-11,True)
+        if wmma_checks and row['elements']==257 and not row['transpose']:
+            linearity(row['original_linearity'],1e-11,True)
+            finite_range(row['original_range'],1e-11,row['N']*row['Q']*row['q_components'],True)
         if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else [])+(['TF32_Lt'] if lt else [])+(['TF32_WMMA_fused'] if wmma and not row['transpose'] else []):
             raise ValueError('Missing precision comparison')
         for method in row['methods']:
@@ -181,6 +200,9 @@ def validate_case(case):
             timing(method['timing'])
             if compensated and row['elements']==257 and not row['transpose']:
                 linearity(method['linearity'],tol,method['precision']=='FP64')
+            if wmma_checks and row['elements']==257 and not row['transpose']:
+                linearity(method['linearity'],1e-11 if method['precision']=='FP64' else 2e-6,method['precision']=='FP64')
+                finite_range(method['range_stress'],tol,row['N']*row['Q']*row['q_components'],method['precision']=='FP64')
             if method['precision']=='FP32_fused' and method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*4:
                 raise ValueError('Unexpected fused vector workspace')
             if method['precision'] in ['mixed_compensated','mixed_compensated_bits'] and method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*8:
@@ -227,7 +249,8 @@ def trace_summary(path):
             scope='Executed kernel symbols only; no executed instruction counters or speedup claim. Profile includes all probe methods.')
 
 
-def run(output,seconds,scale=False,fused=False,compensated=False,lt=False,profile=False,wmma=False):
+def run(output,seconds,scale=False,fused=False,compensated=False,lt=False,profile=False,wmma=False,wmma_checks=False):
+    if wmma_checks and (not wmma or scale):raise ValueError('WMMA controls require screen WMMA')
     if wmma and not (lt and fused):raise ValueError('WMMA requires Lt/fused comparators')
     if lt and compensated:raise ValueError('Lt and compensated are separate experiments')
     if profile and not lt:raise ValueError('Trace requires isolated Lt experiment')
@@ -270,6 +293,7 @@ def run(output,seconds,scale=False,fused=False,compensated=False,lt=False,profil
     if compensated:args.append('compensated')
     if lt:args.append('lt')
     if wmma:args.append('wmma')
+    if wmma_checks:args.append('wmma-checks')
     dev.write(output/'command.json',dict(argv=args,manifest=manifest,gpu_before=gpu,runner_sha256=dev.sha(Path(__file__))))
     started=time.monotonic();code=None
     try:
@@ -319,9 +343,10 @@ if __name__=='__main__':
     parser.add_argument('--compensated',action='store_true',help='Forward compensated mixed-register dot and small basis linearity controls; requires --fused')
     parser.add_argument('--lt',action='store_true',help='ND2/Q14 only: checked cuBLASLt TF32 tensor-op heuristic, <=64MiB workspace')
     parser.add_argument('--wmma',action='store_true',help='Forward-only P20/Q14/QC3 fused TF32 WMMA research, requires --lt --fused')
+    parser.add_argument('--wmma-checks',action='store_true',help='Screen-only stationarity/range controls, retains negative mixed results')
     parser.add_argument('--profile-lt',action='store_true',help='Pinned Nsight CUDA activity in RAM; separate diagnostic, never a performance benchmark')
     parser.add_argument('--seconds',type=int,default=120);args=parser.parse_args()
     if args.action=='build':build()
     elif args.action=='check':print('CEED tensor probe verified' if verified() else 'invalid')
     elif args.output is None:parser.error('run requires new output directory')
-    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated,args.lt,args.profile_lt,args.wmma)
+    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated,args.lt,args.profile_lt,args.wmma,args.wmma_checks)

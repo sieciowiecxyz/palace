@@ -102,6 +102,33 @@ class TensorProbeTests(unittest.TestCase):
                 method=copy.deepcopy(row['methods'][2]);method.update(precision='TF32_WMMA_fused',extra_fp32_workspace_bytes=row['P']*row['Q']*row['q_components']*4,shared_bytes_per_block=18432)
                 row['methods'].append(method)
         self.assertTrue(probe.validate_case(wmma))
+        controls=copy.deepcopy(wmma);controls['wmma_checks']=True
+        def linear(tol):
+            metric=dict(relative_l2=0.,scaled_max=0.,passed=True,tolerance=tol)
+            return dict(alpha=1.23456789012345,homogeneity=copy.deepcopy(metric),superposition=copy.deepcopy(metric))
+        def ranged(tol):
+            metric=dict(relative_l2=0.,scaled_max=0.,passed=True,tolerance=tol)
+            return [dict(scale=s,finite_output=True,nonfinite_outputs=0,accuracy=copy.deepcopy(metric)) for s in
+                [1e-300,1e-80,2.**-75,2.**-74,1e-30,1.,1e30,2.**100,2.**101,1e80,1e300]]
+        for row in controls['rows']:
+            if row['elements']!=257 or row['transpose']:continue
+            row.update(original_linearity=linear(1e-11),original_range=ranged(1e-11))
+            for method in row['methods']:
+                method.update(linearity=linear(1e-11 if method['precision']=='FP64' else 2e-6),range_stress=ranged(method['accuracy']['tolerance']))
+        self.assertTrue(probe.validate_case(controls))
+        method=controls['rows'][0]['methods'][-1]
+        method['linearity']['homogeneity'].update(relative_l2=.001,passed=False)
+        method['range_stress'][-1].update(finite_output=False,nonfinite_outputs=1,accuracy=None)
+        self.assertTrue(probe.validate_case(controls))  # Completed negative experiment is retained.
+        valid_negative=copy.deepcopy(controls)
+        method['range_stress'][-1]['nonfinite_outputs']=0
+        with self.assertRaises(ValueError):probe.validate_case(controls)
+        bad=copy.deepcopy(valid_negative);bad['rows'][0]['original_range'].pop()
+        with self.assertRaises(ValueError):probe.validate_case(bad)
+        bad=copy.deepcopy(valid_negative);bad['rows'][0]['original_range'][0]['accuracy'].update(relative_l2=.1,passed=False)
+        with self.assertRaises(ValueError):probe.validate_case(bad)
+        bad=copy.deepcopy(valid_negative);del bad['rows'][0]['methods'][-1]['linearity']
+        with self.assertRaises((ValueError,KeyError)):probe.validate_case(bad)
         wmma['rows'][0]['methods'][-1]['shared_bytes_per_block']=0
         with self.assertRaises(ValueError):probe.validate_case(wmma)
         for key,value in [('impl_flags',0),('check_state',1),('workspace_bytes',65*1024*1024)]:

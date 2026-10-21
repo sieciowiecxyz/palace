@@ -110,7 +110,21 @@ template<class F> json range_stress(F apply,Buffer<double>&dx,Buffer<double>&dy,
   dx.write(x);return result;
 }
 
-json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add,bool fused,bool compensated,bool lt,bool wmma) {
+template<class F> json finite_range(F apply,Buffer<double>&dx,Buffer<double>&dy,const std::vector<double>&x,
+                                  const std::vector<double>&b,const std::vector<double>&initial,int p,int q,int qc,int n,double tolerance) {
+  json result=json::array();
+  for(double scale:{1e-300,1e-80,std::ldexp(1.,-75),std::ldexp(1.,-74),1e-30,1.,1e30,std::ldexp(1.,100),std::ldexp(1.,101),1e80,1e300}){
+    auto input=x;for(auto &value:input)value*=scale;
+    dx.write(input);apply();auto output=dy.read();
+    const size_t nonfinite=std::count_if(output.begin(),output.end(),[](double v){return !std::isfinite(v);});
+    json item={{"scale",scale},{"nonfinite_outputs",nonfinite},{"finite_output",nonfinite==0},{"accuracy",nullptr}};
+    if(nonfinite==0)item["accuracy"]=error(oracle(b,input,initial,p,q,qc,n,false,false),output,tolerance);
+    result.push_back(item);
+  }
+  dx.write(x);return result;
+}
+
+json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add,bool fused,bool compensated,bool lt,bool wmma,bool wmma_checks) {
   CeedInt p,q,qc;CEED(CeedBasisGetNumNodes(basis,&p));CEED(CeedBasisGetNumQuadraturePoints(basis,&q));CEED(CeedBasisGetNumQuadratureComponents(basis,mode,&qc));
   const double *tab=nullptr;
   if(mode==CEED_EVAL_INTERP)CEED(CeedBasisGetInterp(basis,&tab));
@@ -147,8 +161,9 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
     if(error(ref,bad,2e-3)["passed"].get<bool>())throw std::runtime_error("fault detector failed");}
   // Timings intentionally don't reset ApplyAdd between repeats: every method
   // accumulates another result, without any reset/copy hidden inside its timing.
-  if(compensated&&!trans&&elements==257){result["original_linearity"]=linearity(native,dx,dy,input,ref,1e-11);
+  if((compensated||wmma_checks)&&!trans&&elements==257){result["original_linearity"]=linearity(native,dx,dy,input,ref,1e-11);
     if(!result["original_linearity"]["homogeneity"]["passed"].get<bool>()||!result["original_linearity"]["superposition"]["passed"].get<bool>())throw std::runtime_error("original linearity control failed");}
+  if(wmma_checks&&!trans&&elements==257)result["original_range"]=finite_range(native,dx,dy,input,coefficients,initial,p,q,qc,n,1e-11);
   dy.write(initial);result["original_timing"]=timing(native);
   json methods=json::array();
   for(int precision=0;precision<(compensated&&!trans?6:fused?4:3);++precision){const bool mixed=precision!=0;const double tol=(precision==0||precision>=4)?1e-11:(precision==2?2e-3:2e-6);
@@ -166,8 +181,9 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
     dy.write(initial);apply();auto value=dy.read();json check=error(ref,value,tol);
     if(elements==257)check["independent_cpu"]=error(oracle(coefficients,input,initial,p,q,qc,n,trans,add),value,tol);
     json test;
-    if(compensated&&!trans&&elements==257)test=linearity(apply,dx,dy,input,value,tol);
+    if((compensated||wmma_checks)&&!trans&&elements==257)test=linearity(apply,dx,dy,input,value,wmma_checks&&precision!=0?2e-6:tol);
     json stress;if(precision==5&&elements==257)stress=range_stress(apply,dx,dy,input,coefficients,initial,p,q,qc,n);
+    if(wmma_checks&&!trans&&elements==257)stress=finite_range(apply,dx,dy,input,coefficients,initial,p,q,qc,n,tol);
     dy.write(initial);methods.push_back({{"precision",precision==0?"FP64":precision==1?"FP32_pedantic":precision==2?"TF32_requested":precision==3?"FP32_fused":precision==4?"mixed_compensated":"mixed_compensated_bits"},{"accuracy",check},{"timing",timing(apply)},
       {"linearity",test},{"range_stress",stress},{"extra_fp32_workspace_bytes",precision>=4?db.size*8:precision==3?db.size*4:precision==0?0:(ni+no+db.size)*4}});
   }
@@ -191,6 +207,8 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
         CUDA(palace_probe_unpack(fy.data,dy.data,no,add));};
       dy.write(initial);apply();auto value=dy.read();test["accuracy"]=error(ref,value,2e-3);
       if(elements==257)test["accuracy"]["independent_cpu"]=error(oracle(coefficients,input,initial,p,q,qc,n,trans,add),value,2e-3);
+      if(wmma_checks&&!trans&&elements==257){test["linearity"]=linearity(apply,dx,dy,input,value,2e-6);
+        test["range_stress"]=finite_range(apply,dx,dy,input,coefficients,initial,p,q,qc,n,2e-3);}
       dy.write(initial);test["timing"]=timing(apply);
     }
     methods.push_back(test);
@@ -201,8 +219,11 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
     auto apply=[&]{CUDA(palace_probe_wmma(fb.data,dx.data,dy.data,p,q,qc,n));};
     dy.write(initial);apply();auto value=dy.read();auto check=error(ref,value,2e-3);
     if(elements==257)check["independent_cpu"]=error(oracle(coefficients,input,initial,p,q,qc,n,false,false),value,2e-3);
-    methods.push_back({{"precision","TF32_WMMA_fused"},{"accuracy",check},{"timing",timing(apply)},
-      {"extra_fp32_workspace_bytes",db.size*4},{"shared_bytes_per_block",(3*16*32+32*64+16*64)*4}});
+    json test={{"precision","TF32_WMMA_fused"},{"accuracy",check},
+      {"extra_fp32_workspace_bytes",db.size*4},{"shared_bytes_per_block",(3*16*32+32*64+16*64)*4}};
+    if(wmma_checks&&elements==257){test["linearity"]=linearity(apply,dx,dy,input,value,2e-6);
+      test["range_stress"]=finite_range(apply,dx,dy,input,coefficients,initial,p,q,qc,n,2e-3);}
+    test["timing"]=timing(apply);methods.push_back(test);
   }
   result["methods"]=methods;db.check();dx.check();dy.check();fb.check();fx.check();fy.check();result["canaries_passed"]=true;
   if(lower)lower->check();
@@ -211,15 +232,17 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
 
 int main(int argc,char**argv){
   try{
-    if(argc<2||argc>7)throw std::runtime_error("expected output path [scale] [fused] [compensated] [lt] [wmma]");
-    bool scale=false,fused=false,compensated=false,lt=false,wmma=false;
+    if(argc<2||argc>8)throw std::runtime_error("expected output path [scale] [fused] [compensated] [lt] [wmma] [wmma-checks]");
+    bool scale=false,fused=false,compensated=false,lt=false,wmma=false,wmma_checks=false;
     for(int i=2;i<argc;++i){if(std::string(argv[i])=="scale"&&!scale)scale=true;
       else if(std::string(argv[i])=="fused"&&!fused)fused=true;
       else if(std::string(argv[i])=="wmma"&&!wmma)wmma=true;
+      else if(std::string(argv[i])=="wmma-checks"&&!wmma_checks)wmma_checks=true;
       else if(std::string(argv[i])=="lt"&&!lt)lt=true;
       else if(std::string(argv[i])=="compensated"&&!compensated)compensated=true;else throw std::runtime_error("invalid/duplicate suite option");}
     if(compensated&&!fused)throw std::runtime_error("compensated requires fused comparator");
     if(wmma&&(!lt||!fused))throw std::runtime_error("WMMA requires Lt and fused comparators");
+    if(wmma_checks&&(!wmma||scale))throw std::runtime_error("WMMA checks require screen WMMA");
     if(compensated&&lt)throw std::runtime_error("Lt and compensated are separate experiments");
     if(error({0},{1e-300},1e-11)["passed"].get<bool>()||error({1e-300},{1.001e-300},1e-11)["passed"].get<bool>())
       throw std::runtime_error("tiny-relative-error fault detector failed");
@@ -230,7 +253,7 @@ int main(int argc,char**argv){
     cudaDeviceProp prop;CUDA(cudaGetDeviceProperties(&prop,0));int blas_version;BLAS(cublasGetVersion(handle,&blas_version));
     json report={{"scope","Isolated GPU-resident basis actions; not UVM, solver speedup or RF qualification. TF32 request is not proof of Tensor Core instructions."},
       {"gpu",prop.name},{"cublas_version",blas_version},{"suite",scale?"scale":"screen"},{"fused",fused},{"compensated",compensated},
-      {"lt",lt},{"wmma",wmma},{"compensated_bits",compensated},{"tiny_error_controls",true},{"rows",json::array()}};
+      {"lt",lt},{"wmma",wmma},{"wmma_checks",wmma_checks},{"compensated_bits",compensated},{"tiny_error_controls",true},{"rows",json::array()}};
     // MFEM caches tabulations by rule address: retain mapped rules until FE teardown.
     std::vector<std::unique_ptr<mfem::IntegrationRule>> mapped_rules;
     mfem::ND_FECollection nd(2,3),nd2(2,2);mfem::RT_FECollection rt(1,3);mfem::H1_FECollection h1(2,3);
@@ -256,7 +279,7 @@ int main(int argc,char**argv){
       palace::ceed::InitBasisFromRule(*fe,*ir,components,ceed,&basis);
       for(auto mode:{CEED_EVAL_INTERP,(family==0||family==3)?CEED_EVAL_CURL:family==1?CEED_EVAL_DIV:CEED_EVAL_GRAD})
         for(int elems:(scale?std::vector<int>{257,1023,4099,16383,65537,131071,1601320}:std::vector<int>{257,131071}))for(int variant=0;variant<3;++variant) {
-          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2,fused,compensated,lt,wmma);row["family"]=family;row["rule_degree"]=degree;
+          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2,fused,compensated,lt,wmma,wmma_checks);row["family"]=family;row["rule_degree"]=degree;
           row["rule_source"]=trace?"representative_triangle_z0_trace":family==3?"triangle":"tet_volume";
           report["rows"].push_back(row);std::cout<<"completed family="<<family<<" Q="<<points<<" mode="<<int(mode)<<" n="<<elems<<" variant="<<variant<<std::endl;
         }

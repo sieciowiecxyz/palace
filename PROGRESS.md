@@ -1,6 +1,6 @@
 # Postępy optymalizacji
 
-Aktualizacja: 2026-10-21. Mode: goal, Active: M6 (EXP167–175 Lt assessed, fusedWMMA instructionproof+microgain PASS; W.1/PC assessment NEXT, M6.6 complete). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [raport M1](docs/optimization-baseline.md), [kontrola pól](docs/field-validation.md).
+Aktualizacja: 2026-10-21. Mode: goal, Active: M7 (M6 assessment complete EXP176: directWMMA W.1FAIL/REJECT, not RFpromotion). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [M7](docs/milestones/M7.md).
 
 ## Wymóg użytkownika
 
@@ -3721,3 +3721,35 @@ Usermodel unloaded viaAPI under renewed explicitauthorization; APIserver
 retained (subsequent userrequest mayreload). No secrets recorded. Localcommit
 only, no upstream push. Newhotworkspaces allRAM/VRAM, ordinarytrace/results
 bytes recorded; no swap/diskbasis.
+
+## EXP176 prereg — WMMA stationarity and dynamic range before PC
+
+Previous goal turn made concrete progress EXP167–175/commitbd201d3. Current
+GPU14177MiBfree/onlyTelegramcompute57MiB/host79GiBavailable/no swap.
+Add optional --wmma-checks to existing cachedscreen, no native/deps change.
+N257 forward INTERP/CURL independent homogeneity(alpha1.23456789012345)
+and superposition; compareoriginal/FP64/FP32pedantic/TF32requested/fusedFP32/
+Lt/WMMA. Reference linearity1e-11, mixedlinearity2e-6 (existingFP32action
+filter, preregistered before results), not looseTF32action2e-3. Also11input
+scales1e-300…1e300 using independentlongdoubleoracle; nonfinite outputs
+explicitcounts/nullnorm, underflow finiteerrors retained. Original/FP64
+range mustPASS1e-11. Mixednegative results mean completedassessment, not
+numericalqualification. No fullFEM solelybecauseactiontime improved10%.
+120s/6GiB/no swap; rootdesign/sameLunabaysitting. No driver/appchanges.
+
+EXP176 root strict12row/newlinearity+rangecontrols PASS execution, negative
+mixedresults preserved. Original/FP64linear~1.5–1.9e-16/range11of11PASS;
+fusedFP32linear~7.9–8.7e-8PASS. WMMAhomogeneity2.3325e-4/3.5941e-4,
+superposition2.3820e-4/3.5687e-4FAIL prereg2e-6. Midrange7of11actionPASS;
+1e-300/1e-80 finitezeros/error1;1e80/1e300 10794nonfiniteoutputs each.
+This is actiondefect/rangelimit, not measuredwholePC/RFfailure. Receipt
+artifacts/m6-wmma-controls-20261021/root-analysis.json. RejectdirectWMMA
+PCpromotion; no native/defaultchange. SourceFGMRES asserts !UseStoredBasis
+(iterative.cpp), extraZ +fullFP64V representationcost described, notmeasured.
+M6assessmentcomplete per negativefilter rule; originalscope/notolerancerelax.
+M7active/fullW4W5/medians/geometry/package stillrequired. Detailedchecklist
+and missingfrequencies docs/milestones/M7.md. No paidcompute.
+EXP176 checkpoint172Python/8shell/docschecker/diffPASS. SameLuna docs-garden
+foundstale current/open headings inM6; rootmarked oldcheckpointsections as
+history and updatedcurrentTC/integration assessment, checker/diffPASS.
+Native verifiedmanifest exactlyequalsEXP153–166, no rebuild required forM7.

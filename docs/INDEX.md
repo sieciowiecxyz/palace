@@ -34,6 +34,12 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 - [M6: kernele CUDA i sweepy](milestones/M6.md)
   - Czytaj gdy: wznawiasz aktywny etap kernel/batching/TF32 oraz planujesz rzeczywiste wymiary operatorów
   - Opis: Aktualny profil i source MAGMA custom branch≤40, kolejność pomiarów P/Q/N i W.1→W.3; brak deklaracji TC lub nowego speedupu.
+- [M6: decyzja po ocenie](milestones/M6-decision.md)
+  - Czytaj gdy: wznawiasz po EXP176 i wybierasz finalistę do M7
+  - Opis: DirectWMMA W.1FAIL/REJECT, scopedTCproof i microgain zachowane; bezpromocji PC, ograniczenia FGMRES.
+- [M7: kwalifikacja finalisty](milestones/M7.md)
+  - Czytaj gdy: planujesz W.4/W.5, mediany pełnych par, nową geometrię lub pakiet
+  - Opis: Active checklista i dokładny coverage; pierwsza nowa para1.710GHz, reusable7f tylko przyzgodnymmanifest.
 - [M6.1: audyt baz libCEED](ceed-basis-audit.md)
   - Czytaj gdy: wybierasz kształty prototypu FP32/TF32 lub oceniasz długości workspace
   - Opis: EXP105–106 host metadata tiny/W.3, frozen quality PASS, logiczne bytes osobno od długości buforów; brak deklaracji TC/speedupu.
