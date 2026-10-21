@@ -132,9 +132,10 @@ palace/linalg/iterative.cpp jako granicę wokół B->Mult. Plan integracji:
 RAII scopePC z audytem wejść/wyjść, zero mixed poza nim (w szczególności A*x
 i niezależny rawresidual). Cache coefficientów musi sprawdzać treść/dimensions
 i lifetime; sam adres CeedBasis może zostać ponownie użyty po destroy.
-Ta granica i cache nie zostały jeszcze zaimplementowane/zakwalifikowane.
-Przed W.3: tiny i W.2, frozenK/iteracje/pamięć oraz faktyczne wywołania mixed;
-fallback FP64 i cleanup obowiązkowe. Przy braku netzysku odrzucić integrację.
+EXP112–113 wdrożyły tę granicę/cache i sprawdziły tiny oraz medium3,55.
+Jakość/cleanup PASS, ale więcejiteracji i brak wykazanego speedupu: HOLD przedW.3.
+[Raport integracji i hipoteza liniowości](pc-basis-fp32.md). K/W.2 pozostałych
+freq/W.3 oraz całkowity czas nadal wymagane przed promocją.
 
 Dowody: artifacts/m6-ceed-fused-{screen,scale}-20261021 i niezależny
 artifacts/m6-ceed-fused-root-analysis-20261021.json. JSON394168/157144B,

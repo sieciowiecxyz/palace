@@ -214,3 +214,13 @@ pierwszej volumeQ6 próby zachowane. [Raport](ceed-tensor-probe.md).
 matchP*Q*qcomp*4 (staticbasis); malformed extravectorworkspace rejected.
 Badargument/unsupportedshape deviceAPI guards exercised. Forwardgain/~2,6×,
 transposemarginal; no operator/RF/UVM/physicalpeak promotion. [Report](ceed-tensor-probe.md).
+
+
+## M6.4 — scope/cache i tania integracja, EXP112–113
+
+150pinnedtestsPASS: strictscope/cache/precision/cleanup counters, odrzucenie
+niekwalifikowanych flag przed runtime, sourceguardApplyB i kolejnośćrelease.
+Tiny oba porty i medium3,55 PASS fields/raw/S/VSWR/energy/power/setup oraz
+faktyczne mixed calls/live0cache. Więcej reliable restartów/iteracji, brak
+wykazanego speedupu; pozostałeW2freq/W3 NOTRUN po tanimfiltrze. Nie promować
+z samego executioncomplete ani mikrobenchmarku. [Dowody](pc-basis-fp32.md).

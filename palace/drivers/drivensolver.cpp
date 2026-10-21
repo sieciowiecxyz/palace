@@ -33,6 +33,8 @@
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
 
+extern "C" void PalacePCBasisRelease() __attribute__((weak));
+
 namespace palace
 {
 
@@ -375,6 +377,12 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         K.reset();
         C.reset();
         M.reset();
+        const char *pc_basis = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
+        if (pc_basis && std::string(pc_basis) == "1")
+        {
+          MFEM_VERIFY(PalacePCBasisRelease, "Mixed PC basis requires its release hook!");
+          PalacePCBasisRelease();
+        }
         Mpi::Print("PALACE_FINAL_SOLVER_RELEASED: enabled=1\n");
         MemoryMark("linear_workspace_release.end");
       }

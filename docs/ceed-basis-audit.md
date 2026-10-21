@@ -6,7 +6,9 @@ Native source SHA `a217334ae31f5df0a51953bc9e78bbc42cd4f3abab42121c95d0ecc59e420
 ## Mechanizm i ograniczenia
 
 `tools/adapter/ceed_audit.cpp` w istniejącym adapterze przechwytuje publiczne
-CeedBasisApply/ApplyAdd i **zawsze wywołuje oryginał**. Opt-in `--basis-audit`
+CeedBasisApply/ApplyAdd. Sam opt-in `--basis-audit` **wywołuje oryginał**;
+od EXP112 osobna flaga PC-forward może jawnie zastąpić wybrane działania
+([oddzielny eksperyment](pc-basis-fp32.md)). Opt-in `--basis-audit`
 ustawia PALACE_CEED_BASIS_AUDIT=1; bez flagi tylko przekazanie wywołania.
 Po apply odczytuje host metadata: topology/space/P/Q/components/q_components,
 elementy, eval/transpose/add i długości obu wektorów. Brak kopiowania pól,

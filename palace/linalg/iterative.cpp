@@ -20,6 +20,7 @@
 #include "utils/profilewindow.hpp"
 
 extern "C" void PalaceProfileCapture(int begin) __attribute__((weak));
+extern "C" void PalacePCBasisScope(int begin) __attribute__((weak));
 
 namespace palace
 {
@@ -336,6 +337,24 @@ inline void ApplyB(const Solver<OperType> *B, const VecType &x, VecType &y,
 {
   BlockTimer bt(Timer::KSP_PRECONDITIONER, use_timer);
   MFEM_ASSERT(B, "Missing preconditioner in ApplyB!");
+  struct PCScope
+  {
+    bool enabled;
+    PCScope()
+    {
+      static const bool on = [] {
+        const char *value = std::getenv("PALACE_PC_BASIS_FP32_FORWARD");
+        return value && std::string_view(value) == "1";
+      }();
+      enabled = on;
+      if (enabled)
+      {
+        MFEM_VERIFY(PalacePCBasisScope, "Mixed PC basis requires its runtime adapter!");
+        PalacePCBasisScope(1);
+      }
+    }
+    ~PCScope() { if (enabled) PalacePCBasisScope(0); }
+  } scope;
   B->Mult(x, y);
 }
 

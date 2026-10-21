@@ -136,3 +136,14 @@ ani zależności. `run NEW --seconds 120 [--scale]` ma oddzielny nowy katalog,
 M6.5 `--fused` adds an optional CUDA register-FP32 action in the same cached
 probe; host/native/dependencies unchanged. `--scale --fused` uses the identical
 binary and42action ladder. No fullPalace recompile or newlibrary needed.
+
+
+## Eksperymentalny PC-only basis — M6.4
+
+`--pc-basis-fp32-forward` wymaga aktualnego native+adaptera ze wspólnym
+ceed_fused.cuh; zwykły `build --jobs 2`, bez rebuilda dependencies. Wymagane
+native coarse/right/release-final-solver; bezCPU/profilera/Qpool/AMS/hybrid.
+Wyłączenie flagi wraca do oryginału. Tiny+medium3,55 poprawne, lecz bez wykazanego
+netzysku; nie zalecany default. [Raport/argv/fallback](pc-basis-fp32.md).
+Probe recipe osobno hashuje współdzielony header; po zmianie native wymaga własnego
+cached build przed kolejnym użyciem. Stare mikrobenchmarki zachowują dawne manifesty.

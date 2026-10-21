@@ -21,7 +21,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP105–106 M6.1 PASS: host audit tiny i pełny W.3,108grup/14627calls/zeroerrors; raw/pola/S/energy PASS. W.3 272,718s/35iter (kontrola audytu, nie nowy speedup). Actual Hcurl P20/Q14/qcomp3/N1601320; wymagane bytes osobno od długości workspace. docs/ceed-basis-audit.md.
 - EXP107–108 M6.2 filtrPASS:96screen+42size-ladder (tylko6actualN1601320), FP32actionerror≤1,054e-7, TF32requested≤4,973e-4. ActualN FP32+konwersje2,598–3,223ms vsoriginal3,473–3,744ms; TF32wolniejszyodFP32, małeNmixedwolniejsze. To nie UVM/solver/RF/TCproof. docs/ceed-tensor-probe.md.
 - EXP109–110 fusedFP32 filterPASS: 96screen/42ladder, error≤1,148e-7; actualNforward1,334–1,342ms vs3,474–3,478ms, transpose tylko2–5%zysku. Fused per-path FP32basis3360B, alecomparisonprocessnadaltrzymalibraryscratch, brakmeasuredpeak/RF/UVM/solverclaim.
-- Następne M6.4: tylkoPCforward, RAII/audyt scopeB->Mult/coeffcachecontent+lifetime+cleanup, FP64outsidePC/A/rawresidual/transpose/fallback zachowane, K/W1→W3 przedpromocją. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/3powtórzenia otwarte.
+- EXP112–113 PCforward integration tiny/medium3,55K+scope/cachecleanupPASS, lecz iteracje40/42→45/45 i48/49→55/57, medium99,580→99,592s bez wykazanego zysku. Większy rawgap skorygowany restartem; HOLD, niepromowany, W3 NOTRUN. docs/pc-basis-fp32.md.
+- Następne: mały homogeneity/superposition filter i dokładniejszy compensated/mixed FP32dot bez dużych wektorów. Hipoteza numerycznej nieliniowościPC w classicrightGMRES; FGMRESobecnieodrzucaFP32basis iK64pojemnośćV/Z+17,5GB vsFP32V. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -2630,3 +2631,49 @@ SameLuna read-onlydocs-garden PASS; root reviewed sharedcode/actions/error
 bounds/currentrecipe hashes and direction/bytes distinction. Candidateonly
 PCforward; integration/scope/cache/cleanup+fullK/netjob stillOPEN. No paidcompute,
 no native/depsrebuild/swap/appsclosing. M6/M7/W4/W5/median/sweeps remainOPEN.
+
+EXP112 prereg M6.4: opt-in --pc-basis-fp32-forward. Shared testedGPUkernel
+moved totools/adapter/ceed_fused.cuh, probe hashes/sources includeit. RAII
+ApplyB guard onlyaroundB->Mult; originalA/verifiedrawAx-b andtranspose remain
+originalFP64. Adapter forwardonly/nonTensor/supportedP/Q/qcomp/N>=8192;
+unsupported/small/nonfinitecoeff/alias/cachecapacity useoriginal path (counted),
+API/CUDAerrors abort, no postfailurefallback. Staticcoeffcache keyedexact
+finiteFP64content+dimensions, max256entries/<1MblogicalFP32basis, notCeedBasis
+address; no intermediatevectors. Conservativepre/postdevice sync. Cache cleared
+at finalsolverrelease beforefields; strictscope/cachecleanup gate + K separate.
+Nativebuildjobs2/cache/no dependencyrebuild; fallbackactualnative+manifest saved
+build/m6-pc-basis/pre-integration-native andpre-integration-manifest.json.
+Firsttinybothports controlOFF/candidateON60s each,currentmixedcoarse/directK64/
+right/reuse/deferred/releases andwholefieldsreference. 150pinnedtestsPASS.
+No paidcompute/physicschange/defaultpromotion; do notstartmedium/W3untilrootreview.
+
+EXP112 tinyPASS currentbuild13.698s; control16.512s40/42iter vsPCforward
+16.617s45/45iter. IndependentrootCSV S/VSWR/energy/powerPASS, weightedfields
+candidate<=7.372e-7/2.420e-7. Audit94enters=exits/active0/mixed4888/
+outsideoriginal3714/transposeoriginal8460/cache3misses+4885hits/
+allocated=freed8400B/live0/release1. OriginalA/rawchecksremainFP64. Extra
+reliable-restartnorms2.736e-3/3.629e-4 thenfinal8.491e-7/7.504e-7; notsilently
+acceptedrecurrence. FP32PC canbeinsufficientlylinear forclassicrightGMRES
+reconstruction, coulderasekernelgain; noFEMspeedclaimfromtiny. Investigate
+cheapmediumbeforefullW3; FGMRESextraZmemory isnotfree.
+EXP113 prereg: mediumcoax3.55/bothports samebuildcontrol/candidate180s each,
+sameK64/direct/mixedcoarse/reuse/defer/fields flags, rawcheck/frozenK. Onlyone
+frequency first; ifmoreiterations/netloss do notautomaticallylaunchfullW3.
+
+EXP113 rootCSV/strictauditPASS: mediumdeltaS1.027e-10/VSWR5.341e-11/
+energy1.002e-10/power1.234e-10; fields≤9.361e-8/1.109e-7. Onepairtime
+99.579642/99.592211s,48/49→55/57iterations. Scope116/116,8352mixed/
+4258outside-original/10440transpose-original;4tables8784Ballocated=freed/live0.
+No netgainclaimed,noW3 automaticrun. Rawgap.00922/.01011vscontrol1.52e-5/1.29e-5
+beforeacceptedFP64rawrestarts. SourceclassicrightGMRES reconstructsB(sumyV),
+FGMRESsumyZ; numericalnonlinearityhypothesisnotisolatedcausalproof. Existing
+FGMRES rejectsFP32basis; illustrative fullK64V/Z capacity23.335GBvs5.834GB
+packedV(+17.501GB), notmeasuredpeak/lazyallocation. NewnextstepcompensatedFP32
++homogeneity/superposition smallfilter, notnaivelytoggleFGMRESorlooserRFtol.
+
+EXP112–113 checkpoint:150pinnedtests/8shell/docschecker/diffcheckPASS.
+SameLuna read-onlydocs-garden PASS; root reviewed code/roleboundary/actualCSV/
+rawchecks/fieldaudits/cachehash+cleanup andunchangedcurrentnativehash. Current
+PCforwardintegrationNOTPROMOTED/HOLD, noW3costafterunpromisingmediumfilter.
+Nextsmalllinearity/compensatedmixed arithmetic test. PriorqualifiedFP64basis
++M5mixedcoarse fallback/default retained. M6/M7/W4/W5/sweeps/median stillOPEN.

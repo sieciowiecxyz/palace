@@ -122,7 +122,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 - [ ] Research cuBLASLt/libCEED/MFEM; CUTLASS dopiero przy brakującej funkcji. Zapisać link, rewizję, licencję i przydatność.
 - [x] M6.2 pierwszy biblioteczny filtr EXP107–108: oryginalny MAGMA/FP64/FP32/TF32requested, konwersje/workspace i crossover przez actualN1601320. CPU/control/canaries PASS; nie promocja solvera. docs/ceed-tensor-probe.md.
 - [ ] Potwierdzić użycie Tensor Cores i sprawdzić całe rozwiązanie. BF16/FP16 to osobne hipotezy z kontrolą błędu, nie domyślna zamiana typu.
-- [ ] EXP109–110 fusedFP32 actionfilter PASS (forward~2,6×, transpose marginal), bez interim floatvectors; integracjaPCforward/netjob/UVM nadal OPEN. Dalej ocenić batching/reuse i pełny solve przed zaliczeniem M6.5. docs/ceed-tensor-probe.md.
+- [ ] EXP109–110 fusedFP32 actionfilter PASS; EXP112–113 PCforwardtiny/medium poprawne lecz więcejiteracji/brak wykazanego speedupu, HOLD przedW3. Dalej homogeneity/compensateddot bezdużychwektorów, potem netjob/UVM/K przed zaliczeniem M6.4/M6.5. docs/pc-basis-fp32.md.
 
 - [ ] M6.6 — szybsze sweepy3,3–3,9GHz/oba porty: audyt existingPROM, continuation/warmstart, symbolic reuse i recycling; cały czas/pamięć/jakość vs niezależne solve. docs/milestones/sweeps.md.
 

@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string_view>
 #include <tuple>
+#include "pc_basis.hpp"
 
 namespace {
 constexpr size_t max_groups = 2048;
@@ -75,14 +76,16 @@ __attribute__((destructor)) void report() {
 extern "C" int CeedBasisApply(CeedBasis basis,CeedInt nelem,CeedTransposeMode transpose,
                               CeedEvalMode mode,CeedVector u,CeedVector v) {
   static auto fn=next<decltype(&CeedBasisApply)>("CeedBasisApply");
-  const int result=fn(basis,nelem,transpose,mode,u,v);
+  int result;
+  if(!PalacePCBasisTryApply(basis,nelem,transpose,mode,u,v,false,&result))result=fn(basis,nelem,transpose,mode,u,v);
   if(enabled())record(basis,nelem,transpose,mode,u,v,false,result);
   return result;
 }
 extern "C" int CeedBasisApplyAdd(CeedBasis basis,CeedInt nelem,CeedTransposeMode transpose,
                                  CeedEvalMode mode,CeedVector u,CeedVector v) {
   static auto fn=next<decltype(&CeedBasisApplyAdd)>("CeedBasisApplyAdd");
-  const int result=fn(basis,nelem,transpose,mode,u,v);
+  int result;
+  if(!PalacePCBasisTryApply(basis,nelem,transpose,mode,u,v,true,&result))result=fn(basis,nelem,transpose,mode,u,v);
   if(enabled())record(basis,nelem,transpose,mode,u,v,true,result);
   return result;
 }
