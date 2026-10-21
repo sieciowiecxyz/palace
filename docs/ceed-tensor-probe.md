@@ -165,3 +165,60 @@ qcomp≤3 beforeproducts): build1,811s,96screen13,764s/42ladder19,295s PASS,
 allprecisionactioncontrols. CurrentbinarySHAa5900a00…c772aa04;
 artifacts/m6-ceed-fused-guard-{screen,scale}-20261021. Root checked strictJSON
 and commandmanifest hashes. Not M7 performance repeats or RFqualification.
+
+## EXP114–116: dokładniejszy compensated dot na SM120
+
+Status: **kandydat do małego testu PC, nie promocja solvera**. Dotyczy
+forward; transpose/Add pozostają porównaniem oryginalnym/bibliotecznym.
+Pierwszy `mixed_compensated`: dwie tablice coefficientów FP32 hi/lo,
+input hi/lo, FMA residual produktu i TwoSum sumy, FP64 split/recombine.
+Błąd mały, ale wszystkie16 większych działań EXP114 wolniejsze1,33–4,06×
+według CUDA interval. Nie uruchomiono niezmienionego wariantu na pełnej antenie.
+
+Drugi `mixed_compensated_bits` zmienia wyłącznie split wejścia: jawne RZ
+zachowuje pierwsze24bity significand, reszta29bitów jest zaokrąglana i ważona
+2^(E−52), ze znakiem wejścia. Dla E∈[−74,100] bez FP64 odejmowania w pętli;
+zero osobno, pozostałe termy używają jawnego FP64 fallback z coefficientami
+hi+lo. Wyjściowe dodanie hi/lo nadal FP64. To własny eksperymentalny mixed
+algorytm, **nie pełne FP64 ani Tensor Cores**. Współczynniki i fixture są
+rzeczywistymi tabulacjami FE, ale test nie dowodzi dokładności każdej możliwej
+bazy lub całego PC. Inspiracja [Ogita/Rump/Oishi, Accurate Sum and Dot Product](https://epubs.siam.org/doi/10.1137/030601818),
+nie twierdzenie, że dowód tej pracy obejmuje nasz wariant. Semantyka RZ i
+reinterpretacji bitów: [NVIDIA CUDA casting intrinsics](https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__INTRINSIC__CAST.html).
+Własny kod Apache2; istniejące libCEED/MFEM pozostają przypięte bez zmian.
+Źródła sprawdzone2026-10-21, build CUDA12.9.1/SM120, nie aktualizacja zależności.
+
+| Actual ND20/Q14/N1601320, forward | Oryginał | Compensated bits |
+| --- | --- | --- |
+| Interp, CUDA interval median | 3,482ms | 3,035ms |
+| Curl, CUDA interval median | 3,473ms | 3,048ms |
+
+Około12–13% krótsze **GPU-resident basis action**, nie pełny solve. To mediana
+3 powtórzeń wewnątrz jednej próby, nie trzy pełne joby M7. ScalarQC1/trace często
+wolniejsze, brak uniwersalnej promocji. Koszt własnych dwóch małych tablic
+6720B przy P20/Q14/QC3; benchmark nadal trzyma scratch innych comparatorów,
+więc nie jest to zmierzona redukcja peakVRAM procesu.
+
+EXP11596actions/32newforward i EXP11642actions/14newforward PASS. Max typowy
+L2~9e-15, zakresowy~9,16e-15, gate1e-11. Small257columns mają niezależny
+longdoubleCPUoracle, homogeneity α1,23456789012345, superposition oraz11 osobnych
+skal1e-300..1e300 z granicami binarnymi. Negatywne wyniki kandydatów zachowujemy;
+original/FP64/control muszą przejść. Usunięto absolutne floors z helpera błędu,
+aby tiny references nie ukrywały względnego błędu; wstrzyknięte1e-300 błędy
+wymuszają FAIL. Guarded fallback testowany, brak testu pełnej liniowości PC.
+
+```sh
+python3 tools/experiments/ceed_tensor_probe.py build
+python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-comp-screen --fused --compensated --seconds 120
+python3 tools/experiments/ceed_tensor_probe.py run artifacts/NEW-comp-scale --scale --fused --compensated --seconds 120
+```
+
+Cache addonbuild6,035s, screen14,161s, ladder20,235s; native/dependencies
+bez rebuilda/zmian. 6GiB/noSwap/120s każda próba; gorące daneRAM/VRAM.
+Dowody: artifacts/m6-compensated-screen-20261021,
+m6-compensated-bits-{screen,scale}-20261021 oraz
+m6-compensated{,-bits}-root-analysis-20261021.json. Root sprawdził strictcoverage,
+wszystkie precision/range/linearity flags oraz commandmanifest przeciw aktualnej
+binarce/recipe (SHA9c874f98…8957a294). 152pinnedtestsPASS.
+Następne: osobna opt-in integracja PC Hcurl forward z contentcache/cleanup,
+tiny→mediumK i kosztem całego jobu; bez usuwania obecnego FP64 fallbacku.

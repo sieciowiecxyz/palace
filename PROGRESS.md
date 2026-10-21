@@ -22,7 +22,8 @@ Aktualizacja: 2026-10-21. Mode: goal, Active: M6. [PLAN](PLAN.md), [MILESTONES](
 - EXP107–108 M6.2 filtrPASS:96screen+42size-ladder (tylko6actualN1601320), FP32actionerror≤1,054e-7, TF32requested≤4,973e-4. ActualN FP32+konwersje2,598–3,223ms vsoriginal3,473–3,744ms; TF32wolniejszyodFP32, małeNmixedwolniejsze. To nie UVM/solver/RF/TCproof. docs/ceed-tensor-probe.md.
 - EXP109–110 fusedFP32 filterPASS: 96screen/42ladder, error≤1,148e-7; actualNforward1,334–1,342ms vs3,474–3,478ms, transpose tylko2–5%zysku. Fused per-path FP32basis3360B, alecomparisonprocessnadaltrzymalibraryscratch, brakmeasuredpeak/RF/UVM/solverclaim.
 - EXP112–113 PCforward integration tiny/medium3,55K+scope/cachecleanupPASS, lecz iteracje40/42→45/45 i48/49→55/57, medium99,580→99,592s bez wykazanego zysku. Większy rawgap skorygowany restartem; HOLD, niepromowany, W3 NOTRUN. docs/pc-basis-fp32.md.
-- Następne: mały homogeneity/superposition filter i dokładniejszy compensated/mixed FP32dot bez dużych wektorów. Hipoteza numerycznej nieliniowościPC w classicrightGMRES; FGMRESobecnieodrzucaFP32basis iK64pojemnośćV/Z+17,5GB vsFP32V. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
+- EXP114–116: compensateddot+bit-split actionfilter PASS (CPU/linearity/range1e-300..1e300). ActualND20/Q14/N1601320 forward3,474–3,482→3,035–3,048ms; error~6e-15. Pierwszywariantbyłwolniejszy; scalar/trace nieprzyspieszone. Nie solver/RF/UVM/TCclaim; nativebez zmian. docs/ceed-tensor-probe.md.
+- Następne: mała integracja compensated PCforward ND20/Q14 ze scope/cache/cleanup, samebuild control/K/rawresidual i całościowymczasem; dopiero potem W3. Nie przenosić mikrobenchmarkowego zysku na całą antenę. M6.3TCproof/M6.6sweep/M7.5geometria NOTRUN; M6/M7/W4/W5/medianyotwarte.
 
 ## Historyczny skrót M1/M2
 
@@ -64,9 +65,10 @@ Artefakty lokalne zawierają dokładne argv/config/build manifesty, wyniki, tele
 
 ## Następny krok
 
-M5: audyt przypiętego cuDSS i istniejących preconditionerów; rachunek czasu oraz
-working set przed nowym prototypem. Kolejność docs/milestones/M5.md. M4 zamknięty
-po EXP94; końcowa promocja/default/pakiet oraz W.4/W.5 dopiero w M7.
+M6.4: po użytecznym filtrze EXP115–116 ocenić compensated PC-only Hcurl
+forward ND20/Q14 na tiny/medium, bez zmian A i rawresidual. Zachować cache
+według treści oraz jawny cleanup; pełny W.3 dopiero po jakości i netkoszcie.
+Kolejność docs/milestones/M6.md. M6.6 sweep/M7 nadal otwarte.
 
 ## Reguły pracy
 
@@ -2677,3 +2679,56 @@ rawchecks/fieldaudits/cachehash+cleanup andunchangedcurrentnativehash. Current
 PCforwardintegrationNOTPROMOTED/HOLD, noW3costafterunpromisingmediumfilter.
 Nextsmalllinearity/compensatedmixed arithmetic test. PriorqualifiedFP64basis
 +M5mixedcoarse fallback/default retained. M6/M7/W4/W5/sweeps/median stillOPEN.
+
+EXP114 prereg: addononly compensatedforward mixed dot, F32 hi+lo coefficient
+splits andF32 TwoSum/FMAproductresidual, F64inputsplit/outputrecombine. No
+native/adapter modification, no newintermediatevectors;2smallstaticbasisarrays.
+InspiredbyOgita/Rump/Oishi AccurateSumDotProduct DOI10.1137/030601818,
+notclaimingpaperproofapplies tothismixedvariant. FP32sumtransform explicitRN
+intrinsics, nofastmath. Compareoriginal/CPU/FP64/F32pedantic/TF32/fused.
+Forwardonlycandidategate1e-11 (not2e-6); preservedoriginalRFgates.
+Small257columns addhomogeneityalpha1.23456789012345 andindependentv superposition
+fororiginal/allmethods; baselineoriginal/FP64controlsrequired, candidatefailure
+preserved. Basislinearity only, notwholePC/causalproof. Screen96actions32forward
+candidate rows; ifpromising/qualitypassthenactualNladder.120s addonbuild/run,
+6GiB/noSwap,allhotdataRAM/VRAM, no native/depsrebuild/paidcompute.151testsPASS.
+
+EXP114 root strict96action validationPASS/build5.381s/run13.923s;32forward
+candidate errors~7e-15 andhomogeneity/superposition~1e-14 (basis only).
+All16largeN131071actions SLOWER1.332–4.053× originalFP64 CUDAinterval; no actualN/fullFEM
+run/promote. Receipt artifacts/m6-compensated-root-analysis-20261021.json.
+Goodaccuracyalone isnot hardwareoptimization; reject unchangedalgorithm.
+
+EXP115 prereg: samecompensatedsum, separate bit-split inputvariantavoids
+per-input FP64subtraction in common exponentrange[-74,100]. Out-of-range
+terms explicitlyuseFP64fallback andsamehi/lo coefficientpair; no silentfloat
+flush/overflow. F64outputrecombine remains. IndependentCPU/range11scales
+1e-300..1e300 inclbinaryrangeedges andoriginal/FP64controls. Correct action
+errorhelper tiny-reference floors beforestress; injected1e-300errorsmustfail.
+RetainEXP114comparator/fused/librarymethods, action+linearitygate1e-11.
+Addononly cachedbuild120s then96screen120s/6GiB/noSwap;152pinnedtestsPASS.
+OnlyifqualityPASSandkeyND20Q14forwardN131071 fasterthanoriginalconsider42ladder.
+No native/PC/defaultchange orfullFEM/paidcompute; allhotdataRAM/VRAM.
+EXP115 invocation correction: cachedaddonbuild6.035sPASS; delegated argv had
+--seconds120 (invalidCLI), exited2 beforeGPUrun/noartifact. Rootcorrectedto
+--seconds 120; sameexperiment/source, no candidatefailure or simulationrerun.
+EXP115 rootstrict96actionsPASS,32newforward/16small11scaleCPUrangetests,
+maxrangeL2~9.16e-15. ND20/Q14/N131071 CUDAinterval.299–.305→.256–.258ms;
+components2 .585–.592→.509–.510ms. ScalarQC1/traceoftenSLOWER, do notselect.
+Thisisolates inputsplit substitutionwithincompensatedalgorithm, notwholePC
+causality. Receipt artifacts/m6-compensated-bits-root-analysis-20261021.json.
+EXP116 prereg: samecachedrecipe --scale --fused --compensated --seconds 120,
+42actions/14newforward/actualN1601320, allsamegates. No nativebuildneeded.
+OnlyND20/Q14largeforward candidate forfuturePCscope; transpose/defaultoriginal.
+EXP116 rootstrict42actionsPASS/currentbinaryrecipe+commandmanifestverified;
+14newforward qualityPASS,actualN1601320 interp3.481824→3.034816ms,
+curl3.473312→3.048ms (CUDAinterval3samplesmedian). No TC/native/wholejob claim.
+Scalar/tracevariants notselected. NextscopedPCND20/Q14 tiny/medium beforeW3;
+FP64originaloutsidePC/rawresidual/default preserved. Newartifacts source+receipt
+linked docs/ceed-tensor-probe.md, allhotdataRAM/VRAM. M6/M7/sweeps remainOPEN.
+EXP114–116 checkpoint:152pinnedtests/8shell/docschecker/diffcheckPASS;
+sameLuna read-onlydocs-gardenPASS; rootreviewed bitrange/formula/FMA sum,
+strictnegative-result preservation, recipe/currentbinary and actualN timings.
+Nativehash unchanged4e2fa56f…a4dc611; no solver/default change/promotion.
+Next bounded scopedPC ND20/Q14 integration, control/quality/netcost first.
+M6/M7/W4/W5/sweeps/medians/generalization remainOPEN; goalactive.

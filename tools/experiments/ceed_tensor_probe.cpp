@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -20,6 +21,8 @@ using json=nlohmann::json;
 extern "C" cudaError_t palace_probe_pack(const double*,float*,size_t);
 extern "C" cudaError_t palace_probe_unpack(const float*,double*,size_t,bool);
 extern "C" cudaError_t palace_probe_fused_basis(const float*,const double*,double*,int,int,int,int,bool,bool);
+extern "C" cudaError_t palace_probe_compensated(const float*,const float*,const double*,double*,int,int,int,int);
+extern "C" cudaError_t palace_probe_compensated_bits(const float*,const float*,const double*,double*,int,int,int,int);
 #define CUDA(x) do { auto code=(x);if(code!=cudaSuccess)throw std::runtime_error(cudaGetErrorString(code)); } while(0)
 #define CEED(x) do { if((x)!=0)throw std::runtime_error("libCEED failure: " #x); } while(0)
 #define BLAS(x) do { auto code=(x);if(code!=CUBLAS_STATUS_SUCCESS)throw std::runtime_error("cuBLAS failure "+std::to_string(code)); } while(0)
@@ -46,7 +49,9 @@ json error(const std::vector<double> &reference,const std::vector<double> &value
   for(size_t i=0;i<value.size();++i){if(!std::isfinite(value[i])||!std::isfinite(reference[i]))throw std::runtime_error("nonfinite result");
     const double d=value[i]-reference[i];diff+=static_cast<long double>(d)*d;norm+=static_cast<long double>(reference[i])*reference[i];
     worst=std::max(worst,std::abs(d));peak=std::max(peak,std::abs(reference[i]));}
-  const double rel=std::sqrt(double(diff/std::max(norm,1e-300L))),scaled=worst/std::max(peak,1e-150);
+  // No absolute floors: tiny references must not hide relative errors.
+  const double rel=norm>0?double(std::sqrt(diff/norm)):diff==0?0:std::numeric_limits<double>::max();
+  const double scaled=peak>0?worst/peak:worst==0?0:std::numeric_limits<double>::max();
   return {{"relative_l2",rel},{"scaled_max",scaled},{"tolerance",tolerance},{"passed",rel<=tolerance&&scaled<=tolerance}};
 }
 
@@ -78,7 +83,31 @@ template<class F> json timing(F apply) {
   return {{"wall_ms",wall},{"cuda_interval_ms",gpu},{"median_wall_ms",med(wall)},{"median_cuda_interval_ms",med(gpu)}};
 }
 
-json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add,bool fused) {
+template<class F> json linearity(F apply,Buffer<double>&dx,Buffer<double>&dy,const std::vector<double>&x,const std::vector<double>&bx,double tolerance) {
+  const double alpha=1.23456789012345;std::vector<double> scaled(x),v(x.size()),sum(x.size());
+  for(size_t i=0;i<x.size();++i){scaled[i]*=alpha;v[i]=.31*std::cos(.127*(i%1231));sum[i]=x[i]+v[i];}
+  dx.write(scaled);apply();auto by=dy.read(),expected=bx;
+  for(auto &value:expected)value*=alpha;
+  auto homogeneous=error(expected,by,tolerance);
+  dx.write(v);apply();by=dy.read();
+  for(size_t i=0;i<by.size();++i)expected[i]=bx[i]+by[i];
+  dx.write(sum);apply();auto superposition=error(expected,dy.read(),tolerance);
+  dx.write(x);return {{"alpha",alpha},{"homogeneity",homogeneous},{"superposition",superposition},
+    {"scope","Small independent columns of basis action only; not whole preconditioner defect or solver qualification"}};
+}
+
+template<class F> json range_stress(F apply,Buffer<double>&dx,Buffer<double>&dy,const std::vector<double>&x,
+                                  const std::vector<double>&b,const std::vector<double>&initial,int p,int q,int qc,int n) {
+  json result=json::array();
+  for(double scale:{1e-300,1e-80,std::ldexp(1.,-75),std::ldexp(1.,-74),1e-30,1.,1e30,std::ldexp(1.,100),std::ldexp(1.,101),1e80,1e300}){
+    auto input=x;for(auto &v:input)v*=scale;
+    dx.write(input);apply();auto check=error(oracle(b,input,initial,p,q,qc,n,false,false),dy.read(),1e-11);
+    result.push_back({{"scale",scale},{"accuracy",check}});
+  }
+  dx.write(x);return result;
+}
+
+json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,int elements,int components,bool trans,bool add,bool fused,bool compensated) {
   CeedInt p,q,qc;CEED(CeedBasisGetNumNodes(basis,&p));CEED(CeedBasisGetNumQuadraturePoints(basis,&q));CEED(CeedBasisGetNumQuadratureComponents(basis,mode,&qc));
   const double *tab=nullptr;
   if(mode==CEED_EVAL_INTERP)CEED(CeedBasisGetInterp(basis,&tab));
@@ -94,6 +123,13 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
   const auto setup_start=std::chrono::steady_clock::now();
   CUDA(palace_probe_pack(db.data,fb.data,db.size));CUDA(cudaDeviceSynchronize());
   const double basis_pack_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-setup_start).count();
+  std::unique_ptr<Buffer<float>> lower;
+  double low_pack_ms=0;
+  if(compensated&&!trans){const auto t=std::chrono::steady_clock::now();
+    std::vector<float> residual(coefficients.size());
+    for(size_t i=0;i<residual.size();++i)residual[i]=float(coefficients[i]-double(float(coefficients[i])));
+    lower=std::make_unique<Buffer<float>>(residual.size());lower->write(residual);
+    low_pack_ms=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-t).count();}
   if(fused&&palace_probe_fused_basis(fb.data,dx.data,dy.data,7,q,qc,n,trans,add)!=cudaErrorNotSupported)
     throw std::runtime_error("fused unsupported-shape guard failed");
   CeedVector u,v;CEED(CeedVectorCreate(ceed,ni,&u));CEED(CeedVectorCreate(ceed,no,&v));
@@ -101,17 +137,21 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
   auto native=[&] {if(add)CEED(CeedBasisApplyAdd(basis,elements,CEED_TRANSPOSE,mode,u,v));else CEED(CeedBasisApply(basis,elements,trans?CEED_TRANSPOSE:CEED_NOTRANSPOSE,mode,u,v));};
   native();auto ref=dy.read();
   json result={{"P",p},{"Q",q},{"q_components",qc},{"components",components},{"elements",elements},{"N",n},{"eval",int(mode)},{"transpose",trans},{"add",add},
-    {"input_bytes",ni*8},{"output_bytes",no*8},{"extra_fp32_workspace_bytes",(ni+no+db.size)*4},{"basis_pack_once_ms",basis_pack_ms}};
+    {"input_bytes",ni*8},{"output_bytes",no*8},{"extra_fp32_workspace_bytes",(ni+no+db.size)*4},{"basis_pack_once_ms",basis_pack_ms},{"low_basis_pack_once_ms",low_pack_ms}};
   if(elements==257){auto cpu=oracle(coefficients,input,initial,p,q,qc,n,trans,add);result["original_vs_cpu"]=error(cpu,ref,1e-11);
     if(!result["original_vs_cpu"]["passed"].get<bool>())throw std::runtime_error("original libCEED vs independent CPU oracle failed");
     auto bad=ref;bad[0]+=1+2*std::abs(*std::max_element(ref.begin(),ref.end(),[](double a,double b){return std::abs(a)<std::abs(b);}));
     if(error(ref,bad,2e-3)["passed"].get<bool>())throw std::runtime_error("fault detector failed");}
   // Timings intentionally don't reset ApplyAdd between repeats: every method
   // accumulates another result, without any reset/copy hidden inside its timing.
+  if(compensated&&!trans&&elements==257){result["original_linearity"]=linearity(native,dx,dy,input,ref,1e-11);
+    if(!result["original_linearity"]["homogeneity"]["passed"].get<bool>()||!result["original_linearity"]["superposition"]["passed"].get<bool>())throw std::runtime_error("original linearity control failed");}
   dy.write(initial);result["original_timing"]=timing(native);
   json methods=json::array();
-  for(int precision=0;precision<(fused?4:3);++precision){const bool mixed=precision!=0;const double tol=precision==0?1e-11:(precision==2?2e-3:2e-6);
-    auto apply=[&]{if(precision==3){CUDA(palace_probe_fused_basis(fb.data,dx.data,dy.data,p,q,qc,n,trans,add));return;}
+  for(int precision=0;precision<(compensated&&!trans?6:fused?4:3);++precision){const bool mixed=precision!=0;const double tol=(precision==0||precision>=4)?1e-11:(precision==2?2e-3:2e-6);
+    auto apply=[&]{if(precision==5){CUDA(palace_probe_compensated_bits(fb.data,lower->data,dx.data,dy.data,p,q,qc,n));return;}
+      if(precision==4){CUDA(palace_probe_compensated(fb.data,lower->data,dx.data,dy.data,p,q,qc,n));return;}
+      if(precision==3){CUDA(palace_probe_fused_basis(fb.data,dx.data,dy.data,p,q,qc,n,trans,add));return;}
       if(mixed)CUDA(palace_probe_pack(dx.data,fx.data,ni));
       for(int d=0;d<qc;++d){const double alpha=1,beta=trans?(d>0||(!mixed&&add)?1:0):0;const float af=1,bf=float(trans&&d>0);
         const int m=trans?p:q,k=trans?q:p;const auto op=trans?CUBLAS_OP_N:CUBLAS_OP_T;
@@ -122,26 +162,35 @@ json action(Ceed ceed,CeedBasis basis,cublasHandle_t handle,CeedEvalMode mode,in
       if(mixed)CUDA(palace_probe_unpack(fy.data,dy.data,no,add));};
     dy.write(initial);apply();auto value=dy.read();json check=error(ref,value,tol);
     if(elements==257)check["independent_cpu"]=error(oracle(coefficients,input,initial,p,q,qc,n,trans,add),value,tol);
-    dy.write(initial);methods.push_back({{"precision",precision==0?"FP64":precision==1?"FP32_pedantic":precision==2?"TF32_requested":"FP32_fused"},{"accuracy",check},{"timing",timing(apply)},
-      {"extra_fp32_workspace_bytes",precision==3?db.size*4:precision==0?0:(ni+no+db.size)*4}});
+    json test;
+    if(compensated&&!trans&&elements==257)test=linearity(apply,dx,dy,input,value,tol);
+    json stress;if(precision==5&&elements==257)stress=range_stress(apply,dx,dy,input,coefficients,initial,p,q,qc,n);
+    dy.write(initial);methods.push_back({{"precision",precision==0?"FP64":precision==1?"FP32_pedantic":precision==2?"TF32_requested":precision==3?"FP32_fused":precision==4?"mixed_compensated":"mixed_compensated_bits"},{"accuracy",check},{"timing",timing(apply)},
+      {"linearity",test},{"range_stress",stress},{"extra_fp32_workspace_bytes",precision>=4?db.size*8:precision==3?db.size*4:precision==0?0:(ni+no+db.size)*4}});
   }
   result["methods"]=methods;db.check();dx.check();dy.check();fb.check();fx.check();fy.check();result["canaries_passed"]=true;
+  if(lower)lower->check();
   CEED(CeedVectorDestroy(&u));CEED(CeedVectorDestroy(&v));return result;
 }
 
 int main(int argc,char**argv){
   try{
-    if(argc<2||argc>4)throw std::runtime_error("expected output path [scale] [fused]");
-    bool scale=false,fused=false;
+    if(argc<2||argc>5)throw std::runtime_error("expected output path [scale] [fused] [compensated]");
+    bool scale=false,fused=false,compensated=false;
     for(int i=2;i<argc;++i){if(std::string(argv[i])=="scale"&&!scale)scale=true;
-      else if(std::string(argv[i])=="fused"&&!fused)fused=true;else throw std::runtime_error("invalid/duplicate suite option");}
+      else if(std::string(argv[i])=="fused"&&!fused)fused=true;
+      else if(std::string(argv[i])=="compensated"&&!compensated)compensated=true;else throw std::runtime_error("invalid/duplicate suite option");}
+    if(compensated&&!fused)throw std::runtime_error("compensated requires fused comparator");
+    if(error({0},{1e-300},1e-11)["passed"].get<bool>()||error({1e-300},{1.001e-300},1e-11)["passed"].get<bool>())
+      throw std::runtime_error("tiny-relative-error fault detector failed");
     if(palace_probe_fused_basis(nullptr,nullptr,nullptr,20,14,3,0,false,false)!=cudaErrorInvalidValue)
       throw std::runtime_error("fused argument guard failed");
     mfem::Mpi::Init(argc,argv);mfem::Device device("cpu");
     Ceed ceed;CEED(CeedInit("/gpu/cuda/magma",&ceed));cublasHandle_t handle;BLAS(cublasCreate(&handle));
     cudaDeviceProp prop;CUDA(cudaGetDeviceProperties(&prop,0));int blas_version;BLAS(cublasGetVersion(handle,&blas_version));
     json report={{"scope","Isolated GPU-resident basis actions; not UVM, solver speedup or RF qualification. TF32 request is not proof of Tensor Core instructions."},
-      {"gpu",prop.name},{"cublas_version",blas_version},{"suite",scale?"scale":"screen"},{"fused",fused},{"rows",json::array()}};
+      {"gpu",prop.name},{"cublas_version",blas_version},{"suite",scale?"scale":"screen"},{"fused",fused},{"compensated",compensated},
+      {"compensated_bits",compensated},{"tiny_error_controls",true},{"rows",json::array()}};
     // MFEM caches tabulations by rule address: retain mapped rules until FE teardown.
     std::vector<std::unique_ptr<mfem::IntegrationRule>> mapped_rules;
     mfem::ND_FECollection nd(2,3),nd2(2,2);mfem::RT_FECollection rt(1,3);mfem::H1_FECollection h1(2,3);
@@ -167,7 +216,7 @@ int main(int argc,char**argv){
       palace::ceed::InitBasisFromRule(*fe,*ir,components,ceed,&basis);
       for(auto mode:{CEED_EVAL_INTERP,(family==0||family==3)?CEED_EVAL_CURL:family==1?CEED_EVAL_DIV:CEED_EVAL_GRAD})
         for(int elems:(scale?std::vector<int>{257,1023,4099,16383,65537,131071,1601320}:std::vector<int>{257,131071}))for(int variant=0;variant<3;++variant) {
-          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2,fused);row["family"]=family;row["rule_degree"]=degree;
+          auto row=action(ceed,basis,handle,mode,elems,components,variant!=0,variant==2,fused,compensated);row["family"]=family;row["rule_degree"]=degree;
           row["rule_source"]=trace?"representative_triangle_z0_trace":family==3?"triangle":"tet_volume";
           report["rows"].push_back(row);std::cout<<"completed family="<<family<<" Q="<<points<<" mode="<<int(mode)<<" n="<<elems<<" variant="<<variant<<std::endl;
         }

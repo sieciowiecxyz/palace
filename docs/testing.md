@@ -224,3 +224,13 @@ Tiny oba porty i medium3,55 PASS fields/raw/S/VSWR/energy/power/setup oraz
 faktyczne mixed calls/live0cache. Więcej reliable restartów/iteracji, brak
 wykazanego speedupu; pozostałeW2freq/W3 NOTRUN po tanimfiltrze. Nie promować
 z samego executioncomplete ani mikrobenchmarku. [Dowody](pc-basis-fp32.md).
+
+## M6.4 — compensated action filter, EXP114–116
+
+`ceed_tensor_probe.py --fused --compensated` dodaje dwa forward mixed dots,
+gate1e-11, smallCPUoracle/homogeneity/superposition. Bit-split ma11oddzielnych
+skal1e-300..1e300 (w tym granice guardu) i runtime faultcontrols tinyrelative
+error. Weryfikator odrzuca brak coverage/progów/stress/faultflag; negatywny
+wynik kandydata zachowuje. 152pinnedtestsPASS. 96screen/42size-ladderPASS,
+actualNND20/Q14forward~12%taniej, nie netjob/PC/RFkwalifikacja. Dokładne wyniki
+w docs/ceed-tensor-probe.md. Native/build manifest niezmienione; addoncache osobny.

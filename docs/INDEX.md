@@ -39,7 +39,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: EXP105–106 host metadata tiny/W.3, frozen quality PASS, logiczne bytes osobno od długości buforów; brak deklaracji TC/speedupu.
 - [M6.2: biblioteczny FP32/TF32 basis probe](ceed-tensor-probe.md)
   - Czytaj gdy: oceniasz net koszt konwersji/TC albo planujesz FP32 basis w PC
-  - Opis: EXP107–110 biblioteka i fused FP32, rzeczywiste N, memory/accuracy/crossover/direction split; tylko mikrooperacje bez promocji RF/UVM/TC.
+  - Opis: EXP107–116 biblioteka, fused FP32 i compensated bit-split, actual N/linearity/range/crossover; mikrooperacje bez promocji RF/UVM/TC.
 - [M6.4: eksperymentalny PC-only forward FP32](pc-basis-fp32.md)
   - Czytaj gdy: oceniasz scope/cache albo wpływ niższej precyzji PC na GMRES i raw residual
   - Opis: EXP112–113 tiny/medium3,55PASS jakościowo, więcejiteracji/brak wykazanego speedupu; HOLD przedW3, cachecleanup i hipoteza liniowości.

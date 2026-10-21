@@ -12,7 +12,7 @@ import dev
 
 BASE=dev.ROOT/'build/m6-ceed-tensor'
 HERE=Path(__file__).resolve().parent
-SOURCES=[HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',dev.ROOT/'tools/adapter/ceed_fused.cuh']
+SOURCES=[HERE/'ceed_tensor_probe.cpp',HERE/'ceed_tensor_probe.cu',HERE/'ceed_compensated.cuh',dev.ROOT/'tools/adapter/ceed_fused.cuh']
 PROGRAM=BASE/'ceed-tensor-probe'
 FLAGS=['-std=c++17','-O2','-I/src/palace/palace','-I/opt/view/include',
        '-I/usr/local/cuda/include','-I/opt/cudss/include']
@@ -67,6 +67,11 @@ def build():
 
 
 def validate_case(case):
+    compensated=case.get('compensated',False)
+    bits=case.get('compensated_bits',False)
+    if bits and (not compensated or case.get('tiny_error_controls') is not True):
+        raise ValueError('Missing compensated/tiny-error controls')
+    if compensated and not case.get('fused'):raise ValueError('Missing fused comparator')
     suite=case.get('suite','screen')
     if suite not in ['screen','scale']:raise ValueError('Unknown basis suite')
     scale=suite=='scale'
@@ -94,6 +99,13 @@ def validate_case(case):
             if len(values)!=3 or not all(isinstance(v,(float,int)) and not isinstance(v,bool) and 0<v<120000 for v in values):
                 raise ValueError('Invalid timing coverage')
             if check['median_'+key]!=sorted(values)[1]:raise ValueError('Invalid timing median')
+    def linearity(check,tol,required=False):
+        if not isinstance(check,dict) or check.get('alpha')!=1.23456789012345:
+            raise ValueError('Missing independent basis linearity control')
+        for key in ['homogeneity','superposition']:
+            accuracy(check[key],tol)
+            if required and check[key]['passed'] is not True:
+                raise ValueError('Original/FP64 basis linearity control failed')
     for row in case['rows']:
         key=tuple(row[k] for k in ['family','Q','components','eval','elements','transpose','add'])
         if key in seen:raise ValueError('Duplicate action')
@@ -106,10 +118,12 @@ def validate_case(case):
             accuracy(row['original_vs_cpu'],1e-11)
             if row['original_vs_cpu']['passed'] is not True:
                 raise ValueError('Original vs independent reference failed')
-        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else []):
+        if compensated and row['elements']==257 and not row['transpose']:
+            linearity(row['original_linearity'],1e-11,True)
+        if [m['precision'] for m in row['methods']]!=['FP64','FP32_pedantic','TF32_requested']+(['FP32_fused'] if case.get('fused') else [])+(['mixed_compensated'] if compensated and not row['transpose'] else [])+(['mixed_compensated_bits'] if bits and not row['transpose'] else []):
             raise ValueError('Missing precision comparison')
         for method in row['methods']:
-            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'FP32_fused':2e-6}[method['precision']]
+            tol={'FP64':1e-11,'FP32_pedantic':2e-6,'TF32_requested':2e-3,'FP32_fused':2e-6,'mixed_compensated':1e-11,'mixed_compensated_bits':1e-11}[method['precision']]
             accuracy(method['accuracy'],tol)
             if row['elements']==257:
                 accuracy(method['accuracy']['independent_cpu'],tol)
@@ -118,13 +132,24 @@ def validate_case(case):
             if method['precision']=='FP64' and method['accuracy']['passed'] is not True:
                 raise ValueError('FP64 library/layout control failed')
             timing(method['timing'])
+            if compensated and row['elements']==257 and not row['transpose']:
+                linearity(method['linearity'],tol,method['precision']=='FP64')
             if method['precision']=='FP32_fused' and method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*4:
                 raise ValueError('Unexpected fused vector workspace')
+            if method['precision'] in ['mixed_compensated','mixed_compensated_bits'] and method['extra_fp32_workspace_bytes']!=row['P']*row['Q']*row['q_components']*8:
+                raise ValueError('Unexpected compensated vector workspace')
+            if method['precision']=='mixed_compensated_bits' and row['elements']==257:
+                stress=method.get('range_stress')
+                scales=[1e-300,1e-80,2.**-75,2.**-74,1e-30,1.,1e30,2.**100,2.**101,1e80,1e300]
+                if not isinstance(stress,list) or [s.get('scale') for s in stress]!=scales:
+                    raise ValueError('Missing independent input-range coverage')
+                for item in stress:accuracy(item['accuracy'],1e-11)
     if seen!=expected:raise ValueError('Incomplete basis action coverage')
     return True
 
 
-def run(output,seconds,scale=False,fused=False):
+def run(output,seconds,scale=False,fused=False,compensated=False):
+    if compensated and not fused:raise ValueError('Compensated screen requires --fused comparator')
     if not 30<=seconds<=120:raise ValueError('Probe requires30..120s deadline')
     dev.require_host_memory();manifest=verified();settings=dev.read(dev.SETTINGS)
     gpu=dev.capture(['nvidia-smi','--query-gpu=name,uuid,driver_version,memory.free','--format=csv,noheader,nounits'])
@@ -145,6 +170,7 @@ def run(output,seconds,scale=False,fused=False):
         '--entrypoint','/native/ceed-tensor-probe',settings['runtime_image'],'/work/case.json']
     if scale:args.append('scale')
     if fused:args.append('fused')
+    if compensated:args.append('compensated')
     dev.write(output/'command.json',dict(argv=args,manifest=manifest,gpu_before=gpu,runner_sha256=dev.sha(Path(__file__))))
     started=time.monotonic();code=None
     try:
@@ -172,8 +198,9 @@ if __name__=='__main__':
     parser.add_argument('action',choices=['build','check','run']);parser.add_argument('output',nargs='?',type=Path)
     parser.add_argument('--scale',action='store_true',help='ND2/Q14 size ladder through actual N1601320, bounded GPU-resident action probe')
     parser.add_argument('--fused',action='store_true',help='Also screen fused FP32-register action without intermediate vector buffers')
+    parser.add_argument('--compensated',action='store_true',help='Forward compensated mixed-register dot and small basis linearity controls; requires --fused')
     parser.add_argument('--seconds',type=int,default=120);args=parser.parse_args()
     if args.action=='build':build()
     elif args.action=='check':print('CEED tensor probe verified' if verified() else 'invalid')
     elif args.output is None:parser.error('run requires new output directory')
-    else:run(args.output,args.seconds,args.scale,args.fused)
+    else:run(args.output,args.seconds,args.scale,args.fused,args.compensated)

@@ -18,7 +18,14 @@ extern "C" cudaError_t palace_probe_unpack(const float *x,double *y,size_t n,boo
 }
 
 #include "../adapter/ceed_fused.cuh"
+#include "ceed_compensated.cuh"
 extern "C" cudaError_t palace_probe_fused_basis(const float *b,const double *x,double *y,
                                                 int p,int q,int qc,int n,bool trans,bool add) {
   return palace_pc_basis::Apply(b,x,y,p,q,qc,n,trans,add);
+}
+extern "C" cudaError_t palace_probe_compensated(const float *hi,const float *lo,const double *x,double *y,int p,int q,int qc,int n) {
+  return palace_compensated::Apply(hi,lo,x,y,p,q,qc,n);
+}
+extern "C" cudaError_t palace_probe_compensated_bits(const float *hi,const float *lo,const double *x,double *y,int p,int q,int qc,int n) {
+  return palace_compensated::Apply<true>(hi,lo,x,y,p,q,qc,n);
 }
