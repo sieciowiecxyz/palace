@@ -1,7 +1,7 @@
 # M6.6 — kwalifikacja siedmiu punktów rzeczywistej anteny
 
 Status: **7/7 PASS, ocena M6.6 zakończona**;2026-10-21. Medium/frozen fixture T-Shaped, nie produkcyjna
-najlepsza geometria z repo anten. [Bramki](../../MILESTONES.md),
+najlepsza geometria z repo anten. [Bramki](optimization-contract.md),
 [historia sweepów](sweeps.md). Nie zamyka M6/M7 przed wymaganymi dowodami.
 
 ## Protokół

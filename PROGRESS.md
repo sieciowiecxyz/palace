@@ -1,4 +1,19 @@
-## Bieżący checkpoint — M7.3 PASS / następny M7.4
+## Bieżący checkpoint — plan lokalnych PR-ów (2026-10-22)
+
+Zastąpiono PLAN/MILESTONES minimalistycznymi etapami M0–M4. Tryb normalny,
+Active none; przygotowano dokumentację, nie rozpoczęto wykonania etapów.
+Nie pobierano upstream, nie tworzono branchy PR ani niczego nie publikowano.
+Następny krok po rozpoczęciu realizacji: M0 — aktualny upstream i duplikaty.
+
+Badania optymalizacji zakończone: [audyt](docs/milestones/final-audit.md).
+Dawne kryteria: [archiwum](docs/milestones/optimization-contract.md).
+Poniższe checkpointy są historyczną chronologią, nie aktualnym statusem.
+
+## Historia zakończonych badań M0–M7
+
+Wszystkie statusy, instrukcje kolejnego kroku i oznaczenia goal poniżej są zapisami historycznymi. Obecny tryb i kolejka: PLAN.md.
+
+### Historyczny checkpoint — M7.3 PASS / następny M7.4
 
 Końcowy pakiet artifacts/m7-sm120-bundle-r3-20261022, image43ac46f6…/
 nativeA6. EXP228/229image-native bez hostnative overlays: tiny3.55GHz/
@@ -11,7 +26,7 @@ automatycznebindingnativefield-referenceinventorydopodanejR, rekwalifikacja
 15W5/3median/newgeometrynanajnowszymkwalifikatorze, beznowychdużychGPUrunów
 jeślinativebez zmian. Historycznecheckpointyponiżej sąchronologią.
 
-## Bieżący checkpoint — M7.5 PASS / następny M7.3
+### Historyczny checkpoint — M7.5 PASS / następny M7.3
 
 EXP221–222 nowa geometria directora+2mm/3.500GHz/bothports/medium i pełneK
 PASS. FreshFP64reference764.008s/61.139GBcgroup, fixed3candidate755.874s/
@@ -30,7 +45,7 @@ Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176:
 
 **Gorące dane solvera w RAM/VRAM.** Cache, wejścia/wyniki i sporadyczne odczyty SSD dozwolone; niewielkie zapisy mierzyć. Bez swapowania zadania i intensywnego dyskowego workspace. UVM GPU↔RAM. Nie zamykać aplikacji użytkownika. Disk basis pozostaje usunięty; polityka I/O w PLAN.md.
 
-## Bieżący checkpoint
+### Historyczny checkpoint
 
 - Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 i W.5 **15/15**freq/oba porty PASS,210regionalnychwierszy pól; suma czasu+2.58%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/ciągłe pasmo/produkcja. Receipt artifacts/m7-full-W5-fixed3-summary-20261022.json.
 - EXP215–220 **M7.2 PASS**:3nowe pary3.500GHz/oba porty, własne referencje, wszystkieKPASS/42regionalne wpisy pól. Mediany R745.458s/C747.733s (+0.305%); mediana sparowanego wzrostu+0.476%; peakcgroupmedian60.684→46.364GB (−23.597%). P2exactW.3 ma osobno sprawdzone7regionów/rawperpara, czasy2ports. Raport docs/milestones/paired-medians.md. Fizyczna redukcja peak VRAM nieudowodniona; logicalmanaged−26.33% i cuDSSallocated−46.63% to oddzielne miary.

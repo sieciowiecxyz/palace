@@ -4,6 +4,11 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
+Bieżące M0–M4 dotyczą lokalnego przygotowania PR-a. Checkpointy M0–M7 poniżej opisują zakończone badania optymalizacji, według dawnego kontraktu.
+
+- [Archiwum: kontrakt optymalizacji](milestones/optimization-contract.md)
+  - Czytaj gdy: sprawdzasz kryteria i tolerancje zakończonych badań M0–M7
+  - Opis: Historyczne bramki zachowane po zastąpieniu głównego planu przygotowaniem PR-ów.
 - [M0: dowody zamknięcia](milestones/M0.md)
   - Czytaj gdy: weryfikujesz zakończenie researchu i migracji
   - Opis: Powiązanie kryteriów M0 z raportami oraz granice dowodów.

@@ -3,9 +3,9 @@
 Polityka SSD doprecyzowana przez użytkownika (2026-10-19): gorące dane solvera w RAM/VRAM; UVM GPU↔RAM. Zwykłe wejścia/wyniki, cache i sporadyczny odczyt SSD są dozwolone. Niewielkie zapisy wymagają pomiaru wolumenu i częstotliwości I/O; nie deklarować zerowego zużycia dysku. Bez swapowania zadania i intensywnego przepisywania bazy/macierzowych workspace na SSD w pętli solvera. Obecny disk basis pozostaje usunięty; dawne wyniki z nim nie stają się przez tę korektę zakwalifikowanym baseline. Nową metodę używającą dysku oceniać po zmierzonym I/O, czasie i dokładności.
 Plan przeniesiony z repo antenowego. Historyczne ścieżki `infra/palace`, STATE i polecenia odnoszą się do tamtego repo; aktualny build/runner tego forka opisuje [build.md](build.md).
 
-Bieżąca kolejka i stan wykonania w tym forku: [PLAN](../PLAN.md), [MILESTONES](../MILESTONES.md), [PROGRESS](../PROGRESS.md). Aktualizacja celu 2026-10-18: jedna 5070 Ti; obowiązkowa ocena FEM–BEM/MoM; multi-GPU poza obecnym zakresem.
+Badania z 2026-10-18 zakończone 2026-10-22: [audyt wyników i ograniczeń](milestones/final-audit.md), [historyczny kontrakt](milestones/optimization-contract.md). Obecne [PLAN](../PLAN.md) i [MILESTONES](../MILESTONES.md) dotyczą przygotowania lokalnych PR-ów; nie reaktywują badań.
 
-Data opracowania: 2026-10-18. Status: **goal aktywny, etap M2; M1 zamknięty w ograniczonym zakresie opisanym w checkpointach. Stan bieżący w PROGRESS.md**.
+Data opracowania: 2026-10-18. Status: dokument historyczny; poniżej pierwotne cele i kierunki researchu.
 Dokument zbiera cele użytkownika, wyniki wcześniejszych prób, weryfikację załącznika i plan dalszej pracy.
 Liczby historyczne niżej nie są nowymi benchmarkami; bieżące uruchomienia rejestruje PROGRESS.md.
 
@@ -201,9 +201,9 @@ Pomiar wydajności: identyczny sprzęt i obciążenie tła, mediana 3 poprawnych
 
 Cel ambitny, a nie obietnica: dodatkowe ≥1,5× przyspieszenie względem 955,176 s (około 637 s) i ≥25% spadku porównywalnego szczytu pamięci hosta. Osobno mierzyć całkowity RAM, VRAM i ruch PCIe — przeniesienie alokacji na host nie jest zmniejszeniem wszystkich danych. Mniejsze poprawy można przyjmować, jeśli są powtarzalne i nie pogarszają innych istotnych metryk; zapisywać kompromis na wykresie/tabeli Pareto.
 
-## 8. Aktualna kolejność wykonawcza
+## 8. Historyczna kolejność wykonawcza
 
-Kryteria i aktualne checkboxy są wyłącznie w [MILESTONES](../MILESTONES.md) i [PLAN](../PLAN.md), wyniki w [PROGRESS](../PROGRESS.md).
+Historyczne kryteria: [kontrakt optymalizacji](milestones/optimization-contract.md). Dawny plan: `git show 8425a1b:PLAN.md`; wyniki: [audyt](milestones/final-audit.md).
 
 M1: referencja/residuum/profil/powietrze → M2: research i prototyp Maxwell FEM–BEM/MoM → M3: GMRES/pamięć → M4: reuse setup → M5: preconditioner/mixed precision → M6: Tensor Cores/TF32/BF16 → M7: kwalifikacja na jednej GPU.
 
@@ -221,6 +221,8 @@ Cel ukończony po użytecznej, zmierzonej poprawie na jednej 5070 Ti, kwalifikac
 - Babysitting oddawać tej samej Lunie high z dokładnym case, obrazem, argv, deadline i listą artefaktów. Agent główny czeka na raport, a potem sam interpretuje wyniki.
 - Sukces szybkości liczyć dla zaakceptowanego wyniku. Nie porównywać innego portu/mesh/tolerancji, CPU referencji z niepasującymi ustawieniami ani timeoutu z pełnym runem.
 
-### Krótki prompt do kontynuacji
+### Historyczny prompt zakończonych badań
+
+Archiwum, nie instrukcja do wykonania. Aktualny zakres pracy określa PLAN.md.
 
 > Przeczytaj AGENTS, PLAN, MILESTONES, PROGRESS i aktywny checkpoint. Cel: mniej VRAM/RAM i krótszy czas wiarygodnego medium na jednej 5070 Ti 16 GB + 96 GB RAM. Realizuj bramki po kolei: referencja/residuum/profil, prototyp Maxwell FEM–BEM/MoM, pamięć GMRES, reuse, preconditioner/mixed precision, TC i kwalifikacja. Nie zmieniaj fizyki dla lepszego czasu. Każdy eksperyment ma jedną hipotezę, referencję, limit i kontrolę jakości. Ta sama Luna high tylko uruchamia gotowe polecenia i odbiera wyniki; projekt i interpretacja należą do agenta głównego. Zapisuj także odrzucenia; bez płatnego compute i bez obowiązku multi-GPU.
