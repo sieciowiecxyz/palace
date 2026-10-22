@@ -25,6 +25,22 @@ restartu FAIL również dla baseline-vs-baseline; AMR różnicuje siatkę równi
 powtórzeniami baseline. Nie ogłaszamy pełnej kwalifikacji tych dwóch diagnostyk.
 Pełne CI/MFEM 4.10 i inne urządzenia pozostają do sprawdzenia przed merge.
 
+## Opis dla review — korekta 2026-10-23
+
+Opis `pr-description.md` zaczyna się od przyczyny nakładania pamięci, potem podaje
+pomiar i nazwane testy. MB oznacza jednostkę dziesiętną. Zachowano wszystkie FAIL,
+timeouty i granice toolchaina. Dodano krótką informację o pomocy Codex; nie deklaruje
+ona osobistego review użytkownika. Kod/testy i commit `8b5d4a1f8` pozostają bez zmian;
+solvera nie uruchamiano ponownie przy edycji tekstu.
+
+Wskazówki: [Ghostty](https://github.com/ghostty-org/ghostty/blob/main/AI_POLICY.md)
+(konkret, ograniczenie rozwlekłości), [LLVM](https://llvm.org/docs/AIToolPolicy.html)
+(zrozumienie zmiany i otwarte pytania) oraz
+[Palace CONTRIBUTING](https://github.com/awslabs/palace/blob/main/CONTRIBUTING.md)
+(mały diff, reproducer i testy). Zasady disclosure Ghostty/LLVM dotyczą tych projektów;
+nie zakładamy, że są regulaminem Palace. Notatka i poprzedni opis są lokalnie
+w `artifacts/upstream-pr/description-review.md` i `pr-description-before-edit-20261023.md`.
+
 ## 1. Sprawdź lokalny commit i diff
 
 ```sh

@@ -12,6 +12,13 @@ Docs-garden i review wykonane; runtime/builder zatrzymane, cache zachowany.
 [Instrukcja sprawdzenia i ręcznej publikacji](docs/upstream-prs.md).
 Kolejne kandydaty pozostają w PLAN jako kolejka, bez aktywacji nowych badań.
 
+### Korekta opisu PR — 2026-10-23
+
+Opis uproszczony po przeglądzie zasad Ghostty/LLVM/Palace. Metryki, named tests,
+FAIL i ograniczenia zachowane; disclosure pomocy Codex. Kod/testy i commit pilota
+bez zmian. Bez nowego buildu/runu i bez publikacji. Poprzedni opis oraz review notes
+w artifacts/upstream-pr; manifest z aktualnymi SHA. [Szczegóły](docs/upstream-prs.md).
+
 ## Historia zakończonych badań M0–M7
 
 Wszystkie statusy, instrukcje kolejnego kroku i oznaczenia goal poniżej są zapisami historycznymi. Obecny tryb i kolejka: PLAN.md.
