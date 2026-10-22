@@ -1,21 +1,22 @@
 # Plan przygotowania PR-ów do Palace
 
-Mode: normal
+Mode: goal
 Active: none
 
 ## Cel i granice
 
 Przygotować małe, niezależne zmiany do upstream, sprawdzone lokalnie.
 Bez pushowania, tworzenia PR-ów, forków ani kontaktowania maintainerów.
-Ten dokument ustala kolejkę; wykonanie etapów jeszcze nie rozpoczęte.
+Lokalny pilot ukończony 2026-10-22; niczego nie opublikowano.
+Pakiet i ręczna publikacja: [instrukcja](docs/upstream-prs.md).
 
 ## Milestones
 
-- [ ] M0 — Pobrać upstream i ustalić aktualną gałąź domyślną (`main`/`master`), SHA oraz możliwe duplikaty zmian. Zachować fork badawczy.
-- [ ] M1 — Na aktualnym upstream utworzyć lokalny branch pierwszej małej zmiany: skrócenie życia buforów / ograniczenie nakładania pamięci postprocessingu. Przenieść wyłącznie potrzebny patch.
-- [ ] M2 — Przetestować patch względem czystego upstream: poprawność, regresje i osobno czas/pamięć. Zacząć od krótkiego przypadku; większy tylko gdy potrzebny.
-- [ ] M3 — Przeczytać zasady contribution i ostatnie review upstream. Dopasować kod oraz lokalny opis PR-a do praktyk projektu.
-- [ ] M4 — Przygotować lokalny pakiet do przeglądu i instrukcję: jak sprawdzić diff/testy, wypchnąć branch do własnego forka i otworzyć PR. Niczego nie publikować.
+- [x] M0 — Pobrać upstream i ustalić aktualną gałąź domyślną (`main`/`master`), SHA oraz możliwe duplikaty zmian. Zachować fork badawczy.
+- [x] M1 — Na aktualnym upstream utworzyć lokalny branch pierwszej małej zmiany: skrócenie życia buforów / ograniczenie nakładania pamięci postprocessingu. Przenieść wyłącznie potrzebny patch.
+- [x] M2 — Przetestować patch względem czystego upstream: poprawność, regresje i osobno czas/pamięć. Zacząć od krótkiego przypadku; większy tylko gdy potrzebny.
+- [x] M3 — Przeczytać zasady contribution i ostatnie review upstream. Dopasować kod oraz lokalny opis PR-a do praktyk projektu.
+- [x] M4 — Przygotować lokalny pakiet do przeglądu i instrukcję: jak sprawdzić diff/testy, wypchnąć branch do własnego forka i otworzyć PR. Niczego nie publikować.
 
 ## Kolejka kolejnych PR-ów
 

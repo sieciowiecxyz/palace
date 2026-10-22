@@ -1,0 +1,123 @@
+# Lokalny pilot PR do Palace
+
+Stan: patch i testy przygotowane lokalnie. Niczego nie opublikowano.
+Badawczy fork zachowany; PR zawiera wyłącznie trzy pliki z czystego upstream.
+
+## Co jest do wysłania
+
+- Worktree: `/home/sieciowiec/dev/cpp/palace-pr-driven-release`.
+- Branch: `pr/driven-release-workspace`.
+- Lokalny commit: `8b5d4a1f87e7ceb5d4fe5fcacb7849aa17dc54b7`.
+- Baza: upstream **main**, `29ad351f916e47e005a43730513f155eeb634e3e`.
+- Tytuł: **Release final uniform driven solve state before postprocessing**.
+- Pliki: `palace/drivers/drivensolver.cpp`, `test/unit/regression/cases.cpp`, `CHANGELOG.md`.
+- Diff:47 dodanych /4 usunięte linie; bez eksperymentalnego adaptera, nowych opcji lub zmiany precyzji.
+- Pakiet: `/home/sieciowiec/dev/cpp/palace/artifacts/upstream-pr/` — opis `pr-description.md`, patch `pilot.patch`, manifest `manifest.json`, wejścia, harness i logi. Surowe artefakty są ignorowane przez Git, pozostają na tej maszynie.
+
+Patch skraca życie KSP i macierzy po ostatnim rozwiązaniu, zanim finalny postprocessing
+alokuje workspace. Nie przyspiesza samego solvera. W trzech parach kontrolowanego
+coax peak RSS spadł **15,82%**, mediana czasu wzrosła **1,34%**. Na tiny two-port
+zysk RSS bliski0%; brak pomiaru fizycznego VRAM. Szczegóły i wszystkie ograniczenia:
+[M2](milestones/M2.md), praktyki maintainerów: [M3](milestones/M3.md).
+
+Testy upstream CPU/CUDA/MPI przechodzą w wyszczególnionym zakresie. Ścisły ekran
+restartu FAIL również dla baseline-vs-baseline; AMR różnicuje siatkę również między
+powtórzeniami baseline. Nie ogłaszamy pełnej kwalifikacji tych dwóch diagnostyk.
+Pełne CI/MFEM 4.10 i inne urządzenia pozostają do sprawdzenia przed merge.
+
+## 1. Sprawdź lokalny commit i diff
+
+```sh
+cd /home/sieciowiec/dev/cpp/palace-pr-driven-release
+git status --short
+git log --oneline 29ad351f916e47e005a43730513f155eeb634e3e..HEAD
+git diff --stat 29ad351f916e47e005a43730513f155eeb634e3e..HEAD
+git diff --check 29ad351f916e47e005a43730513f155eeb634e3e..HEAD
+git diff 29ad351f916e47e005a43730513f155eeb634e3e..HEAD
+```
+
+Oczekiwany jeden lokalny commit, tylko trzy powyższe pliki i czysty worktree.
+Jeśli później edytujesz kod, obejrzyj również `git diff` i `git diff --cached`;
+porównanie BASE..HEAD nie pokazuje zmian niezacommitowanych.
+Nie wysyłaj brancha badawczego `codex/local-cuda` ani jego historii.
+
+## 2. Jak odtworzyć testy
+
+Zapisane wykonania: `final-regressions.sh`, `median-validation.sh`,
+`amr-control-and-restarts.sh` i logi obok nich. Każdy test ma oddzielny wynik;
+kod0 z zewnętrznego skryptu nie zastępuje kontroli raportowanych exit codes.
+
+Zachowany lokalny kontener runtime `palace-pr-test` ma `/work` wskazujące artefakty,
+`/src/palace` na worktree PR, GPU CDI, limit12GiB i brak swapu. W razie ponowienia
+wybierz nowe katalogi wyników. Poniższe polecenia są instrukcją; nie uruchamiają się
+przy czytaniu pliku:
+
+```sh
+podman start palace-pr-test
+podman exec palace-pr-test sh -c '
+  export OMP_NUM_THREADS=1
+  export LD_LIBRARY_PATH=/work/candidate-v2:/work/deps:/opt/view/lib:/opt/cudss/lib:/usr/local/cuda/lib64
+  timeout -k 5 90 /work/candidate-v2/palace-unit-tests coaxial_lumped_wave --skip-benchmarks --palace-linear-solver SuperLU --regression-run-dir /work/recheck-cpu-$(date +%s)
+'
+podman exec palace-pr-test sh -c '
+  export OMP_NUM_THREADS=1
+  export LD_LIBRARY_PATH=/work/candidate-v2:/work/deps:/opt/view/lib:/opt/cudss/lib:/usr/local/cuda/lib64
+  timeout -k 5 100 /opt/view/bin/mpirun --timeout 90 -np 2 /work/candidate-v2/palace-unit-tests coaxial_lumped_wave --skip-benchmarks --palace-linear-solver SuperLU --regression-run-dir /work/recheck-mpi2-$(date +%s)
+'
+podman exec palace-pr-test sh -c '
+  export OMP_NUM_THREADS=1
+  export LD_LIBRARY_PATH=/work/candidate-v2:/work/deps:/opt/view/lib:/opt/cudss/lib:/usr/local/cuda/lib64
+  timeout -k 5 180 /work/candidate-v2/palace-unit-tests cpw_lumped_uniform,coaxial_lumped_wave --device cuda --backend /gpu/cuda/magma --palace-linear-solver cuDSS --skip-benchmarks --regression-run-dir /work/recheck-cuda-$(date +%s)
+'
+podman stop --time 1 palace-pr-test
+```
+
+To odtwarza **zamrożony build**, nie dowolny późniejszy kod. Po zmianach/rebase
+przebuduj i przetestuj nowy commit; nie przypisuj starych ELF nowemu diffowi.
+Przyrostowy build zachowany w `palace-pr-builder:/opt/palace-cudss-build`:
+
+```sh
+podman start palace-pr-builder
+podman exec palace-pr-builder cmake --build /opt/palace-cudss-build --target palace unit-tests --parallel 2
+podman stop --time 1 palace-pr-builder
+```
+
+Po buildzie trzeba skopiować nowy binary, `libpalace.so` i testy do **nowego**
+katalogu artefaktów, ustawić jego LD_LIBRARY_PATH i zapisać SHA. Nie nadpisuj
+zamrożonych `baseline`/`candidate-v2`. Dane toolchaina: `build-environment.json`.
+Kontenery/cache pozostają lokalne; nie trzeba wynajmować GPU ani wysyłać3GB.
+
+## 3. Zanim opublikujesz
+
+Przeczytaj `pr-description.md`, szczególnie wyniki negatywne i granice testów.
+Licensing statement pochodzi z template projektu — potwierdź go przy wysyłaniu.
+[CONTRIBUTING](https://github.com/awslabs/palace/blob/29ad351f916e47e005a43730513f155eeb634e3e/CONTRIBUTING.md)
+wymaga aktualnej bazy i sprawdzenia duplikacji. Po czasie sprawdź ponownie otwarte
+PR-y; [#793](https://github.com/awslabs/palace/pull/793) pokazuje, dlaczego mały diff
+musi mieć mierzalną korzyść. Nie ma gwarancji merge. Żadnej rozmowy nie rozpoczęto.
+
+## 4. Ręczna publikacja — dotąd NIC z tej sekcji nie wykonano
+
+1. Utwórz własny fork `awslabs/palace` na GitHubie (albo użyj istniejącego).
+2. Poniżej przykład dla konta `sieciowiecxyz`. Najpierw sprawdź remotes; jeśli
+   `origin` już istnieje, zweryfikuj go zamiast nadpisywać.
+
+```sh
+cd /home/sieciowiec/dev/cpp/palace-pr-driven-release
+git remote -v
+git remote add origin git@github.com:sieciowiecxyz/palace.git
+git fetch upstream
+```
+
+Jeżeli `upstream/main` zmienił się od zapisanej bazy, zrób lokalny rebase
+`git rebase upstream/main`, obejrzyj diff i ponów adekwatne testy na nowym buildzie.
+Jeśli coś się nie zgadza, wróć do lokalnej pracy przed push. Popraw opis wyników
+po rebase. Dalsze komendy wysyłają dane i są do ręcznego wykonania:
+
+```sh
+git push -u origin pr/driven-release-workspace
+gh pr create --repo awslabs/palace --base main --head sieciowiecxyz:pr/driven-release-workspace --title 'Release final uniform driven solve state before postprocessing' --body-file /home/sieciowiec/dev/cpp/palace/artifacts/upstream-pr/pr-description.md
+```
+
+Wyślij tylko pilot. Reuse RHS, GMRES FP32 storage i mixed-cuDSS pozostają w kolejce
+[PLAN](../PLAN.md); każdy wymaga osobnej deduplikacji, brancha i dowodów.

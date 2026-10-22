@@ -1,7 +1,7 @@
 # M1: rzeczywiste DOF i bilans pamięci
 
 EXP21, 2026-10-18. Audyt offline obecnego medium W.3; bez uruchamiania GPU,
-zmiany modelu i dyskowego workspace. Audyt był częścią M1; po EXP22 M1 zamknięty, dowody w [M1](milestones/M1.md).
+zmiany modelu i dyskowego workspace. Audyt był częścią M1; po EXP22 M1 zamknięty, dowody w [M1](milestones/optimization-M1.md).
 
 ## Odtworzenie i kontrola
 

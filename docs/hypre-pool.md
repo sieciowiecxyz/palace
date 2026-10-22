@@ -1,6 +1,6 @@
 # Początkowa pula HYPRE/Umpire — EXP11
 
-Status 2026-10-18: **pozytywny filtr coax-tiny; jedna pełna antena FP64 z seedem 256 MiB ukończyła execution**. Ten run to pojedynczy punkt 3,50 GHz/P2, a jakość rozwiązania pozostaje otwarta; nie kwalifikuje seedu dla innych ustawień ani nie zmienia globalnego defaultu. M1 został później zamknięty w zakresie [checkpointu](milestones/M1.md); ten test nie poszerza jego kwalifikacji.
+Status 2026-10-18: **pozytywny filtr coax-tiny; jedna pełna antena FP64 z seedem 256 MiB ukończyła execution**. Ten run to pojedynczy punkt 3,50 GHz/P2, a jakość rozwiązania pozostaje otwarta; nie kwalifikuje seedu dla innych ustawień ani nie zmienia globalnego defaultu. M1 został później zamknięty w zakresie [checkpointu](milestones/optimization-M1.md); ten test nie poszerza jego kwalifikacji.
 
 ## Mechanizm
 

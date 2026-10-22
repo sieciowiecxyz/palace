@@ -1,0 +1,46 @@
+# M3 — GMRES i pamięć
+
+Status: **COMPLETE — ocena M3.1–M3.3**, bez globalnej promocji. Po [negatywnej decyzji M2](M2-decision.md), bez promocji BEM.
+Medium i zamrożone K pozostają. Brak zmiany defaultu; [EXP80–85](../mixed-basis-validation.md) zaliczają W.1/W.2/W.3, z−2,87GB peakcgroup na jednym punkcie anteny. Ocena polityki migracji zakończona w [EXP86–90](../basis-prefetch.md); W.4/W.5 nadal otwarte w M7.
+
+## Potwierdzony punkt startu
+
+`palace/linalg/iterative.cpp` ma opt-in `PALACE_GMRES_FP32_BASIS`; baza jest
+pakowana w `StoredBasisVector`, a stara ścieżka odczytów/ortogonalizacji rozpakowuje ją
+do pełnego wektora FP64. Nowy opt-in DIRECT używa Dot/AddTo z FP64partials;
+operator nadal wymaga jednego Unpack przed ApplyBA. `vector.cpp` zawiera Pack/Unpack. Nie zakładać,
+że sam istniejący opt-in jest aktualnie kwalifikowany na referencji M1.
+
+Referencja M1: W.3/P2/3,50GHz,11,218,724 ND DOF,35iter/447,462s,
+managed55,148GB; GMRES Vnet6,462GB. FP32 może zmniejszyć samą bazę około
+dwukrotnie, nie cały proces. cuDSS25,008GB nadal przekracza16GBVRAM.
+Krótki profil ortogonalizacji0,156s nie uzasadnia obietnicy dużego speedupu
+całego solve; celem pierwszego kroku jest pamięć i usunięcie konwersji.
+
+## Kolejka małych kroków
+
+1. Audyt i W.1 wykonane w EXP77–81: actualAPIreal/complex/MGS/faultdetectorPASS;
+   ownership jednej rangi i końcówki partycji sprawdzone. MPI multi-rank poza kwalifikacją.
+2. Wykonany izolowany CUDA probe bez dużej siatki: bezpośredni dot/axpy z FP32 storage,
+   FP64 arithmetic/accumulation; complex ma zachować koniugację i oba składniki.
+   Sprawdzić skale/dynamic range/zerowe dane oraz ortogonalność MGS.
+3. Cached incremental build bez dependencies rebuild; opt-in/fallback.
+   W.2/W.3 z raw/S/całymi polami PASS w EXP83–85.
+4. EXP86–90: prefetch osobno od reprezentacji; W.2/W.3 aktualnego native i actualAPI PASS.
+   Ruch UVM137,366→136,492GB/iter w późnym oknie, orthog.706→.330s/2iter.
+   Brak dalszej redukcji pamięci i statystycznej promocji czasu.
+5. Restart120/240 NOT RUN:35iter<K64, brak redukcji dotkniętej bazy. Ocena
+   warunkowa zakończona; nie zmieniono konwergencji dla pozornego oszczędzania.
+
+Runy lokalne i ograniczone jak w workflow. Zero SSD scratch/swap; source/build
+cache zostaje. Root projektuje/analizuje, ta sama Luna tylko dokładne argv.
+
+EXP79: complex coax-tiny same62/64iter, raw<1e-6/field/S/TEM PASS.
+Czas~18,7s bez istotnej zmiany; directGPUpeak nieco wyższy. Nie zalicza to
+M3.2/M3.3 ani bramek większego coax/anteny. Zachowany fallback pre-M3native.
+
+EXP85:35iter,raw8,356e-7, ΔE/B1,133e-8/1,595e-9, cgroup58,890→56,019GB,
+managed55,148→52,277GB. Czas414→410s jednejpary nie dowodzi speedupu.
+M3.1 i W.2/W.3 PASS. M3.2/M3.3 zamknięte po EXP86–90: jakość/peak/actualbytes
+i ocena polityki zapisane, opt-in/fallback zachowane. Nowe buildy9,996/13,846s,
+bez dependency rebuild. Aktywny [M4](optimization-M4.md); końcowe W.4/W.5/M7 nadal wymagane.

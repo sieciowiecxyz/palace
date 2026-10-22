@@ -1,0 +1,100 @@
+# M2 — Maxwell FEM–BEM/MoM
+
+Status: **ocena CLOSED / integracja REJECT**; [decyzja i audyt](M2-decision.md). M1 zakończony: [dowody](optimization-M1.md). Żadnego nowego solvera
+nie promowano. Jeden GPU, lokalnie, RAM/VRAM; nadal medium i zamrożone K.
+
+Aktualizacja2026-10-19: [oracle](../maxwell-oracle.md), [native/dielektryk](../maxwell-native-dielectric.md), [coupling](../maxwell-coupling.md).
+PECcomplexMiePASS0,564%. Native2kernels usuwaokoło25×dispatchoverhead względem
+per-blockcuBLAS, lecz nadalprzegrywazdenseapply. Eta4:−17,31%matrixdata,
+niepeakRAM; GPUoperator/CPUbasisGMRES0,078s/170iter i jakośćPASS.
+DielectricPMCHWT/Mie εr2,94lossless: płaskieinscribedmeshscatterFAIL; po jawnej
+regule zachowania objętości zbieżność0,176→0,0223%complexfield i1%PASS.
+EXP30–31: rzeczywisty MFEMND1/Bemppinterface wykonany. Trace/pair~1e−15,
+zbieżność E/H20/22→11,7/11,4→6,12/5,79%; comparatorFEM6,18/5,82%.
+Δcoupled–FEM0,57/0,76% ienergyPASS, ale całkowity1%fieldgate**FAIL**.
+EXP32: Gramprimaltracirank90/120,330/480; odrzucić jego osobnąinwersję.
+DualRWG/RBCfullrank/κscaled≤2,93, fizycznepairing/transforms/constanttracePASS;
+plane-traceRWG0błąd20,99→10,43→5,16%, nie1%ND2qualification.
+EXP33: [actualglobalND2](../maxwell-nd2.md)/faceDOFs/CSR i plane-waveDirichlet
+PASS0,151/0,332%E/H; samainterpolacjaH1,468%FAIL. MałyCPUrun5,514s/433MB,
+brakzyskuanteny. EXP34 [BCmortar/coupledND2](../maxwell-nd2-coupling.md)
+physical/nativeT-K/sparseSchur/energyPASS, wholefieldFAIL17,74/15,22→10,07/5,64%.
+Historyczny EXP34 pozostaje FAIL. [EXP35–37](../maxwell-trace-duality.md)
+rozstrzygają dualność i niezależną powierzchnię: magnetic F2/B3 ma E/H0,560/0,751%
+PASS; F3/B3 0,358/0,904% PASS, ale H pogarsza się. To transparentny interfejs,
+nie transmisja przez dielektryk ani monotoniczna zbieżność wszystkich pól.
+[EXP38–41](../maxwell-transmission.md) wykonują eps2,94 z niezależnym PMCHWT
+tej samej geometrii. Centroidscreening F2/B3 vs referenceB4 FAIL1,092/1,320%;
+referenceEchange0,408%>0,3%, B4potentialq8/q12 już<1e−6. [EXP42–43](../maxwell-transmission.md) odtwarzają wszystkie elementy na regułach
+objętościowych2/5 bez nowego BEMsolve. Degree5 E/H2,888/1,612%, refchange
+1,945/1,158%, potentialq12/q16~7,4e−4 FAIL. Całka i referencja niezbieżne;
+centroidy nie kwalifikują pola. [EXP44–47](../maxwell-near-panels.md) kontrolują
+RWGnative/solid-angle/adaptive i poprawiają fineB4potential na całej reguledegree5.
+KontrolePASS, lecz pola2,888/1,611% nadal FAIL. EXP48–53 wykonują coarseB3
+i degree2/5: corrected referencechange1,647/0,781% nadal FAIL0,3%; volumeagreement
+FAIL. Cached NumBa skraca replay, nie dowodzi oszczędności anteny.
+[EXP54–58](../maxwell-fem-refinement.md): analytic epsilon2,94 ND2F3PASS0,443/0,717%,
+actual coupled F3/B3 i stałe640probesPASS0,664/0,597% vsB4. To nie pełnyF3L2;
+nie zastępuje niezaliczonych reference/volume convergence gates.
+[EXP59–69](../maxwell-stream.md): fusedpotential CPUquery kontrolowany;
+własna F3degree5E/H1,683/.972%, refchange1,725/.876%, degreeagreementFAIL.
+DenseB5structuralmemory>cap. [EXP70–76](../maxwell-fmm.md): cached ExaFMM build i p8 Maxwell actionPASS; PMCHWTsolve FAIL independentraw, bez kwalifikacji pól. Dwa zestawy tablic przekraczały512MiB tmpfs; niezależne k teraz zwalniane sekwencyjnie bez zwiększenia cap.
+Brak kwalifikacji
+pełnych pól transmisji, kontroli rezonansów, skalowalnego assembly
+oraz kosztu przy zgodnym błędzie. M2.1–M2.4 niezaliczone w pełnym zakresie.
+Nie promować solvera anteny. EXP74–76 zakończyły ocenę negatywną decyzją; M3 rozpoczyna się zgodnie z regułą odrzucenia w PLAN, bez zaliczenia bramek promocji.
+
+## Powód i oczekiwany mechanizm
+
+FEMW.3:11,22mlnND2DOF,57,586%wyłącznieAIR. 25GBsamychfaktorówcuDSS przekracza
+16GBVRAM; profil dwóch iteracji pokazuje295GBUVMtransferów iP92%okna.
+Hipoteza: zostawić FEM dla dielektryków/feedu/bliskiego otoczenia, zastąpić
+zewnętrzne powietrze operatorem Maxwell BEM i skompresować oddziaływania dalekie.
+Gęsty blok obecnego ND2trace94200DOF to132GiB — sam denseBEM nie rozwiązuje problemu.
+WczesnyM1profil nie jest testem późnej bazy Arnoldiego ani dowodem speedupu BEM.
+
+## Historyczna kolejka oceny (zamknięta decyzją powyżej)
+
+1. Przypiąć rewizje i porównać rzeczywiste API/licencje/backends: Maxwell,
+   zespolone liczby, osobliwe kwadratury, RWG/BC i śladyH(curl), PEC/dielektryk,
+   CUDAmatvec vs samo assembly, FMM/H². Nie dodawać zależności do Palace przed wyborem.
+2. Wybrać niezależny oracle dla PECsphere oraz dielectricMie. Początkowy test
+   kilkuset/niskich tysięcy niewiadomych, limit60–120s po coldsetup; cacheJIT/build.
+   Najpierw FP64, znaki exp(±iωt), normalne, pasywność/energia i zbieżność.
+3. Prototyp rzeczywistego MaxwellBEM: dokładnynearfield plus kompresjafarfield,
+   CUDAapply na małym przykładzie z niezależną kontrolą. ScalarHelmholtz to smoke,
+   nie zaliczenieMaxwell. Densemałyoracle nie jest wersją dla anteny.
+4. Transparent ND2 coupling PASS w EXP35–37. Dielectric volume replay FAIL.
+   EXP44–47 rozstrzygają fineB4nearpotential: adaptive/independentcontrolPASS,
+   ale2,888/1,611%pól nie znika. EXP48–53: obie strony nearcontrolPASS,
+   reference mesh i volumeagreement FAIL. EXP54–58 wykonują niezależny FEM3:
+   analyticPASS i fixedpointPASS. EXP59–69: własna F3volume/referenceFAIL,
+   near/far kontrolowane na degree2, degree5controlsNOTRUN. Następny kandydat
+   mały MaxwellFMMvsdense/PMCHWT przedB5, bez ślepego denseB5/q/solve.
+   Następnie ryzyko rezonansów i koszt przy zgodnym błędzie.
+5. Decyzja integrate/reject; nie wdrażać wolniejszej lub niepoprawnej metody.
+   Zachować działający FEM i dokumentować czego nie pokrywa prototyp.
+
+## Wstępne źródła — jeszcze nie wybór implementacji
+
+- [Bempp-cl](https://github.com/bempp/bempp-cl), MIT: udokumentowane kernels
+  Maxwell i JIT/Numba/OpenCL. Kandydat na niezależny oracle/quadrature, nie dowód
+  natywnego CUDA ani działającego sprzężenia z MFEM. Zweryfikować konkretne
+  operator spaces/FMM. Rewizja i audyt przypięte w raporcie oracle; MFEM/porty nadal otwarte.
+- [H2Opus](https://github.com/ecrc/h2opus), BSD3: GPUhierarchical matvec/compression,
+  single/double i CUDA/MAGMA/KBLAS. Nie jest solveremMaxwell. Zespolony oscylacyjny
+  operator, strongadmissibility i poprawna kompresja wymagają audytu źródeł;
+  nie zakładać obsługi complex/TF32 na podstawie README. Audyt wykazał real-only typedef;
+  gotowej zespolonej integracji nie potwierdzono.
+- [NVIDIA oversubscription](https://developer.nvidia.com/blog/improving-gpu-memory-oversubscription-performance/):
+  wyniki zależą od wzorca dostępu i wskazówek pamięci. To uzasadnia późniejszy
+  kontrolowany test rezydencji faktorów; nie dowodzi zysku na5070Ti/Palace.
+
+## Późniejszy test FEM, po ocenie M2
+
+Osobny opt-in/probe polityki dostępu do dużych faktorów cuDSS, np. preferred
+CPU/mappedaccess z gorącymi buforami wVRAM. Celem ograniczenie pagefault/prefetch/
+eviction; pełnyczas może się pogorszyć przez PCIe i to oznacza REJECT.
+Nie zmniejsza to automatycznie RAM ani ilości danych. Następnie mniejszyworkspace,
+FP32storage/faktory z korektąFP64 i ewentualneTC w prawdziwym gorącymGEMM.
+Wszystko z K.3/K.4 i całkowitymczasem, nie tylko niższym sampledVRAM.

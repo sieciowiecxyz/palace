@@ -2,7 +2,7 @@
 
 2026-10-18. Archiwalny raport prób EXP13/14: same te próby nie zamykają
 M1.2/M1.3. Późniejszy kwalifikowany punkt W.3 zamknął M1 w zakresie
-[checkpointu](milestones/M1.md). Medium przestrzenne, materiały i mesh
+[checkpointu](milestones/optimization-M1.md). Medium przestrzenne, materiały i mesh
 pozostają bez zmian w opisanych eksperymentach.
 
 ## Wznowienie i kontrolowane parametry
@@ -85,7 +85,7 @@ medium run przeszedł bramki numeryczne przy tej samej geometrii i siatce;
 szczegóły są w [raporcie native complex coarse](native-complex-coarse.md).
 W chwili tych prób M1 pozostawał otwarty. Został później zamknięty po
 kwalifikacji pojedynczego punktu W.3 i audycie pamięci; patrz
-[checkpoint M1](milestones/M1.md). Profil pełnego pasma, enclosure i walidacja
+[checkpoint M1](milestones/optimization-M1.md). Profil pełnego pasma, enclosure i walidacja
 produkcyjna pozostają poza tym zakresem.
 
 Historyczne profile CPU/cuDSS, dokładnego real-block coarse solve i zwalniania

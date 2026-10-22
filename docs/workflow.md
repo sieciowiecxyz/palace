@@ -11,7 +11,7 @@ Wykonuj bezpieczne zadania w uzgodnionym zakresie bez potwierdzania każdego kro
 ## Zakończenie
 Sprawdź każde ID kryterium na zintegrowanym kodzie. Uruchom regresje i rzeczywiste smoke/E2E; następnie jako agent główny zleć Lunie High wykonanie skilla `docs-garden`, sprawdź jej wynik i przejrzyj diff przed commitem. Raport subagenta nie zastępuje walidacji. Przy ryzykownej zmianie użyj niezależnego przeglądu lub wykonaj osobny przegląd samodzielnie. Nie osłabiaj testów i wymagań dla uzyskania PASS. Zamknij etap, zaktualizuj PROGRESS.md, następnie aktywuj kolejny etap w jednej spójnej zmianie.
 
-Commituj i pushuj zweryfikowane fragmenty. Sprawdzaj prawdziwe wyniki Git i CI. Niedokończone zmiany zapisuj jawnie jako WIP wyłącznie na gałęzi roboczej; WIP nie zalicza kryteriów.
+Commituj zweryfikowane fragmenty lokalnie. Push i publikacja wymagają zgodności z aktualnym zakresem użytkownika; obecny plan PR-ów wyraźnie ich zabrania. Sprawdzaj prawdziwe wyniki Git i CI, jeśli CI zostało uruchomione. Niedokończone zmiany zapisuj jawnie jako WIP wyłącznie na gałęzi roboczej; WIP nie zalicza kryteriów.
 
 ## Praca równoległa
 Tylko koordynator edytuje PLAN, MILESTONES, INDEX i wspólne checkpointy. Wykonawcom przydzielaj cel, pliki lub worktree, zależności, kryteria i testy. Równoleglij niezależne zadania w aktywnym etapie, nie kroki zależne od siebie. Wspólne manifesty i lockfile przydziel jednej osobie. Zbierz wyniki wykonawców przed integracją, przetestuj całość ponownie i anuluj zbędne zadania. Domyślnie unikaj rekurencyjnego tworzenia subagentów i wspólnej edycji plików. Bez subagentów realizuj zadania kolejno.

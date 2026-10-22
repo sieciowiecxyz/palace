@@ -64,7 +64,7 @@ Pierwszy 20 mm run q6/10 nie zmieścił się w 180 s i pozostaje FAIL, chociaż 
 
 Regresje snapshotów pokrywają SHA/format/nieukończone referencje, inną fizykę i pokrycie regionów oraz NaN/duplikaty. Rzeczywiste tiny testy: snapshot FP64→FP32, historyczne porównanie disk→resident (storage disk jest wycofany), domyślny background worker i kontrolowane B×1,02 (oczekiwany FAIL jakości). Native pliki E/B single-rank little-endian są chronione sprawdzaniem źródłowego config i zależności. Szczegóły: [kontrola pól](field-validation.md).
 
-Historyczne referencje/porównania dużej anteny z disk basis są **REJECT** według wymogu RAM/VRAM. Wcześniejszy resident FP32 attempt zatrzymał guard. Resident FP64 EXP12 ukończył jeden punkt, lecz raw relative residual≈0,1253 i nie był zakwalifikowaną referencją dokładności. Korekty EXP13/14 zakończyły się limitem 1800 s; ich puste `field-comparison.json` oznaczają brak pomiaru błędu, nie przekroczenie progu. Późniejsza W.3 native complex coarse ma ostrzejszą resident FP64 referencję oraz niezależny 35-iteracyjny solve, który przeszedł zamrożone kontrole raw/S/pól/energii dla 3,50 GHz/P2. To nie jest fizyczna walidacja ani wynik całego pasma. Szczegóły: [natywny complex coarse](native-complex-coarse.md). M1 zakończony po aktualnym CUDA-only profilu i audycie alokacji; dowody i granice w [M1](milestones/M1.md). Nie promowano defaultu. Fazy mierzą logiczne managed allocations, nie fizyczną rezydencję. Zobacz też [audyt pamięci](memory-audit.md), [pomiar faz](memory-phases.md) i [korektę referencji](reference-correction.md).
+Historyczne referencje/porównania dużej anteny z disk basis są **REJECT** według wymogu RAM/VRAM. Wcześniejszy resident FP32 attempt zatrzymał guard. Resident FP64 EXP12 ukończył jeden punkt, lecz raw relative residual≈0,1253 i nie był zakwalifikowaną referencją dokładności. Korekty EXP13/14 zakończyły się limitem 1800 s; ich puste `field-comparison.json` oznaczają brak pomiaru błędu, nie przekroczenie progu. Późniejsza W.3 native complex coarse ma ostrzejszą resident FP64 referencję oraz niezależny 35-iteracyjny solve, który przeszedł zamrożone kontrole raw/S/pól/energii dla 3,50 GHz/P2. To nie jest fizyczna walidacja ani wynik całego pasma. Szczegóły: [natywny complex coarse](native-complex-coarse.md). M1 zakończony po aktualnym CUDA-only profilu i audycie alokacji; dowody i granice w [M1](milestones/optimization-M1.md). Nie promowano defaultu. Fazy mierzą logiczne managed allocations, nie fizyczną rezydencję. Zobacz też [audyt pamięci](memory-audit.md), [pomiar faz](memory-phases.md) i [korektę referencji](reference-correction.md).
 
 Opt-in profile CPU/cuDSS, real-block `ComplexCoarseSolve` i zwalniania finalnego solvera są w [profilach referencji](reference-profiles.md); eksperymentalny natywny complex FP64 coarse ma osobny [raport](native-complex-coarse.md). CPU tiny/fallback/native coarse tiny i TEM przeszły filtry. Full CPU oraz historyczny exact real-block full zatrzymały się OOM/host guardem; natywny W.3 full przeszedł kontrolę numeryczną dla jednego punktu, bez promocji defaultu. Nie jest to walidacja produkcyjna całej anteny.
 
@@ -156,7 +156,7 @@ obejmują wymaganie direct/CUDA, dodatnie markery per solve i profiler jako
 niekwalifikujący RF, capture markers, brak utraty zdarzeń i naturalny cleanup.
 ActualAPI CPU/CUDA relink currentnative PASS; prefetch jakościowo sprawdzony
 w tiny,3mediumcoaxshards/bothports i aktualnym W.3. [Wyniki/argv](basis-prefetch.md),
-[M4](milestones/M4.md) oceniony w EXP94; aktywny [M5](milestones/M5.md). Upstreamfullsuite i W.4/W.5 nadal NOT RUN.
+[M4](milestones/optimization-M4.md) oceniony w EXP94; aktywny [M5](milestones/M5.md). Upstreamfullsuite i W.4/W.5 nadal NOT RUN.
 
 ## M4 — reuse i kolejność pomiarów, EXP91–94
 
@@ -167,7 +167,7 @@ raw/S/VSWR/energy/power/wholefields; jedna para681,698→602,944s, nie M7median.
 measure1/measure2; requires --release-final-solver, dokładnie2LP/1f/rank1/fixedmesh,
 bez visualization/wave/Floquet. `--port-setup-reuse` liczy faktyczne setupy i CSR.
 `--partial-initial-fields` nie rozluźnia rygoru accuracyreference; źródło jest
-zweryfikowanym seedem, brakujący port jawnie zerowany. [Dowody](milestones/M4.md).
+zweryfikowanym seedem, brakujący port jawnie zerowany. [Dowody](milestones/optimization-M4.md).
 
 ## M5 hybrid — EXP95–96
 

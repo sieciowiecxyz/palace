@@ -1,6 +1,6 @@
 # M1 — właściciele alokacji i następny eksperyment
 
-Data: 2026-10-18. Status: historyczny audyt diagnostyczny; M1 został później zamknięty. Pamięć robocza kolejnych prób wyłącznie RAM/VRAM; zakaz dyskowego offloadu pozostaje bez wyjątków. Aktualny zakres i wnioski M1 opisuje [checkpoint](milestones/M1.md).
+Data: 2026-10-18. Status: historyczny audyt diagnostyczny; M1 został później zamknięty. Pamięć robocza kolejnych prób wyłącznie RAM/VRAM; zakaz dyskowego offloadu pozostaje bez wyjątków. Aktualny zakres i wnioski M1 opisuje [checkpoint](milestones/optimization-M1.md).
 
 ## Aktualny audyt resident native complex FP64 — EXP22
 
@@ -100,6 +100,6 @@ Rozszerzony parser zachowuje `peak_trigger_event` i jego stos. Dla historycznego
 
 Kolejność historycznego zmieszanego stdout solvera i stderr alokacji nie jest wiarygodnym zegarem faz: buforowanie pozostawiło ostatnią wydrukowaną iterację 140 przed alokacją diagnostyki wykonywanej po solve. Późniejszy run FP64 resident użył znaczników monotonicznych wprowadzonych przez `--memory-marks`; zmierzone fazy i ograniczenia interpretacji zapisano w [raporcie faz](memory-phases.md). Oddzielne stdout/stderr zachowują kompletne linie, ale końcowy `palace.log` konkatenowany stdout→stderr nie ma globalnej chronologii. Nie wyznaczać kolejności między strumieniami z tego pliku.
 
-Fazy wykazały największy logiczny peak managed podczas GMRES (54,74 GiB), a nie przy późniejszej diagnostyce pól. Jest to licznik alokacji managed, nie pomiar fizycznej rezydencji VRAM/RAM. Sam historyczny resident run FP64 nie rozstrzygał jakości anteny; późniejsza referencja i kwalifikowany solve W.3 są zebrane w [checkpoint M1](milestones/M1.md). Nie rozszerzają one wyniku na całe pasmo ani enclosure. Szczegóły historycznego wyniku, stopping check, pól i ograniczeń są w [raporcie faz](memory-phases.md); nie sumować peaków z różnych faz ani nie dodawać osobno cuDSS do managed peak.
+Fazy wykazały największy logiczny peak managed podczas GMRES (54,74 GiB), a nie przy późniejszej diagnostyce pól. Jest to licznik alokacji managed, nie pomiar fizycznej rezydencji VRAM/RAM. Sam historyczny resident run FP64 nie rozstrzygał jakości anteny; późniejsza referencja i kwalifikowany solve W.3 są zebrane w [checkpoint M1](milestones/optimization-M1.md). Nie rozszerzają one wyniku na całe pasmo ani enclosure. Szczegóły historycznego wyniku, stopping check, pól i ograniczeń są w [raporcie faz](memory-phases.md); nie sumować peaków z różnych faz ani nie dodawać osobno cuDSS do managed peak.
 
 Późniejszy Q-pool przeszedł kontrolny Maxwell/TEM, ale na coax-tiny zwiększył logical UVM peak o 5,8% i nie zmniejszył sampled VRAM; [wyniki](ceed-qpool.md). Nie promować tej wersji. Osobne zmniejszenie seedu HYPRE dało 3,75 GiB mniej sampled VRAM procesu na coax-tiny, bez istotnej zmiany portów/energii, a known-TEM L2 pozostał poniżej 1%; [dowody](hypre-pool.md).

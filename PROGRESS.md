@@ -1,13 +1,16 @@
-## Bieżący checkpoint — plan lokalnych PR-ów (2026-10-22)
+## Bieżący checkpoint — lokalny pilot PR ukończony (2026-10-22)
 
-Zastąpiono PLAN/MILESTONES minimalistycznymi etapami M0–M4. Tryb normalny,
-Active none; przygotowano dokumentację, nie rozpoczęto wykonania etapów.
-Nie pobierano upstream, nie tworzono branchy PR ani niczego nie publikowano.
-Następny krok po rozpoczęciu realizacji: M0 — aktualny upstream i duplikaty.
-
-Badania optymalizacji zakończone: [audyt](docs/milestones/final-audit.md).
-Dawne kryteria: [archiwum](docs/milestones/optimization-contract.md).
-Poniższe checkpointy są historyczną chronologią, nie aktualnym statusem.
+M0–M4 zakończone w jawnym zakresie. Branch `pr/driven-release-workspace`, commit
+`8b5d4a1f87e7ceb5d4fe5fcacb7849aa17dc54b7`, baza main29ad351f9, czysty worktree.
+Tylko3pliki: final uniform solve workspace, regresja metadata, changelog.
+Trzy pary: peak RSS−15,82%, czas+1,34%; brak speedup/VRAM claim.
+Standardowe testy CPU/MPI2/CUDA PASS według [M2](docs/milestones/M2.md).
+Strict restart FAIL także baseline-vs-baseline; AMR ma zmienne siatki;
+pełne CI/MFEM4.10 niezakwalifikowane. Niczego nie pushowano, nie utworzono PR/forka
+ani nie kontaktowano maintainerów. Manifest, patch, opis i logi w artifacts/upstream-pr.
+Docs-garden i review wykonane; runtime/builder zatrzymane, cache zachowany.
+[Instrukcja sprawdzenia i ręcznej publikacji](docs/upstream-prs.md).
+Kolejne kandydaty pozostają w PLAN jako kolejka, bez aktywacji nowych badań.
 
 ## Historia zakończonych badań M0–M7
 

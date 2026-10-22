@@ -102,7 +102,7 @@ Defer zachowuje tylko pierwszy wektor E w RAM/VRAM i wykonuje pomiary obu
 portów po zwolnieniu solvera. Wymaga dokładnie2LP/1f/rank1/fixedmesh/restart1,
 bez wizualizacji/wave/Floquet. Snapshoty kontrolne nadal normalnymi plikami.
 Każdy run zapisuje audyty, rawresidual i manifest; pełne argv w PROGRESS EXP94.
-To opcje runtime bez przebudowy; nie globalny default. [Zakres](milestones/M4.md).
+To opcje runtime bez przebudowy; nie globalny default. [Zakres](milestones/optimization-M4.md).
 
 ## Badawczy cuDSS hybrid memory — M5
 

@@ -1,7 +1,7 @@
 # Native complex coarse — M1 / EXP18–19
 
 2026-10-18. Opcjonalna ścieżka FP64 dla jednego ranka CUDA.
-**W.3 przeszedł kontrolę numeryczną. M1 zamknięty później po EXP22; [dowody](milestones/M1.md).**
+**W.3 przeszedł kontrolę numeryczną. M1 zamknięty później po EXP22; [dowody](milestones/optimization-M1.md).**
 Nie zmieniono defaultów, siatki medium, materiałów ani portów.
 
 ## Co zmienia kod

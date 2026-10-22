@@ -6,22 +6,40 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
 
 Bieżące M0–M4 dotyczą lokalnego przygotowania PR-a. Checkpointy M0–M7 poniżej opisują zakończone badania optymalizacji, według dawnego kontraktu.
 
+- [Lokalny pakiet PR](upstream-prs.md)
+  - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
+  - Opis: Zakres zmian, pomiary, artefakty i niewykonane polecenia push/PR.
+- [Przygotowanie PR: M0](milestones/M0.md)
+  - Czytaj gdy: wykonujesz etap M0 obecnego planu lokalnych PR-ów
+  - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
+- [Przygotowanie PR: M1](milestones/M1.md)
+  - Czytaj gdy: wykonujesz etap M1 obecnego planu lokalnych PR-ów
+  - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
+- [Przygotowanie PR: M2](milestones/M2.md)
+  - Czytaj gdy: wykonujesz etap M2 obecnego planu lokalnych PR-ów
+  - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
+- [Przygotowanie PR: M3](milestones/M3.md)
+  - Czytaj gdy: wykonujesz etap M3 obecnego planu lokalnych PR-ów
+  - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
+- [Przygotowanie PR: M4](milestones/M4.md)
+  - Czytaj gdy: wykonujesz etap M4 obecnego planu lokalnych PR-ów
+  - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Archiwum: kontrakt optymalizacji](milestones/optimization-contract.md)
   - Czytaj gdy: sprawdzasz kryteria i tolerancje zakończonych badań M0–M7
   - Opis: Historyczne bramki zachowane po zastąpieniu głównego planu przygotowaniem PR-ów.
-- [M0: dowody zamknięcia](milestones/M0.md)
+- [M0: dowody zamknięcia](milestones/optimization-M0.md)
   - Czytaj gdy: weryfikujesz zakończenie researchu i migracji
   - Opis: Powiązanie kryteriów M0 z raportami oraz granice dowodów.
-- [M1: dowody zamknięcia](milestones/M1.md)
+- [M1: dowody zamknięcia](milestones/optimization-M1.md)
   - Czytaj gdy: wznawiasz bieżącą kwalifikację referencji i profilowanie
   - Opis: Bramki M1, aktualna referencja/profil/pamięć i granice kwalifikacji jednego fixture.
-- [M2: Maxwell FEM–BEM/MoM](milestones/M2.md)
+- [M2: Maxwell FEM–BEM/MoM](milestones/optimization-M2.md)
   - Czytaj gdy: planujesz bieżący prototyp zmniejszenia domeny powietrza
   - Opis: Hipoteza i historia walidacji; ocena zamknięta negatywną decyzją, bramki promocji niezaliczone.
 - [M2: decyzja po ocenie](milestones/M2-decision.md)
   - Czytaj gdy: wznawiasz pracę i sprawdzasz powód przejścia do M3
   - Opis: REJECT obecnej integracji; niezaliczone pola/residual i brak kwalifikowanego speedupu.
-- [M3: GMRES i pamięć](milestones/M3.md)
+- [M3: GMRES i pamięć](milestones/optimization-M3.md)
   - Czytaj gdy: sprawdzasz zamknięcie oceny GMRES i pamięci
   - Opis: FP32 storage/FP64 arithmetic, W.1–W.3 i ocena prefetchu; globalne defaulty bez zmian.
 - [M3: bezpośrednia baza FP32](mixed-basis.md)
@@ -30,7 +48,7 @@ Bieżące M0–M4 dotyczą lokalnego przygotowania PR-a. Checkpointy M0–M7 pon
 - [M3: prefetch i measured UVM](basis-prefetch.md)
   - Czytaj gdy: oceniasz prefetch, pomiar transferów albo zakończenie M3
   - Opis: EXP86–90, mała korzyść ortogonalizacji, strict selective profiling, aktualne W.2/W.3 PASS; bez globalnej promocji czasu.
-- [M4: reuse setup](milestones/M4.md)
+- [M4: reuse setup](milestones/optimization-M4.md)
   - Czytaj gdy: sprawdzasz zamknięcie audytu setup i pamięci między portami
   - Opis: EXP94 pełna para obu portów PASS; jedna faktoryzacja, pomiary po zwolnieniu solvera, zysk czasu i pamięci z jawnym zakresem.
 - [M5: preconditioner](milestones/M5.md)
