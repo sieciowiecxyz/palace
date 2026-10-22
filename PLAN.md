@@ -129,13 +129,13 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.2–W.5 PASS (W.3/P2 w danych nowych par3.500GHz/oba porty), W.5 15freq/oba porty/210fieldrows: maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP215–220 trzy nowe pary3.500GHz K PASS: mediany745.458→747.733s (+0.305%), mediana sparowanego wzrostu+0.476%, peakcgroupmedian−23.597%. Nie wykazano przyspieszenia całości lub fizycznej redukcji peak VRAM; zysk pamięci hosta/logicznej reprezentacji jest zmierzony. Szczegóły docs/milestones/paired-medians.md. Antyrezonans osobno PASS, SIGTERMhistoryczny zachowany. Następna nowageometria(M7.5), pakiet(M7.3), pełny audyt(M7.4); globalne defaulty bez promocji.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.2–W.5 PASS (W.3/P2 w danych nowych par3.500GHz/oba porty), W.5 15freq/oba porty/210fieldrows: maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP215–220 trzy nowe pary3.500GHz K PASS: mediany745.458→747.733s (+0.305%), mediana sparowanego wzrostu+0.476%, peakcgroupmedian−23.597%. Nie wykazano przyspieszenia całości lub fizycznej redukcji peak VRAM; zysk pamięci hosta/logicznej reprezentacji jest zmierzony. Szczegóły docs/milestones/paired-medians.md. Antyrezonans osobno PASS, SIGTERMhistoryczny zachowany. M7.5 nowa geometria directora+2mm także K PASS: jedna para764.008→755.874s/cgroup61.139→46.601GB (−23.779% RAM), docs/milestones/geometry-generalization.md. Następny pakiet(M7.3), pełny audyt(M7.4); globalne defaulty bez promocji.
 
 - [x] Kwalifikacja częstotliwości/portów W.2–W.5 i trzy pełne pary bez profilera, EXP215–220. Czasy3.500GHz dotyczą obu portów; P2 ma osobno sprawdzone pola/raw.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.
 - [ ] Pakiet z manifestem, cache, jawnymi opcjami i blokadą niewspieranych kombinacji; odtworzyć przykład z pakietu.
 
-- [ ] M7.5 — co najmniej jedna istotnie zmodyfikowana geometria anteny (np. reflektor/director), nowy mesh/reference i te same K; brak geometry-specific hardcode. Raportować zmianę fizyki osobno od błędu przyspieszonego solvera.
+- [x] M7.5 — director/nośnik+2mm, nowa zahashowana siatka/własna referencja; pełne K i odrzucanie starych pól/seedów PASS, nowe CSR/faktory. Zysk RAM23.779%, jedna para bez uniwersalnej promocji; docs/milestones/geometry-generalization.md.
 
 ## Oszczędzanie czasu i compute
 

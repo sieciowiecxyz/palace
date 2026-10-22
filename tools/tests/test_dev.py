@@ -835,6 +835,13 @@ class ToolRegressionTests(unittest.TestCase):
                 dev.verified_field_reference(root, changed, info, build)
             with self.assertRaisesRegex(ValueError, 'different physics'):
                 dev.verified_initial_fields(root, changed, info, build)
+            for fn in [dev.verified_field_reference, dev.verified_initial_fields]:
+                with self.assertRaisesRegex(ValueError, 'different physics'):
+                    fn(root, config, dict(info, mesh_sha256='new geometry hash'), build)
+                changed = json.loads(json.dumps(config))
+                changed['Boundaries']['LumpedPort'][0]['R'] = 75.
+                with self.assertRaisesRegex(ValueError, 'different physics'):
+                    fn(root, changed, info, build)
             dev.write(root/'result.json', {'complete': False})
             with self.assertRaisesRegex(ValueError, 'incomplete'):
                 dev.verified_field_reference(root, config, info, build)
@@ -888,6 +895,28 @@ class ToolRegressionTests(unittest.TestCase):
             directory, info, config = dev.fixture(name)
             self.assertEqual(config['Model']['Mesh'], info['mesh'])
             self.assertTrue(all((directory / part).stat().st_size < 100_000_000 for part in info['archive_parts']))
+
+    def test_custom_fixture_keeps_family_medium_paths_and_checksums(self):
+        directory, info, config = dev.fixture('coax-tiny')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for part in info['archive_parts']:
+                (root/part).parent.mkdir(parents=True, exist_ok=True)
+                (root/part).write_bytes((directory/part).read_bytes())
+            (root/'config.json').write_bytes((directory/'config.json').read_bytes())
+            dev.write(root/'fixture.json', info)
+            self.assertEqual(dev.fixture('coax-tiny', root)[1], info)
+            mesh = dev.prepare('coax-tiny', root)
+            self.assertEqual(dev.sha(mesh), info['mesh_sha256'])
+            with self.assertRaisesRegex(ValueError, 'family'): dev.fixture('tshaped-medium', root)
+            changed = dict(info, mesh='different.msh')
+            dev.write(root/'fixture.json', changed)
+            with self.assertRaisesRegex(ValueError, 'mesh path'): dev.fixture('coax-tiny', root)
+            changed = json.loads(json.dumps(info)); changed['medium']['Tol'] = .1
+            dev.write(root/'fixture.json', changed)
+            with self.assertRaisesRegex(ValueError, 'frozen medium'): dev.fixture('coax-tiny', root)
+            dev.write(root/'fixture.json', info); mesh.write_text('corrupt')
+            with self.assertRaisesRegex(ValueError, 'Existing mesh'): dev.prepare('coax-tiny', root)
 
     def test_changed_archive_and_escaping_paths_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

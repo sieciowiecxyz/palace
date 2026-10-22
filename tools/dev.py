@@ -169,9 +169,14 @@ def verified_build():
     return manifest
 
 
-def fixture(name):
-    directory = ROOT / 'examples' / name
+def fixture(name, directory=None):
+    custom = directory is not None
+    directory = Path(directory).resolve() if custom else ROOT / 'examples' / name
     info = read(directory / 'fixture.json')
+    if custom and info.get('name') != name:
+        raise ValueError('Custom fixture must declare its case family')
+    if custom and info.get('medium') != read(ROOT/'examples'/name/'fixture.json')['medium']:
+        raise ValueError('Custom fixture must keep the frozen medium profile')
     for relative in [info['mesh'], *info['archive_parts']]:
         if not (directory / relative).resolve().is_relative_to(directory.resolve()):
             raise ValueError('Fixture path escapes its directory')
@@ -185,6 +190,8 @@ def fixture(name):
     config = read(directory / 'config.json')
     if sha(directory / 'config.json') != info['config_sha256']:
         raise ValueError('Fixture config differs from its contract')
+    if config['Model']['Mesh'] != info['mesh']:
+        raise ValueError('Fixture mesh path differs from its configuration')
     expected = info['medium']
     linear = config['Solver']['Linear']
     if any(linear[k] != expected[k] for k in ['Tol', 'MaxIts', 'MaxSize']):
@@ -194,8 +201,8 @@ def fixture(name):
     return directory, info, config
 
 
-def prepare(name):
-    directory, info, _ = fixture(name)
+def prepare(name, directory=None):
+    directory, info, _ = fixture(name, directory)
     mesh = directory / info['mesh']
     if mesh.exists():
         if sha(mesh) != info['mesh_sha256']:
@@ -922,7 +929,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None, native_coarse_corrections=None):
+        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None, native_coarse_corrections=None, fixture_directory=None):
     invocation_started=time.monotonic()
     sweep_predictor=sweep_predictor_mode(sweep_predictor)
     if bool(initial_history)!=(history_frequencies is not None):
@@ -977,7 +984,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     require_host_memory()
     manifest = verified_build()
     qpool = verified_qpool(manifest) if ceed_qpool else None
-    directory, info, config = fixture(name)
+    directory, info, config = fixture(name, fixture_directory)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
                                bool(initial_fields), linear_tol, cpu_reference, complex_coarse,
                                native_complex_coarse, coax_sweep, coax_frequency)
@@ -1012,7 +1019,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         initial = (reference if Path(initial_fields).resolve() == reference else
                    (verified_partial_initial_fields if partial_initial_fields else verified_initial_fields)(initial_fields, config, info, manifest))
     history = verified_history_source(initial_history,config,info,manifest,history_frequencies) if initial_history else None
-    mesh = prepare(name)
+    mesh = prepare(name, fixture_directory)
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     (output / info['mesh']).parent.mkdir(parents=True, exist_ok=True)
@@ -1405,7 +1412,9 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     b = sub.add_parser('build'); b.add_argument('--jobs', type=int, default=8)
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
+    p.add_argument('--fixture-dir', type=Path, help='Explicit checksum-verified fixture directory of the selected case family')
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
+    r.add_argument('--fixture-dir', type=Path, help='Explicit checksum-verified geometry variant; same case family and medium checks')
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
@@ -1459,7 +1468,7 @@ def main():
     if args.action == 'build':
         if not 1 <= args.jobs <= 24: parser.error('--jobs must be 1..24')
         build(args.jobs)
-    elif args.action == 'prepare': print(prepare(args.case))
+    elif args.action == 'prepare': print(prepare(args.case, args.fixture_dir))
     elif args.action == 'run':
         if not 1 <= args.seconds <= 1800: parser.error('--seconds must be 1..1800')
         if args.background:
@@ -1492,7 +1501,7 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies,args.native_coarse_corrections)
+            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies,args.native_coarse_corrections,args.fixture_dir)
     elif args.action == 'package': package(args.tag)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),

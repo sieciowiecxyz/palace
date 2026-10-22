@@ -377,3 +377,16 @@ peakcgroupmedian−23.597%; tło2366–2373MiB. Prereg, metody, fazy i granice:
 [raport median](milestones/paired-medians.md). Native/dependencies bez rebuilda;
 brak dowodu speedupu całości lub redukcji fizycznego peakVRAM. Nowageometria/
 pakiet i pełny audyt nadal otwarte.
+
+## M7.5 — geometria i referencje
+
+184Python/8shell PASS. `test_geometry_variant.py` sprawdza Tet10 affine
+Jacobian, odtworzenie wielomianu detJ, zgięty element z odwróconym wnętrzem
+oraz zakres deformacji/ochrony. `test_dev.py` pokrywa customfixture family/
+frozenmedium/path/config/archive/meshchecks i odrzucanie starych pól/seedów
+po zmianie mesh/materials/terminacji. Rzeczywisty `prepare/run --fixture-dir`
+wykonany dla nowej anteny; wszystkie1601320curvedtetboundsPASS.
+EXP221–222 pełna para3.500GHz/oba porty na tej nowej siatce K PASS,
+14regionalfieldrows, noweCSR/faktory. ZyskRAM23.779%, czas−1.065% to jedna
+para. Prereg, wyniki i zakres: [generalizacja](milestones/geometry-generalization.md).
+Pakiet/M7.3 i pełny audyt/M7.4 pozostają otwarte.

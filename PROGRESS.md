@@ -1,3 +1,14 @@
+## Bieżący checkpoint — M7.5 PASS / następny M7.3
+
+EXP221–222 nowa geometria directora+2mm/3.500GHz/bothports/medium i pełneK
+PASS. FreshFP64reference764.008s/61.139GBcgroup, fixed3candidate755.874s/
+46.601GB (RAM−23.779%, czas−1.065%, tylkojednapara). NativeA6 bezrebuilda.
+NowameshSHA c66c6f55…; starefieldref/seedrejected i noweCSR/faktory sprawdzone.
+Audyt1601320curvedtets/37996protectednodesPASS; radom/feed/PCB/reflektor
+bez zmian. Raport docs/milestones/geometry-generalization.md. Następny M7.3
+odtwarzalny pakiet z pinneddeps i boundedexample; potem M7.4pełnyaudyt.
+Goalaktywny/defaultybezpromocji. Historycznecheckpointyponiżej sąchronologią.
+
 # Postępy optymalizacji
 
 Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176: directWMMA W.1FAIL/REJECT, not RFpromotion). [PLAN](PLAN.md), [MILESTONES](MILESTONES.md), [M7](docs/milestones/M7.md).
@@ -4321,3 +4332,52 @@ explicit compact Pareto table added with local rental0USD/energyunmeasured,
 logical allocations versus physicalVRAM limits retained. Rootdiffreview,
 docschecker anddiffcheck PASS. Prior179Python/8shell andactual3pairCLI
 PASS; nativeA6/defaults unchanged. Next prepare M7.5newgeometry.
+
+## EXP221–222 prereg — M7.5 geometry generalization
+Previousgoalturn classifiedprogress: M7.2statistics/reportcommitteda42568f,
+all3pairedKPASS/nativeunchanged/cleancheckpoint. NextM7.5preserved.
+Newgeneric--fixture-dir verifies family/frozenmedium/archive/config/mesh,
+keepsantennafeedregion3; no native/defaultchanges. ExperimentalNumPy
+compactzdeformation, quadraticTet10detBernsteinpositiveboundauditsallcells,
+notcorner-onlytest.184Python/8shellPASS. Originalsourceantenyreadonly.
+TwoPREPONLYmeshesrad70/rad57alsomovedradome, retainednotGPUrun. Final
+rad50/55,z2/11/14/30,shift2mm movesdirector+carrier/spacers/rods only;
+radome/mainPCB/feed/reflector/absorber/ports unchanged.147607nodeschanged,
+1601320curvedtetboundspositive/originalandnew; protected37996unchanged.
+Finalfixtureartifacts/m7-director-gap-plus2-geometry-20261022,
+SHA c66c6f55c8e28b3efe87bdc4eac373e65d69b71cb016454a2c92c7d4dbfaf8fb.
+NativeverifiedA6unchanged. Actualoldreference+seed rejectednewmeshidentity;
+stale-data-check.jsonstored, material/BC mismatch controlsPASS.
+EXP221prereg: newcoldFP64reference,exact3.500GHz/2ports/medium/RIGHT/K64/
+Tol1e-6/fresh2/defer/energy/releases/snapshots/1800s/60GiB/no swap/hostguard.
+Outputartifacts/m7-director-gap-plus2-reference-20261022; EXP222candidate
+onlyafterrootreferenceaudit. No seeds/PROM/TF/profiler/cloud/defaultchanges.
+Candidatewillbesamefixed3policy/ownnewref;frozenKunchanged. Notantenna
+retuningorphysicalvalidation;onepairnotmedian. Detailsgeometry-generalization.md.
+EXP221rootreferencePASS:3.500GHz/2ports/newmeshSHA c66c6f55…,
+764.0080178s/61139226624B,44/45iter/originalraw<=8.0418e-7.
+Actualmesh/config/native/inventory/finiteRFenergy/fresh2setup audited.
+CoarseCSR old5d0411e5/3139379a→new4afd6442/94fab340, bothnewRHSsame
+newmatrix, no stalefactorreuse. root-reference-check.jsonstored.
+EXP222prereg: ownnewreference, exactsameconfig/native/3.500GHz/bothports/
+medium/RIGHT/K64/Tol1e-6/directFP32storage/scaledFP32LU+3fixedFP64IR/
+reuse/defer/energy/releases/snapshots/1800s/60GiB/no swap/hostguard.
+No seeds/PROM/TF/profiler/defaultchanges/cloud. FullfrozenKafterrun.
+
+EXP222rootfullKPASS: exactnewmesh/currentA6/3.500GHz/2ports, maxΔS3.5071e-8/
+ΔVSWR5.5569e-8/relativeenergy1.0187e-7/power6.6581e-9,14fieldrows/maxE
+6.3829e-7/B5.2650e-8. C44/45iter/raw<=9.4438e-7,91coarseapply/count3/
+maxcoarse6.8592e-5. Rfresh2setup/Cbuild1+reuse1 confirmed. Receipt
+artifacts/m7-director-gap-plus2-fixed3-qualification-20261022.json.
+ActualcostscopeJSON: managed57.398→42.172GB/cudssalloc25.284→13.481GB,
+globalNVML15821/15819MiBincludesdesktop; no physicalVRAMreductionproof.
+Onepairtime764.008→755.874s/RAM61.139→46.601GB; no median/globalclaim.
+Threepreparations+twojobsordinaryartifacts3.789GB, no diskhotworkspace.
+OriginalFP64vsnewFP64VSWR3.5GHz1.577/1.668→1.401/1.485isgeometricphysics,
+notprecisionerror/newproductionbaseline. M7.5PASS;nextM7.3package/M7.4audit.
+M7.5checkpoint: sameLuna docs-garden PASS/no edits/material inconsistencies;
+rootreviewcode+docs/actualreceipts,184Python/8shell/docschecker/diffcheckPASS.
+NativeverifiedA6/no dependencies/cacheflush/rebuild/defaultchange. M7.5
+completewithinonechangedgeometryscope;M7.3packageandM7.4auditopen.
+No simulationactive. Nextinspectpackage/reproduction/checkcleanupdeadline
+without recompilingorlargeGPUjobs; goalactive.
