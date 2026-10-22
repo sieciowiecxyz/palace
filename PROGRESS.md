@@ -4522,3 +4522,120 @@ NativeA6/cache bez zmian, bez kosztów cloud. Pełny audyt M7.4 nadal otwarty.
 Retry checkpoint:193Python/8shell/docs checker/diffcheck PASS; ta sama
 Luna wykonała docs-garden bez zmian, root przejrzał diff i dowody.
 M7.4 pełny audyt pozostaje otwarty; brak aktywnych symulacji po tej próbie.
+
+## M7.4 ROI/phase audit — EXP237 prereg
+Previous goal turn made progress: commit4e86a57, R4 live examples and lifecycle
+plus193Python/8shell passed. Full audit found K4 explicit slot-region/phase
+assessment weaker than whole material-domain complex L2 evidence.
+Add CPU saved-field replay linked to unchanged actual Palace mesh loader
+(Load/nondimensionalize/Partition/RefineMesh); same ND2/RT1 and snapshot DOF
+headers, no solve/native rebuild. First cached helper, then tiny mapping
+control against native complex norm. Antenna ROIs fixed BEFORE inspection:
+PTFE3, entire PCB2, four x/y-sign PCB sectors at radius>=6mm (includes slot
+neighborhoods; not pointwise slot-tip convergence). Positive Duffy product
+rules levels4/6; complex L2<=1%, reference-weighted local phase RMS<=asin(.01)
+=0.572968deg; undefined phase reference-energy fraction<=1e-6. No phase fit.
+Require exact same native/config/mesh/reference-byte binding, original K;
+for tiny/global PCB/feed replay verify agreement with native norm, not just
+DOF counts. CPU4threads/12GiB/no swap/180s each; read stored results once,
+no hot SSD workspace. New helper/source/input/outputs hashed. If mapping
+control fails, no antenna qualification or goal completion claim.
+
+EXP237 mapping control PASS: positive q4/q6 complex L2 matches native region1
+within3.582e-8 relative; exact same DOF/preprocessing, phase assessed without
+fitting.43.529s CPU. Cached helper compilation initially lacked SLEPC enum
+macro; added same default PALACE_WITH_SLEPC, native solver unchanged.
+Next one 3.500GHz antenna replay,180s cap, no solve.
+
+EXP238 offline antennaROI timeout180.8s/255/noOOM preserved; no fields,FAIL.
+Optimized only evaluator coefficient/orientation extraction once per cell and
+physical VShape once per point; actualnative unchanged. EXP239 tiny15.821s
+vs43.529s, all8norm/phase metrics within1e-12 absolute; mapping controlPASS.
+Next EXP240 antennaROI same180s cap.
+
+EXP240 CPU timeout180.5s/noOOM afterE/P1/q4; preservedFAIL. Added fixed
+referencebasis tables and physical ND/RT Piola mapping. EXP241tiny9.495s;
+allnorm/phase metrics match originalMFEM evaluator within1e-12 absolute.
+No native/operator/precision/gate changes; next EXP242 antenna same180scap.
+
+EXP242 remainsFAIL180.299s/noOOM; completedE/P1q4+q6 andB/P1q4
+beforedeadline. Three whole-replay limits motivate different scheduling:
+checkpoint perquadrature and split by(port,field), same ROIs/q4/q6/norms.
+No narrower quality region or relaxed threshold. Four bounded chunks required
+for coverage; failed earlier runs never promoted. EXP243–246 readyafter
+helper-only cachedbuild; no new FEMsolve or native change.
+
+EXP243–246 four CPU chunks complete141.1/140.3/141.1/145.6s; root48rows
+coverage/thresholds PASS, maxL2=4.0782561e-7, phaseRMS=1.0513844e-5deg,
+undefinedphase0. PCB/feed norm vsnative agreeswithin9.954e-8 relative.
+To coverremainingW5 without15mesh reloads, batch5 same-normalizedphysics
+pairs inoneCPUprocess; mandatory q.summarize guards exact mesh/build/config
+exceptfrequency. Sameperfreq/port/q/ROI gates, no reducedaccuracy/regions.
+Three sequential CPUbatches cap900s each,12GiB/no swap/4CPU, no newFEMsolve.
+EXP247–249 prereg coversall15f. Readonly stored fields, no hotdiskworkspace.
+
+Pre-launch resourcecheck24CPU/76.114GB MemAvailable. EXP247–249 mayrun
+3independentCPUbatches concurrently (each4CPU/12GiB/noswap/900s; total12
+CPU/36GiB), sameLuna onlybabysitting, noGPUcompute. This changes scheduling
+only and is not a timed solver benchmark. Helper/source frozen during jobs.
+
+EXP247–249 all900s timeout/noOOM/FAIL retained. Checkpointselectionpolicy:
+accept only independently complete48-row offlinefrequency records after exact
+coverage/gates and nativePCB/feed check; originalRF solves MUSTbecomplete.
+Never callfailedbatchPASS oracceptpartialfrequency; this avoids rerunning
+completepostprocessing, not promotionofincompleteRF. Rootverified6complete
+frequencycheckpoints;9remain. New completefrequency900s jobs, max3parallel;
+EXP250–258 ready before execution. Full15freqqualification stillpending.
+
+EXP250–259 dispatch10readycommands:9remainingW5singlef plusnewgeometry
+localphase/ROI. Launcher3CPUjobsatmost,900s each, stopsnextwaveonFAIL;
+SIGTERMhandleraddedtohelperCLI for cleanup.196PythonPASS. Sourcehelper
+C++/native unchanged; ROOT still handles allnumericaldecisions.
+
+W5localfields finalrootaudit PASS: all15frequency/2port/E+B/6ROI/q4+q6
+720rows; fresh all15 originalRF requalification PASS. NativePCB/feed norm
+agreement<1e-4 relative, thresholds unchanged, checkpoints parentFAILkept.
+Artifacts m7-final-W5-local-fields-phase-20261022.json and
+m7-final-W5-reference-binding-current-20261022.json. Changedgeometryoffline
+lastjobpending; fullauditnotcloseduntilthatandfinalregressions/docsgarden.
+
+EXP250–259 all10complete/noOOM; rootvalidated newgeometry48rowsPASS,
+maxL2=6.382824e-7/phase1.642138e-5deg/nativeagreement1.134e-7relative.
+Antiresonance currentRF recheckPASS; rigorous discrete phaseRMSupperbound
+from complexL2 <=8.079e-5deg. AllW5/native/fields/phase nowcomplete.
+Offline artifacts892727B; checkpointwriteupperbound5923264B excludingnormal
+compiler cache; elapsed-processsum7924.609s(notwalltime). NoFEM/GPUsolve
+inreplay.197PythonPASS. Futurehelper rejects knownbad5freqbatch/whole180s
+antenna before work and avoidsduplicatequalifier scans. Next finalbundle
+smallliveverification, docs-garden/rootreview/commit; nofullantennarerun.
+
+EXP260–263 finalbundle actualimage native/nooverlay PASS; root K/TEM/volumeL2
+/raw/referencebytes/cleanup checked. Memory18.498s/FP6418.408s aretinychecks,
+notantenna performance claim.197PythonPASS inrepo AND separatebundle from/tmp;
+8shell/docschecker/diffcheckPASS; no activecontainers. Finalauditmatrix in
+docs/milestones/final-audit.md, scopequalificationledger staged inartifacts.
+Remainingonlydocs-garden/rootdiffreview, closingstate+docpayload inventory
+update(localdocs/evidenceonly), commit and goal completionaudit.
+
+Docs-garden identified stale INDEX and implicitROIaggregation documentation.
+RootfixedINDEX, added explicit assessCLI usingalready-testedassessfunction,
+frequency-duplicateguard andCLIregression. ActualassessCLI720+48PASS.
+Runtime/reproduce/native/input/referencebytesunchanged; finalbundleupdated
+onlyMD andanalysis-onlyCLI/test; rerununitcoverage. Nativebuildnotneeded.
+
+## M7.4 CLOSED — końcowy checkpoint2026-10-22
+Poprzedni turngoal: postęp (4e86a57/R4); obecny audyt dołożył pełne720W5
+ROI/phase i48changedgeometry, freshRF/native/referencebinding/W2medium
+orazantiresonance PASS. NativeA6 i medium bez zmian.197→198Python PASS
+wrepo i niezależnym finalbundle z/tmp;8shell/docschecker/diffcheck PASS.
+Ta sama Luna wykonała2przeglądy docs-garden; realneuwagi INDEX i jawnego
+assessCLI usunięte, finalreview PASS. Root potwierdził dowody i przejrzał diff.
+Rekomendacja: explicit directFP32storage/FP64arith, scaledcomplexFP32LU+3IR,
+reuse/defer. Mediana60.684→46.364GB cgroup (−23.5966%);745.458→747.733s
+(+0.305%, brak speedupu). Physical peakVRAM/TCproduction nieudowodnione.
+M2/FDTD/AMS/hybrid/WMMA/PROM negative assessments zachowane, niepromowane.
+Raport: docs/milestones/final-audit.md; finalpakiet:
+artifacts/m7-sm120-bundle-final-20261022. QUALIFICATION.json zakresowy;
+globalny native numerically_validated=false bez zmiany. Bez cloud/swap/SSD
+basis, zwykłeI/O zmierzone wraporcie. Nie ma activepomiarów/nextmilestone;
+Active:none. Zakończenie celu po ostatnim sprawdzeniu inwentarza i commicie.

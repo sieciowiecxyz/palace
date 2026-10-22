@@ -74,4 +74,6 @@ Nowy eksport ma `numerically_validated=false`. Historyczna kwalifikacja dotyczy 
 - M5 `--ams-cycles`: opt-in realshiftedPC z istniejącym HypreAms/GMG, stały
   AMS tol0, audyt HYPREdevicepolicy/operatorów. FullA niezmienione; profilepokazuje
   CUDAkernelswcoarse, ale W3deadlineFAIL. docs/ams-assessment.md. ScaledcomplexFP32
-  z FP64correction jest osobnym niezrealizowanym planem, nie starym realnym shim.
+  z FP64correction wdrożono osobno w mixedcoarse.hpp/complexcudss.cpp; M7
+  kwalifikuje trzy stałe korekcje i FP64 oryginalny operator/residuum, bez TF32.
+  Dowody i zakres: docs/milestones/final-audit.md.

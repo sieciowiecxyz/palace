@@ -39,16 +39,19 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: DirectWMMA W.1FAIL/REJECT, scopedTCproof i microgain zachowane; bezpromocji PC, ograniczenia FGMRES.
 - [M7: kwalifikacja finalisty](milestones/M7.md)
   - Czytaj gdy: planujesz W.4/W.5, mediany pełnych par, nową geometrię lub pakiet
-  - Opis: Active checklista/coverage; fixed3W.2–W.5 i trzy pary3.500GHz PASS, jawny kompromis czasu/pamięci. Nowageometria M7.5 i pakiet M7.3 także PASS; końcowy audyt M7.4 otwarty.
+  - Opis: Końcowe coverage; fixed3W.2–W.5 i trzy pary3.500GHz PASS, jawny kompromis czasu/pamięci. Nowageometria M7.5 i pakiet M7.3 także PASS; końcowy audyt M7.4 zamknięty.
+- [M7.4: audyt i zalecana konfiguracja](milestones/final-audit.md)
+  - Czytaj gdy: sprawdzasz wymagania celu, decyzję o promocji albo odtwarzasz zalecany wariant
+  - Opis: Macierz M0–M7/K, zmierzone23,6% oszczędności RAM bez speedupu, dodatkowe lokalne pola/faza; pełne pokrycie, regresje i końcowy przegląd PASS; M7.4 zamknięty.
 - [M7.2: mediany pełnych par](milestones/paired-medians.md)
   - Czytaj gdy: oceniasz czas/pamięć finalisty, exact W.3/P2 lub odtwarzasz statystyki
   - Opis: Trzy nowe pary3.500GHz/oba porty, K PASS; mediana czasu+0.305%/cgroup−23.597%, rozrzut i sparowane ilorazy. Bez twierdzenia o fizycznej redukcji VRAM; prereg/metoda/limity.
 - [M7.5: zmieniona geometria directora](milestones/geometry-generalization.md)
   - Czytaj gdy: sprawdzasz generalizację optymalizacji lub przygotowujesz nową geometrię/referencję
-  - Opis: Kompaktowe+2mm, pełny curvedTet10 audit, stale ref/seed/CSR invalidation i jedna para K PASS; RAM−23.779%, czas−1.065% bez uniwersalnej promocji. Pakiet M7.3 także PASS; audyt M7.4 otwarty.
+  - Opis: Kompaktowe+2mm, pełny curvedTet10 audit, stale ref/seed/CSR invalidation i jedna para K PASS; RAM−23.779%, czas−1.065% bez uniwersalnej promocji. Pakiet M7.3 także PASS; audyt M7.4 zamknięty.
 - [M7.3: lokalny pakiet runtime](runtime-package.md)
   - Czytaj gdy: tworzysz lub uruchamiasz pakiet z osobnego katalogu albo sprawdzasz obraz/deadline/cleanup
-  - Opis: Image-native/no-overlay tinyFP64+fixed3 K/TEM PASS, jawne profile/pinneddeps/payload/sourceSHA, SIGTERM/timeout/no leftover kontrolowane; M7.4 wciąż otwarty.
+  - Opis: Image-native/no-overlay tinyFP64+fixed3 K/TEM PASS, jawne profile/pinneddeps/payload/sourceSHA, SIGTERM/timeout/no leftover kontrolowane; M7.4 zamknięty.
 - [M7: protokół antyrezonansu](milestones/antiresonance-qualification.md)
   - Czytaj gdy: kwalifikujesz osobny punkt2.900GHz lub interpretujesz S→Z przy biegunie
   - Opis: Preregistered S/power/energy/pola/raw, Zin i granica uwarunkowania; brak VSWRgate wyłącznie tutaj, bez mieszania z matched-band.

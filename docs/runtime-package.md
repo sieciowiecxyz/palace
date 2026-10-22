@@ -152,3 +152,21 @@ Dowody: `artifacts/m7-package-r4-root-qualification-20261022.json`,
 `artifacts/m7-package-lifecycle-r4-20261022/qualification.json` i
 `artifacts/m7-early-create-interrupt-20261022/qualification.json`.
 Końcowy audyt wszystkich wymagań M7.4 pozostaje otwarty.
+
+
+## Finalny pakiet — EXP260–263
+
+Aktualny docelowy katalog to `artifacts/m7-sm120-bundle-final-20261022`.
+Native/source/image pozostają identyczne z kwalifikacją M7, bez przebudowy.
+Nowe rzeczywiste testy memory18,498s i reference18,408s przechodzą K/TEM/
+volumeL2, dokładne wiązanie referencji i image-native bez host overlays;
+deadline/SIGTERM oraz brak kontenerów PASS. Root potwierdził to w
+`artifacts/m7-package-final-root-qualification-20261022.json`.
+198testów Python przechodzi również z tego odrębnego pakietu przy cwd `/tmp`.
+Końcowa decyzja i granice: [audyt M7.4](milestones/final-audit.md).
+`QUALIFICATION.json` określa zakres po zakończeniu audytu; oryginalne
+`build-manifest.json numerically_validated=false` pozostaje niezmienione.
+
+
+Aktualny stan po przeglądzie: **M7.4 CLOSED**. Historyczne wpisy OPEN/NOT RUN
+powyżej zachowują stan w chwili prereg, nie opisują obecnego finalnego pakietu.

@@ -10,6 +10,11 @@ Instrukcje dostosowano do prywatnego `sieciowiecxyz/vibecoding`; jego rewizja je
 
 Migracja nie dodaje Tensor Cores, nowych solverów BEM ani kwalifikacji multi-GPU. Obecny cel optymalizacji i nierozwiązane kwestie numeryczne zachowuje [speedup](speedup.md). Nowe wykonanie i cache sprawdzono na nowej lokalizacji, jak opisano poniżej; wyników historycznych nie zalicza się jako testu migracji.
 
+Aktualizacja2026-10-22: opisane niżej testy migracji są historyczne.
+Późniejsze rzeczywiste uruchomienie przypiętego obrazu bez host overlays
+i odtwarzalny pakiet R4 przeszły [M7.3](runtime-package.md).
+Bieżący audyt i granice są w [M7.4](milestones/final-audit.md).
+
 ## Kontrola coax medium z nowego repo — 2026-10-18
 
 Pierwsze uruchomienie `python3 tools/dev.py run coax-medium artifacts/coax-migration-20261018 --seconds 180` zakończyło proces Palace z exit 0 po 33,58 s. Sześć rozwiązań dla 3,30/3,55/3,80 GHz i obu portów zbiegło, lecz `result.json` zapisał `complete=false` i pustą listę kontroli. Powodem był parser `tools/dev.py`, który oczekiwał prefiksu `PALACE_KSP_CHECK ` bez dwukropka, podczas gdy solver emituje `PALACE_KSP_CHECK:`.

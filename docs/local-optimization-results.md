@@ -1,5 +1,8 @@
 # Palace na RTX 5070 Ti — wynik badania
 
+Ten raport dotyczy badania sprzed migracji i zachowuje jego historyczne wyniki.
+Aktualny wariant i zakres kwalifikacji opisuje [audyt M7](milestones/final-audit.md).
+
 ## Wybrany wariant
 
 **FP64 operator i faktory cuDSS, baza GMRES przechowywana w FP32, CUDA Unified

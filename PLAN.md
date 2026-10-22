@@ -2,9 +2,9 @@
 
 Polityka SSD doprecyzowana przez użytkownika (2026-10-19): gorące dane solvera w RAM/VRAM; UVM GPU↔RAM. Zwykłe wejścia/wyniki, cache i sporadyczny odczyt SSD są dozwolone. Niewielkie zapisy wymagają pomiaru wolumenu i częstotliwości I/O; nie deklarować zerowego zużycia dysku. Bez swapowania zadania i intensywnego przepisywania bazy/macierzowych workspace na SSD w pętli solvera. Obecny disk basis pozostaje usunięty; dawne wyniki z nim nie stają się przez tę korektę zakwalifikowanym baseline. Nową metodę używającą dysku oceniać po zmierzonym I/O, czasie i dokładności.
 Mode: goal
-Active: M7
+Active: none
 
-Stan: goal aktywowany2026-10-18. M0–M5 ocenione, M6 ocena zakończonaEXP176 (WMMAhardwarepath/microgainPASS, directPC W.1FAIL/REJECT; bezpromocji). Aktywny M7: pełna kwalifikacja obecnego finalisty, nowa geometria i pakiet; docs/milestones/M7.md. Lokalnie, bez najmu chmury.
+Stan: zakończenie2026-10-22. M0–M7 ocenione i audyt zamknięty; zalecany zakresowy profil pamięciowy fixed3, pełne FP64 jako fallback. Mediana peak RAM−23,597%, brak wykazanego speedupu lub fizycznej redukcji peakVRAM. M2 integracja i directWMMA pozostają REJECT. Dowody/ustawienia/granice: docs/milestones/final-audit.md. Lokalnie, bez najmu chmury.
 
 ## Cel
 
@@ -28,7 +28,7 @@ Ambicja: dodatkowe ≥1,5× przyspieszenie i ≥25% redukcji porównywalnego szc
 - [x] M4 — reuse setup i deferred postprocessing; pełna para EXP94 PASS, docs/milestones/M4.md.
 - [x] M5 — ocena PC/mixed/FDTD zakończona EXP104; mixed W.2/W.3 PASS jako opt-in, hybrid/AMS/directgprMax REJECT; docs/milestones/M5.md.
 - [x] M6 — ocena kernel/fusion/TC i sweepów zakończonaEXP176; docs/milestones/M6-decision.md. Kerneli PC niepromowano, TCinstructionpath PASS nie zastępuje jakości solvera.
-- [ ] M7 — Kwalifikacja najlepszego wariantu na jednej 5070 Ti i pakiet do użycia.
+- [x] M7 — Kwalifikacja zakresowego wariantu pamięciowego, nowa geometria i odtwarzalny pakiet; końcowy audyt PASS.
 
 Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmuje jakość i porównywalne pomiary. Negatywna ocena prototypu może zamknąć hipotezę z dowodami; nie wymuszać integracji wolniejszego solvera. Brak poprawności lub brak wykonania wymaganego testu nie zalicza bramki. Plan i numeracja zastępują wcześniejszą kolejkę z obowiązkowym multi-GPU.
 
@@ -60,8 +60,8 @@ Etapy kolejno M1 → M2 → M3 → M4 → M5 → M6 → M7. Każda bramka obejmu
 ### M2 — metoda dopasowana do otwartej anteny
 
 - [x] M1: AIRexclusive57,586%DOF, granica94200ND2trace, denseblok132GiB; nieutożsamiać tego ze speedupem.
-- [ ] Porównać FEM–BEM, powierzchniowy MoM i akcelerację FMM/MLFMA/H²; sprawdzić Maxwell, dielektryki, otwarte cienkie metale, zasilanie i promieniowanie.
-- [ ] Przejrzeć istniejące biblioteki, źródła i licencje; oddzielić GPU assembly od GPU matvec/FMM/solve. Nie zakładać CUDA/TC na podstawie etykiety GPU.
+- [x] Porównać FEM–BEM, powierzchniowy MoM i akcelerację FMM/MLFMA/H²; sprawdzić Maxwell, dielektryki, otwarte cienkie metale, zasilanie i promieniowanie.
+- [x] Przejrzeć istniejące biblioteki, źródła i licencje; oddzielić GPU assembly od GPU matvec/FMM/solve. Nie zakładać CUDA/TC na podstawie etykiety GPU.
 - [ ] Przygotować rzeczywisty mały prototyp Maxwell: kula PEC z odniesieniem, potem dielektryk i sprzężony interfejs FEM–BEM. Porównać do FEM przy porównywalnym błędzie.
 - [x] Część PEC: niezależny Miecomplex, zbieżność i1%PASS; pierwszy CPUH-matrix/CUDAapply poprawny, ale9%oszczędności/53×wolniej — bezpromocji. docs/maxwell-oracle.md. Na etapie EXP23–24 dielektryk/interfejs pozostawały otwarte; dalsze wyniki poniżej.
 - [x] EXP25–29: native2kernel/H-matrixeta4−17,31%danych i poprawnyGPUoperator/CPUbasisGMRES; dielectricspherePMCHWT/Miecomplexfar-field/energyPASS ze zbieżnością i jawną regułąobjętości. docs/maxwell-native-dielectric.md. BrakFEMinterface/nearfields/scalableassembly/antenna promotion.
@@ -127,12 +127,13 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 - [x] M6.6 — ocena zakończona EXP166: EXP120–130 frequency-major reuse, per-port history i per-f deferred release; coax3/7freq oraz W3medium3,5/3,6GHz oba porty PASS. Antena996,519→915,924s (jedna para −8,09%), cgroup48,720→47,660GB; pola/raw/frozenK PASS. EXP131–133 linear predictor coax PASS, antena fallback/brak netgain/REJECT. EXP135–138 complex projection math/coax PASS, antena coarse mixed2IR gate FAIL/HOLD. EXP139–142: verified history single-f i legacy coax PASS; antena odtwarza klasę błędu coarse2IR w121s, nie bitowo ten sam RHS. EXP143–147: fixed3 coax PASS i singleP2 executionPASS, pełny3freqsweep deadlineFAIL (5/6), bez promocji/defaultchange. EXP148–152: symbolic reuse ma upperbound~2,2% na obecnym3f; full recycling wymaga dodatkowych wektorów/zmiany solvera, niepromowany; PROM4 medium held-out/rawPASS, ale whole-strategy +19,77% czasu/+11,77%cgroup vsbestuniform, REJECT promocji. EXP153–166 wszystkie7f/oba porty w bounded chunks PASS; fullFP64 vscombinedFP32storage/mixed2IR/reuse, suma−21,095%czasu/maxcgroup−23,825%, jeden pomiar per f, nie mediana/monolithic. docs/milestones/antenna-sweep-qualification.md. ResearchLt/WMMAinstructionproof oceniono osobnoEXP167–175; EXP176 zakończył ocenę prostejintegracjiWMMA negatywnymW.1 (bezpromocji). Potem W4/W5/mediany/nowa geometria i pakiet M7. docs/milestones/sweeps.md.
 
-### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
+### M7 — CLOSED: zaakceptowany wariant pamięciowy i pakiet
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.2–W.5 PASS (W.3/P2 w danych nowych par3.500GHz/oba porty), W.5 15freq/oba porty/210fieldrows: maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP215–220 trzy nowe pary3.500GHz K PASS: mediany745.458→747.733s (+0.305%), mediana sparowanego wzrostu+0.476%, peakcgroupmedian−23.597%. Nie wykazano przyspieszenia całości lub fizycznej redukcji peak VRAM; zysk pamięci hosta/logicznej reprezentacji jest zmierzony. Szczegóły docs/milestones/paired-medians.md. Antyrezonans osobno PASS, SIGTERMhistoryczny zachowany. M7.5 nowa geometria directora+2mm także K PASS: jedna para764.008→755.874s/cgroup61.139→46.601GB (−23.779% RAM), docs/milestones/geometry-generalization.md. M7.3 pakiet także PASS: image-native/coaxFP64+fixed3K/TEM, deadline/SIGTERM/legacyregression; docs/runtime-package.md. Następny pełny audyt(M7.4); globalne defaulty bez promocji.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.2–W.5 PASS (W.3/P2 w danych nowych par3.500GHz/oba porty), W.5 15freq/oba porty/210fieldrows: maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP215–220 trzy nowe pary3.500GHz K PASS: mediany745.458→747.733s (+0.305%), mediana sparowanego wzrostu+0.476%, peakcgroupmedian−23.597%. Nie wykazano przyspieszenia całości lub fizycznej redukcji peak VRAM; zysk pamięci hosta/logicznej reprezentacji jest zmierzony. Szczegóły docs/milestones/paired-medians.md. Antyrezonans osobno PASS, SIGTERMhistoryczny zachowany. M7.5 nowa geometria directora+2mm także K PASS: jedna para764.008→755.874s/cgroup61.139→46.601GB (−23.779% RAM), docs/milestones/geometry-generalization.md. M7.3 pakiet także PASS: image-native/coaxFP64+fixed3K/TEM, deadline/SIGTERM/legacyregression; docs/runtime-package.md. Pełny audyt M7.4 także PASS; globalne defaulty bez zmian, rekomendacja dotyczy jawnego profilu pamięciowego.
 
 - [x] Kwalifikacja częstotliwości/portów W.2–W.5 i trzy pełne pary bez profilera, EXP215–220. Czasy3.500GHz dotyczą obu portów; P2 ma osobno sprawdzone pola/raw.
-- [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.
+- [x] Raport tabeli kompromisów i decyzja: fixed3 jako zakresowy profil pamięciowy, FP64 fallback zachowany. Bez twierdzenia speedupu lub fizycznego peakVRAM; docs/milestones/final-audit.md.
+- [x] M7.4 — końcowy docs-garden/root review i audyt PASS; pełne720W5lokalnepola/faza+48nowageometria, finalpakiet,198Python wrepo i osobnympakiecie/8shell. docs/milestones/final-audit.md.
 - [x] Pakiet z manifestem/pinneddeps, jawnymi opcjami i blokadą niewspieranych kombinacji; image-native tinyFP64/fixed3K/TEM, deadline/SIGTERM i legacy regression PASS. docs/runtime-package.md.
 
 - [x] M7.5 — director/nośnik+2mm, nowa zahashowana siatka/własna referencja; pełne K i odrzucanie starych pól/seedów PASS, nowe CSR/faktory. Zysk RAM23.779%, jedna para bez uniwersalnej promocji; docs/milestones/geometry-generalization.md.

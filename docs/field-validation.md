@@ -38,3 +38,17 @@ Nie ponawiać pełnej anteny bez jawnej hipotezy i kontroli dostępnej pamięci.
 ## Dowody
 
 [Raport M1](optimization-baseline.md): tiny FP64/FP32, test referencji B×1,02 oraz historyczne disk/resident runy. FP64-disk i ukończone FP32-disk comparison pozostają **REJECT** jako warianty robocze; resident FP32 attempt przerwał RAM guard bez pól. W.3 native complex coarse ma nową ostrzejszą resident FP64 referencję i medium solve 3,50 GHz/P2, którego ważone pola E/B przeszły próg 1% we wszystkich regionach. Jest to kontrola zgodności numerycznej jednego punktu na tej samej siatce; pomiar fizyczny, zbieżność siatki i kwalifikacja innych pasm/obudowy pozostają poza tym testem. Szczegóły, wartości i limity: [natywny complex coarse](native-complex-coarse.md); pamięć i run: [fazy pamięci](memory-phases.md). Nie deklarować jakości poza zakresem tych bramek ani przyspieszenia z nieporównywalnych prób.
+
+
+## Końcowa dodatkowa kontrola fazy i szczelin
+
+M7.4 uzupełnia natywne normy o CPU replay zapisanych pól, bez nowego solve.
+W.5 ma pełne720rows:15częstotliwości, oba porty, E/B, PTFEfeed/PCB/cztery
+sektory PCB przy szczelinach i dwie dodatnie kwadratury. Osobno sprawdzona
+nowa geometria. Metoda, jawne progi i granice są w [audycie](milestones/final-audit.md).
+Nie zastępuje to fizycznej walidacji anteny ani zbieżności osobliwości na brzegach.
+Narzędzie developerskie `tools/experiments/field_roi.py` ma cached one-TU
+build; pełny odczyt anteny wyłącznie jako pojedyncza częstotliwość (`batch
+--count 1`,900s) albo ograniczony `--part`. Większe batche i pełny180s replay
+zostały odrzucone po timeoutach; nie ponawiać ich jako domyślnego workflow.
+Nie jest potrzebne przy rutynowym wysłaniu symulacji.
