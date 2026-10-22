@@ -21,6 +21,40 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def reference_binding(reference, candidate, config):
+    """Bind native error norms to the exact reference field bytes, not just physics."""
+    command = dev.read(Path(candidate)/'command.json')
+    require(command['environment'].get('PALACE_REFERENCE_FIELDS') == '/reference-fields',
+            'Candidate did not request native field-reference comparison')
+    mounts = []
+    args = command['argv']
+    for i, arg in enumerate(args[:-1]):
+        if arg == '-v':
+            parts = args[i+1].rsplit(':', 2)
+            if len(parts) == 3 and parts[1] == '/reference-fields':
+                require(parts[2] == 'ro', 'Native field-reference mount must be read-only')
+                mounts.append(Path(parts[0]).resolve())
+    require(len(mounts) == 1, 'Require exactly one native field-reference mount')
+    expected_names = dev.expected_field_files(config)
+    fields = dev.field_inventory(Path(reference)/'fields', expected_names)
+    recorded = command.get('field_reference_files')
+    source = mounts[0]
+    if recorded is None:
+        require(source.is_dir(), 'Legacy native field-reference mount is missing; cannot verify its bytes')
+        recorded = fields if source == (Path(reference)/'fields').resolve() else dev.field_inventory(source, expected_names)
+        method = 'legacy_live_mount_inventory'
+    else:
+        require(command.get('field_reference_identity') == dev.read(Path(reference)/'fields.json')['identity'],
+                'Recorded native field-reference identity differs')
+        method = 'recorded_launch_inventory'
+        if source.is_dir():
+            current = fields if source == (Path(reference)/'fields').resolve() else dev.field_inventory(source, expected_names)
+            require(current == recorded, 'Native field-reference source bytes changed after launch')
+    require(recorded == fields, 'Native field errors were measured against different reference bytes')
+    return dict(passed=True, method=method, mounted_source=str(source), files=fields,
+                scope='Exact field inventory binding; captured launch provenance is not a hardware attestation')
+
+
 def read_csv(path):
     with Path(path).open() as stream:
         data=list(csv.reader(stream,skipinitialspace=True))
@@ -126,6 +160,7 @@ def qualify(reference,candidate,corrections=2,protocol='matched'):
         raws.append(raw)
         require(all(math.isfinite(results[i][k]) and results[i][k]>0 for k in ['end_to_end_seconds','cgroup_memory_peak_bytes']),
                 'Missing cost measurement')
+    binding=reference_binding(paths[0],paths[1],cfg)
     fields=dev.field_comparisons(paths[1],cfg)
     post=[p/cfg['Problem']['Output'] for p in paths]
     metrics=rf_metrics(*(read_csv(p/'port-S.csv') for p in post),
@@ -135,7 +170,7 @@ def qualify(reference,candidate,corrections=2,protocol='matched'):
     normalized['Model']['Mesh']=dev.read(paths[0]/'fixture.json')['mesh_sha256']
     case_id=hashlib.sha256(json.dumps(normalized,sort_keys=True).encode()).hexdigest()
     return dict(passed=metrics['passed'] and fields['passed'],protocol=protocol,frequency_ghz=frequencies[0],coarse_corrections=corrections,raw=raws,fields=fields,
-                metrics=metrics,reference=results[0],candidate=results[1],run_container_names=container_names,
+                metrics=metrics,reference=results[0],candidate=results[1],run_container_names=container_names,field_reference_binding=binding,
                 time_saving_percent=100*(1-results[1]['end_to_end_seconds']/results[0]['end_to_end_seconds']),
                 cgroup_saving_percent=100*(1-results[1]['cgroup_memory_peak_bytes']/results[0]['cgroup_memory_peak_bytes']),
                 input_paths=[str(p) for p in paths],source_sha256=builds[0]['source_sha256'],

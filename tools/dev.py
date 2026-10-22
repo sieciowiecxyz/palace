@@ -1194,46 +1194,49 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
                      '--env-var=LD_PRELOAD='+flags['LD_PRELOAD'], target, 'config.json'])
     else:
         args.extend(['--entrypoint', target, execution_image, 'config.json'])
-    try:
-        command(args, stdout=subprocess.DEVNULL)
-    except BaseException:
-        if profile: shutil.rmtree(profile['ram_directory'])
-        raise
-    write(output / 'command.json', {'argv': args, 'environment': flags,
-                                   'runtime_image': execution_image,
-                                   'native_from_image': bool(runtime_image),
-                                   'diagnostic': {'coax_fields': coax_fields or coax_l2,
-                                                  'pc_side': pc_side, 'coax_l2': coax_l2,
-                                                  'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
-                                                  'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
-                                                  'release_gmres_basis': release_gmres_basis,
-                                                  'release_final_solver': release_final_solver},
-                                   'native_complex_coarse': native_complex_coarse,
-                                   'native_coarse_fp32': native_coarse_fp32,
-                                   'native_coarse_corrections': (native_coarse_corrections if native_coarse_corrections is not None else 2) if native_coarse_fp32 else None,
-                                   'basis_audit': basis_audit,
-                                   'pc_basis_fp32_forward': pc_basis_fp32_forward,
-                                   'pc_basis_compensated_forward': pc_basis_compensated_forward,
-                                   'frequency_major_reuse': frequency_major and port_setup_reuse,
-                                   'frequency_major_batch': frequency_major,
-                                   'frequency_override_ghz': frequencies,
-                                   'sweep_predictor': sweep_predictor,
-                                   'history_source': history,
-                                   'nsys_window': nsys_window,
-                                   'cpu_reference': cpu_reference,
-                                   'phase_trace': phase_trace,
-                                   'initial_fields': str(initial) if initial else None,
-                                   'initial_fields_metadata_sha256': sha(initial/'fields.json') if initial else None,
-                                   'initial_fields_source_accuracy_passed': read(initial/'result.json').get('field_accuracy_passed') if initial else None,
-                                   'initial_fields_scope': 'Starting approximation only; not an accuracy reference' if initial else None,
-                                   'actual_config_sha256': sha(output / 'config.json')})
     started = time.monotonic()
-    status = {'complete': False, 'interrupted': True, 'preparation_seconds':started-invocation_started}
+    status = {'complete': False, 'interrupted': True,
+              'preparation_seconds': started-invocation_started, 'launch_phase': 'creating'}
     try:
+        write(output / 'command.json', {'argv': args, 'environment': flags,
+                                       'runtime_image': execution_image,
+                                       'native_from_image': bool(runtime_image),
+                                       'diagnostic': {'coax_fields': coax_fields or coax_l2,
+                                                      'pc_side': pc_side, 'coax_l2': coax_l2,
+                                                      'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
+                                                      'hypre_pool_mib': hypre_pool_mib, 'memory_marks': memory_marks,
+                                                      'release_gmres_basis': release_gmres_basis,
+                                                      'release_final_solver': release_final_solver},
+                                       'native_complex_coarse': native_complex_coarse,
+                                       'native_coarse_fp32': native_coarse_fp32,
+                                       'native_coarse_corrections': (native_coarse_corrections if native_coarse_corrections is not None else 2) if native_coarse_fp32 else None,
+                                       'basis_audit': basis_audit,
+                                       'pc_basis_fp32_forward': pc_basis_fp32_forward,
+                                       'pc_basis_compensated_forward': pc_basis_compensated_forward,
+                                       'frequency_major_reuse': frequency_major and port_setup_reuse,
+                                       'frequency_major_batch': frequency_major,
+                                       'frequency_override_ghz': frequencies,
+                                       'sweep_predictor': sweep_predictor,
+                                       'history_source': history,
+                                       'nsys_window': nsys_window,
+                                       'cpu_reference': cpu_reference,
+                                       'phase_trace': phase_trace,
+                                       'initial_fields': str(initial) if initial else None,
+                                       'initial_fields_metadata_sha256': sha(initial/'fields.json') if initial else None,
+                                       'initial_fields_source_accuracy_passed': read(initial/'result.json').get('field_accuracy_passed') if initial else None,
+                                       'initial_fields_scope': 'Starting approximation only; not an accuracy reference' if initial else None,
+                                       'field_reference_files': read(reference/'fields.json')['files'] if reference else None,
+                                       'field_reference_identity': read(reference/'fields.json')['identity'] if reference else None,
+                                       'actual_config_sha256': sha(output / 'config.json')})
+        command(args, stdout=subprocess.DEVNULL)
+        started = time.monotonic()
+        status['preparation_seconds'] = started-invocation_started
+        status['launch_phase'] = 'created'
         with (output / 'palace.stdout.log').open('w') as log, \
              (output / 'palace.stderr.log').open('w') as errors, \
              (output / 'telemetry.jsonl').open('w') as telemetry:
             proc = subprocess.Popen(['podman', 'start', '--attach', container], stdout=log, stderr=errors)
+            status['launch_phase'] = 'running'
             low_memory = 0
             memory_path = None
             pid = 0
@@ -1391,6 +1394,7 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         if status.get('host_guard_or_deadline'):
             status['complete'] = False
         status['interrupted'] = False
+        status['launch_phase'] = 'finished'
         if status['complete'] and save_fields:
             write(output/'fields.json', {'schema': 1, 'identity': field_identity(config, info, manifest),
                                          'complete': True, 'files': field_inventory(output/'fields', expected_field_files(config))})

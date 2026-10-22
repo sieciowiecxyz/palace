@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import subprocess
 import tempfile
+import struct
 import unittest
 
 sys.path.insert(0,str(Path(__file__).parents[1]))
@@ -13,6 +14,39 @@ spec.loader.exec_module(q)
 
 
 class QualificationTests(unittest.TestCase):
+    def test_native_field_reference_binding_checks_exact_bytes_and_launch_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td);ref=root/'ref';other=root/'other';cand=root/'cand'
+            for p in [ref/'fields',other/'fields',cand]:p.mkdir(parents=True)
+            cfg={'Solver':{'Driven':{'Samples':[{'Type':'Point','Freq':[3.5]}]}},
+                 'Boundaries':{'LumpedPort':[{'Excitation':1},{'Excitation':2}]}}
+            for name in q.dev.expected_field_files(cfg):
+                (ref/'fields'/name).write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,1.,0.))
+                (other/'fields'/name).write_bytes(struct.pack('<8sQdd',b'PALF64V1',1,2.,0.))
+            q.dev.write(ref/'fields.json',dict(identity='physics'))
+            command=dict(environment={'PALACE_REFERENCE_FIELDS':'/reference-fields'},
+                         argv=['podman','create','-v',f'{ref}/fields:/reference-fields:ro'])
+            def put(c):q.dev.write(cand/'command.json',c)
+            put(command)
+            self.assertTrue(q.reference_binding(ref,cand,cfg)['passed'])
+            put(dict(command,argv=['podman','create','-v',f'{other}/fields:/reference-fields:ro']))
+            with self.assertRaisesRegex(ValueError,'different reference bytes'):q.reference_binding(ref,cand,cfg)
+            captured=dict(command,field_reference_identity='physics',field_reference_files=q.dev.field_inventory(ref/'fields',q.dev.expected_field_files(cfg)))
+            put(captured);self.assertEqual(q.reference_binding(ref,cand,cfg)['method'],'recorded_launch_inventory')
+            put(dict(captured,field_reference_identity='wrong'))
+            with self.assertRaisesRegex(ValueError,'identity differs'):q.reference_binding(ref,cand,cfg)
+            put(dict(captured,argv=['podman','create','-v',f'{other}/fields:/reference-fields:ro']))
+            with self.assertRaisesRegex(ValueError,'source bytes changed'):q.reference_binding(ref,cand,cfg)
+            missing=root/'moved-original/fields'
+            put(dict(captured,argv=['podman','create','-v',f'{missing}:/reference-fields:ro']))
+            self.assertTrue(q.reference_binding(ref,cand,cfg)['passed'])
+            put(dict(command,argv=['podman','create','-v',f'{missing}:/reference-fields:ro']))
+            with self.assertRaisesRegex(ValueError,'Legacy.*missing'):q.reference_binding(ref,cand,cfg)
+            for argv in [['podman','create'],command['argv']+command['argv'][2:],
+                         ['podman','create','-v',f'{ref}/fields:/reference-fields:rw']]:
+                put(dict(command,argv=argv))
+                with self.assertRaises(ValueError):q.reference_binding(ref,cand,cfg)
+
     def tables(self):
         header=['f (GHz)']
         for p in ['1][1','2][1','1][2','2][2']:

@@ -1,10 +1,11 @@
 import importlib.util
 import json
 import struct
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 spec = importlib.util.spec_from_file_location('palace_dev', Path(__file__).parents[1] / 'dev.py')
 dev = importlib.util.module_from_spec(spec)
@@ -12,6 +13,27 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_cleanup_and_incomplete_receipt_cover_metadata_and_container_create_failures(self):
+        real_write=dev.write
+        for stage in ['metadata','create']:
+            with self.subTest(stage=stage),tempfile.TemporaryDirectory() as td:
+                output=Path(td)/'run'
+                def emit(path,value):
+                    if stage=='metadata' and Path(path).name=='command.json':
+                        raise KeyboardInterrupt
+                    return real_write(path,value)
+                def launch(args,**kwargs):
+                    raise subprocess.CalledProcessError(125,args)
+                with patch.object(dev,'require_host_memory'),patch.object(dev,'verified_build',return_value={}),patch.object(dev,'write',side_effect=emit),patch.object(dev,'command',side_effect=launch) as create,patch.object(dev.subprocess,'run',return_value=Mock(returncode=0)) as cleanup:
+                    with self.assertRaises(KeyboardInterrupt if stage=='metadata' else subprocess.CalledProcessError):
+                        dev.run('coax-tiny',output,60,basis='fp64')
+                state=dev.read(output/'result.json')
+                self.assertFalse(state['complete']);self.assertTrue(state['interrupted'])
+                self.assertEqual(state['launch_phase'],'creating')
+                cleanup.assert_called_once()
+                self.assertEqual(cleanup.call_args.args[0][:3],['podman','rm','--force'])
+                self.assertEqual(create.call_count,0 if stage=='metadata' else 1)
+
     def test_native_mixed_fixed_count_is_explicit_strict_and_audited(self):
         for count in [2,3,4]:
             dev.validate_native_mixed(True,True,None,False,None,None,count)

@@ -4482,3 +4482,43 @@ verifiedunchanged. No simulationactive, builder/cachepreserved, no cloud.
 NextM7.4referencebinding/earlypreparecleanup/fullrequirementaudit, then
 recheck15W5+3medians+newgeometryonfinalqualifierwithoutnativeGPUrerun
 unlesscodechangesneedone. Goalactive; no completionclaim.
+
+## M7.4 audit start — EXP232 prereg
+Previousgoalturnprogress: M7.3code/package/tests/liveexamplescommitted854c8a7.
+AuditreadMILESTONES/currentcode; foundnativefieldcompareboundonlybyphysics,
+notexactreferencebytes. Addcaptureoffieldreferenceidentity/inventoryatlaunch
+andqualifierexactbindingtoactualreadonlymount. Legacyrequiresstillpresent
+actualmountbytes; newrecordcanmoveoriginalonlyifprovidedRmatchesrecord.
+Testsrejectdifferentbytes/samephysics, identity/mutable/missinglegacy/
+duplicate/writablemounts; no Kthresholdchanges.193PythonPASS.
+Secondgap: podmancreate/commandmetadatawriteoutsidemaincleanupscope.
+Movemetadata+createunderfinally; preservedsuccesselapseddefinition, add
+launch_phase; failureunitcoversbothmetadataandcreate/incompletereceipt/rm.
+NativeA6unchanged. EXP232readytest tools/experiments/prepare_interrupt.py
+withprivatePATHshim: realpodmancreatefirst, markerstatecreated/Pid0,
+3sboundedreturn-delay, SIGTERMonlyownlivewrapperPID, no solverstart.
+Outputartifacts/m7-early-create-interrupt-20261022. No systemPATHchange,
+appsclose/cloud/rebuild/cacheflush/permissionschanges. Rootauditsreceipt.
+Laterrequalifyall15W5+medians/newgeometryandupdatedbundlewithsmallcontrols.
+Fullrequirementauditstillpending; goalactive.
+
+## M7.4 explicit retry — EXP233–236
+User requested restart. GPU check:2358MiB used/13542MiB free,3% utilization.
+EXP232 pre-start SIGTERM receipt already PASS; no need rerun same evidence.
+Updated Python runner/qualifier only; nativeA6 unchanged. Prepare bundle r4
+using verified existing image43ac, no native/dependency build. Same Luna runs
+tiny memory then FP64,60s limits, then1s deadline/own live SIGTERM controls.
+Root checks exact reference binding, raw/K/TEM and cleanup. No full antenna,
+cloud spend or app unload. Full M7.4 requirement audit still pending.
+
+EXP233–236 zakończone: R4 memory17.317s / FP6418.377s end-to-end,
+oba39/42iteracji, prawdziwe raw<=9.704e-7, K/TEM/volumeL2 PASS.
+Root sprawdził dokładne bajty referencji, image-native i brak kontenerów.
+Delta S9.819e-10 / VSWR1.936e-9 względem dołączonej referencji;
+to nie pomiar przyspieszenia anteny. Deadline i SIGTERM podczas pracy PASS,
+EXP232 przed startem także PASS. Artefakty opisane w docs/runtime-package.md.
+NativeA6/cache bez zmian, bez kosztów cloud. Pełny audyt M7.4 nadal otwarty.
+
+Retry checkpoint:193Python/8shell/docs checker/diffcheck PASS; ta sama
+Luna wykonała docs-garden bez zmian, root przejrzał diff i dowody.
+M7.4 pełny audyt pozostaje otwarty; brak aktywnych symulacji po tej próbie.

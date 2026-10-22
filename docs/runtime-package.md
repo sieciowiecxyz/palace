@@ -119,3 +119,36 @@ w `artifacts/`. Wcześniejsze bundle i przerwania zachowano; łącznie~0.904GB
 zwykłych artefaktów etapu przed dodaniem końcowych receiptów; brak SSD hot
 workspace, czyszczenia cache, kompilacji lub płatnego compute. Energia
 niemierzona.191Python/8shell PASS; pełny audyt M7.4 wciąż otwarty.
+
+## M7.4 — ponowienie EXP233–236
+
+Aktualny pakiet po poprawkach runnera i kwalifikatora:
+`artifacts/m7-sm120-bundle-r4-20261022`. Natywny solver i obraz pozostają
+identyczne jak w M7.3; bez rekompilacji i pobierania zależności.
+
+| Kontrola | Wynik |
+| --- | --- |
+| Tiny memory / oba porty | PASS, 17,317 s end-to-end |
+| Tiny FP64 / oba porty | PASS, 18,377 s end-to-end |
+| Analityczny TEM, volume L2 i oryginalne residuum | PASS dla obu profili |
+| Limit 1 s / SIGTERM podczas obliczeń | PASS; incomplete, kontenery usunięte |
+| SIGTERM przed startem solvera, EXP232 | PASS; kontener usunięty przez runner |
+
+Nowy `command.json` zapisuje tożsamość i inwentarz plików referencji. Kwalifikator
+wiąże je z rzeczywistym montowaniem tylko do odczytu i podaną referencją.
+Dla starszych uruchomień wymaga nadal dostępnego oryginalnego montowania.
+To kontrola pochodzenia danych, nie podpis ani sprzętowe poświadczenie.
+Cleanup obejmuje także zapis metadanych i tworzenie kontenera; sukces ma
+niezmienioną definicję czasu wykonania. Pole `launch_phase` rozróżnia fazy.
+
+Root sprawdził obie próby niezależnie od raportu babysittingu: zgodność
+przypiętego obrazu, brak montowań natywnych plików hosta, referencję bajtową,
+residuum <=1e-6, zamrożone K i analityczny TEM. Memory względem dołączonej
+referencji: max delta S = 9,819e-10, max delta VSWR = 1,936e-9.
+To test odtwarzania małego modelu, bez wniosku o przyspieszeniu całej anteny.
+
+Dowody: `artifacts/m7-package-r4-root-qualification-20261022.json`,
+`artifacts/m7-package-r4-tiny-fixed3-qualification-20261022.json`,
+`artifacts/m7-package-lifecycle-r4-20261022/qualification.json` i
+`artifacts/m7-early-create-interrupt-20261022/qualification.json`.
+Końcowy audyt wszystkich wymagań M7.4 pozostaje otwarty.
