@@ -11,6 +11,7 @@ import json
 import math
 from pathlib import Path
 import re
+import statistics
 
 import dev
 
@@ -99,7 +100,9 @@ def qualify(reference,candidate,corrections=2,protocol='matched'):
             sorted(p['Excitation'] for p in cfg['Boundaries']['LumpedPort'])==[1,2], 'Require both physical ports/excitations1/2')
     require(all(r.get('complete') and r.get('exit_code')==0 for r in results), 'Incomplete reference or candidate')
     logs=[(p/'palace.log').read_text() for p in paths]
-    envs=[dev.read(p/'command.json')['environment'] for p in paths]
+    commands=[dev.read(p/'command.json') for p in paths]
+    envs=[c['environment'] for c in commands]
+    container_names=[c['argv'][c['argv'].index('--name')+1] for c in commands]
     require(not any(k in envs[0] for k in ['PALACE_GMRES_FP32_BASIS','PALACE_GMRES_FP32_DIRECT',
             'PALACE_NATIVE_COARSE_FP32','PALACE_REUSE_PORT_SETUP']), 'Reference is not fullFP64/fresh setup')
     require(all(envs[1].get(k)=='1' for k in ['PALACE_GMRES_FP32_BASIS','PALACE_GMRES_FP32_DIRECT',
@@ -132,7 +135,7 @@ def qualify(reference,candidate,corrections=2,protocol='matched'):
     normalized['Model']['Mesh']=dev.read(paths[0]/'fixture.json')['mesh_sha256']
     case_id=hashlib.sha256(json.dumps(normalized,sort_keys=True).encode()).hexdigest()
     return dict(passed=metrics['passed'] and fields['passed'],protocol=protocol,frequency_ghz=frequencies[0],coarse_corrections=corrections,raw=raws,fields=fields,
-                metrics=metrics,reference=results[0],candidate=results[1],
+                metrics=metrics,reference=results[0],candidate=results[1],run_container_names=container_names,
                 time_saving_percent=100*(1-results[1]['end_to_end_seconds']/results[0]['end_to_end_seconds']),
                 cgroup_saving_percent=100*(1-results[1]['cgroup_memory_peak_bytes']/results[0]['cgroup_memory_peak_bytes']),
                 input_paths=[str(p) for p in paths],source_sha256=builds[0]['source_sha256'],
@@ -180,11 +183,42 @@ def summarize(receipts,expected):
                 scope='Sum of independent cold single-f job pairs/bothports, all repeatedsetup/IO/cleanup included. Notmonolithicsweep, median/fullband/newgeometry/physicalmeasurement/TC proof. Peakcgroup ismax, notsum orphysicalVRAM.')
 
 
+def paired_medians(receipts):
+    require(len(receipts)==3, 'Paired medians require exactly three qualified pairs')
+    # Reuse the existing quality/cost gates; repeated f is permitted only here.
+    checks=[summarize([r],[r['frequency_ghz']]) for r in receipts]
+    keys=['frequency_ghz','coarse_corrections','source_sha256','build_manifest_sha256','case_without_frequency_sha256']
+    require(len({tuple(r[k] for k in keys) for r in receipts})==1,
+            'Paired medians change frequency, precision policy, build or configuration')
+    for key in ['input_paths','run_container_names']:
+        require(all(len(r.get(key,[]))==2 for r in receipts) and
+                len({v for r in receipts for v in r[key]})==6,
+                'Paired medians reuse a path or container; require six independent runs')
+    def stats(values):
+        return dict(median=statistics.median(values),minimum=min(values),maximum=max(values))
+    times=[[r[mode]['end_to_end_seconds'] for r in receipts] for mode in ['reference','candidate']]
+    memory=[[r[mode]['cgroup_memory_peak_bytes'] for r in receipts] for mode in ['reference','candidate']]
+    return dict(passed=True,pairs=3,frequency_ghz=receipts[0]['frequency_ghz'],coarse_corrections=receipts[0]['coarse_corrections'],
+        reference_seconds=stats(times[0]),candidate_seconds=stats(times[1]),
+        paired_speed_ratio=stats([a/b for a,b in zip(*times)]),
+        paired_time_change_percent=stats([100*(b/a-1) for a,b in zip(*times)]),
+        ratio_of_time_medians=statistics.median(times[0])/statistics.median(times[1]),
+        time_change_from_medians_percent=100*(statistics.median(times[1])/statistics.median(times[0])-1),
+        reference_cgroup_bytes=stats(memory[0]),candidate_cgroup_bytes=stats(memory[1]),
+        paired_cgroup_saving_percent=stats([100*(1-b/a) for a,b in zip(*memory)]),
+        cgroup_saving_from_medians_percent=100*(1-statistics.median(memory[1])/statistics.median(memory[0])),
+        maxima={k:max(c['maxima'][k] for c in checks) for k in checks[0]['maxima']},
+        max_relative_E=max(c['max_relative_E'] for c in checks),max_relative_B=max(c['max_relative_B'] for c in checks),
+        total_field_rows=sum(c['total_field_rows'] for c in checks),receipts=receipts,
+        scope='Three requalified matched single-f/two-port pairs. Medians of paired ratios differ from ratio of medians; both reported. Distinct paths/container names reject copied-run reuse but are not independent hardware attestation. Cgroup is not physical VRAM. Background/phases inspected separately; no fullband/generalization/TC claim.')
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('reference',type=Path,nargs='?')
     parser.add_argument('candidate',type=Path,nargs='?')
     parser.add_argument('--summary',type=Path,nargs='+',help='Recheck original pairs named by these receipts, then aggregate; no trust in cached passed flags')
+    parser.add_argument('--paired-medians',type=Path,nargs=3,help='Requalify three independent same-f pairs, then compute medians/ranges; incompatible with --summary')
     parser.add_argument('--expected-frequencies',type=float,nargs='+',help='Explicit required coverage for --summary')
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--corrections',type=int,choices=[2,3,4],default=2,
@@ -192,7 +226,14 @@ if __name__=='__main__':
     parser.add_argument('--protocol',choices=['matched','antiresonance'],default='matched',
                         help='Separate preregistered 2.900 GHz S/Z protocol; never part of a matched-band summary')
     args=parser.parse_args()
-    if args.summary:
+    if args.paired_medians:
+        if args.summary or args.reference or args.candidate or args.expected_frequencies or args.protocol!='matched':
+            parser.error('--paired-medians requires only three matched pair receipts and no other aggregation/pair mode')
+        inputs=[dev.read(p) for p in args.paired_medians]
+        require(all(r.get('protocol','matched')=='matched' for r in inputs),
+                'Paired medians cannot include the separate antiresonance protocol')
+        receipt=paired_medians([qualify(*r['input_paths'],corrections=args.corrections) for r in inputs])
+    elif args.summary:
         if args.protocol!='matched':
             parser.error('--summary requires the matched-band protocol')
         if args.reference or args.candidate or not args.expected_frequencies:
@@ -206,7 +247,9 @@ if __name__=='__main__':
             parser.error('Specify reference and candidate, or --summary with expected frequencies')
         receipt=qualify(args.reference,args.candidate,corrections=args.corrections,protocol=args.protocol)
     dev.write(args.output,receipt)
-    keys=(['passed','coarse_corrections','frequencies_ghz','reference_end_to_end_seconds','candidate_end_to_end_seconds',
+    keys=(['passed','pairs','frequency_ghz','coarse_corrections','reference_seconds','candidate_seconds',
+           'time_change_from_medians_percent','paired_time_change_percent','cgroup_saving_from_medians_percent','maxima','total_field_rows'] if args.paired_medians else
+          ['passed','coarse_corrections','frequencies_ghz','reference_end_to_end_seconds','candidate_end_to_end_seconds',
            'time_saving_percent','max_cgroup_saving_percent','maxima','total_field_rows'] if args.summary else
           ['passed','coarse_corrections','frequency_ghz','metrics','time_saving_percent','cgroup_saving_percent'])
     print(json.dumps({k:receipt[k] for k in keys},indent=2))

@@ -129,9 +129,9 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.4 i W.5 **15/15** na obu portach PASS,210regionalnychwierszy pól, maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP211–214 ponownie kwalifikują W.2 na aktualnym native/fixed3 (tinyTEM-volumeL2, medium3freq/oba porty); starsze manifesty nie zostały uznane za aktualne. EXP186–187 osobny antyrezonans2.900GHz S/Z/pola/rawPASS. EXP191 SIGTERM zachowany, retryEXP193 PASS. Następnie trzy nowe pary3.500GHz/oba porty z oceną W.3/P2 i median, nowageometria/pakiet/audyt. Bez przebudowy native lub luźniejszych progów pasmowych.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.2–W.5 PASS (W.3/P2 w danych nowych par3.500GHz/oba porty), W.5 15freq/oba porty/210fieldrows: maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP215–220 trzy nowe pary3.500GHz K PASS: mediany745.458→747.733s (+0.305%), mediana sparowanego wzrostu+0.476%, peakcgroupmedian−23.597%. Nie wykazano przyspieszenia całości lub fizycznej redukcji peak VRAM; zysk pamięci hosta/logicznej reprezentacji jest zmierzony. Szczegóły docs/milestones/paired-medians.md. Antyrezonans osobno PASS, SIGTERMhistoryczny zachowany. Następna nowageometria(M7.5), pakiet(M7.3), pełny audyt(M7.4); globalne defaulty bez promocji.
 
-- [ ] Wykonać kwalifikację częstotliwości/portów według MILESTONES, trzy pomiary finalisty bez profilera.
+- [x] Kwalifikacja częstotliwości/portów W.2–W.5 i trzy pełne pary bez profilera, EXP215–220. Czasy3.500GHz dotyczą obu portów; P2 ma osobno sprawdzone pola/raw.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.
 - [ ] Pakiet z manifestem, cache, jawnymi opcjami i blokadą niewspieranych kombinacji; odtworzyć przykład z pakietu.
 

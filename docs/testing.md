@@ -361,3 +361,19 @@ mieszanie z matched-summary odrzucane. Standardowy VSWRgate pozostaje.
 Przed obliczeniem2.9 spisano [prereg](milestones/antiresonance-qualification.md).
 EXP186–187 para antyrezonansu również PASS:14fieldrows, maxΔS7.753e-8,
 maxΔZ3.001e-6Ω. Szczegółowe wyniki i ograniczenia w prereg/raporcie.
+
+### EXP215–220: trzy nowe pary i odtwarzalne mediany
+
+179Python testsPASS. `--paired-medians` ponownie kwalifikuje trzy rzeczywiste
+pary, wymaga wspólnego f/config/build/count oraz sześciu odrębnych ścieżek i
+nazw kontenerów; zwraca osobno mediany sparowanych ilorazów i iloraz median.
+Kontrole: duplikaty/FAIL/NaN/zmianafreq/build/mesh/count i mieszanie trybów
+lub antyrezonansu odrzucane. Syntetyczne dane wykrywają pomylenie obu
+statystyk. Defaultowa kwalifikacja par i zwykły summary zachowane.
+
+Rzeczywiste3pary3.500GHz/oba porty rekwalifikowane przez nowy CLI:42fieldrows
+KPASS, P2exactf ma7regionów/rawperpara. Medianyczasu745.458→747.733s,
+peakcgroupmedian−23.597%; tło2366–2373MiB. Prereg, metody, fazy i granice:
+[raport median](milestones/paired-medians.md). Native/dependencies bez rebuilda;
+brak dowodu speedupu całości lub redukcji fizycznego peakVRAM. Nowageometria/
+pakiet i pełny audyt nadal otwarte.

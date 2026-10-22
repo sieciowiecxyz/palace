@@ -9,8 +9,9 @@ Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176:
 ## Bieżący checkpoint
 
 - Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 i W.5 **15/15**freq/oba porty PASS,210regionalnychwierszy pól; suma czasu+2.58%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/ciągłe pasmo/produkcja. Receipt artifacts/m7-full-W5-fixed3-summary-20261022.json.
+- EXP215–220 **M7.2 PASS**:3nowe pary3.500GHz/oba porty, własne referencje, wszystkieKPASS/42regionalne wpisy pól. Mediany R745.458s/C747.733s (+0.305%); mediana sparowanego wzrostu+0.476%; peakcgroupmedian60.684→46.364GB (−23.597%). P2exactW.3 ma osobno sprawdzone7regionów/rawperpara, czasy2ports. Raport docs/milestones/paired-medians.md. Fizyczna redukcja peak VRAM nieudowodniona; logicalmanaged−26.33% i cuDSSallocated−46.63% to oddzielne miary.
 - EXP183/184: współczesny2IR→3IR przy3.3GHz +10.74%całego czasu; koszt wcoarse, wpływ tła GPU confounds starsze dane. Dwa krótkie profile PASS, nie RFkwalifikacja. UVM migruje wielokrotnie w badanym oknie; bez deklaracji unikalnego wolumenu lub fizycznej rezydencji zGPUprocesspeak.
-- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. EXP191SIGTERM zachowany/retryEXP193 PASS. EXP211–214current-buildW.2 PASS:tinyanalyticTEM-volumeL2, medium3freq/oba porty/RF/wholefields/TEMsamples. **Następne:** prereg wM7.md, trzy nowe pełne pary3.500GHz/oba porty, własne referencje, W.3/P2 i mediany. Nowageometria/pakiet/audyt otwarte.
+- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. EXP191SIGTERM zachowany/retryEXP193 PASS. EXP211–214current-buildW.2 PASS. **Następne M7.5:** istotna zmiana directora/reflektora, nowy mesh/hash/reference i te sameK/cacheinvalidation; potem pakiet/M7.3 i pełny audyt/M7.4. Goal nadalaktywny.
 - Native SHAa6ec732f…187c3338 bez zmian, cache zachowany; Python qualifier i docs nie wymagają rebuilda. Bez płatnego compute, swapu lub hotworkspace SSD. Globalne defaulty niepromowane.
 
 ## Wcześniejsze etapy — historia wyników
@@ -4242,3 +4243,81 @@ babysitting, rootdesigned/analyzed/recordsworkerreportcorrectionsfromactual
 logs. No paidresources/swap/hotSSDworkspace/appkills/rebuild. GoalM7active,
 nextthreecontemporary3.500GHzbothportR/CpairsperpreregM7.md, thenmeaningful
 newgeometry, reproduciblepackageandfullcompletionaudit.
+
+## EXP215 prereg — M7.2 pair1 3.500GHz FP64 reference
+
+PreviousgoalturnPROGRESS:commitfa78284, W5all15fixed3KPASS+currentW2tiny/
+mediumTEMrequalificationPASS. Worktreeclean/nativeverifiedunchanged.
+FollowprewrittenM7.2preregM7.md:R1→C1→R2→C2→R3→C3, threefullnewpairs,
+bothports/exact3.500GHz/medium/RIGHT/K64/Tol1e-6/60GiB/no swap/hostguard/
+1800s/defer/energy/releases/snapshots, noprofiler/seeds/PROM/TF.
+EXP215:R1fullFP64basis+coarse/fresh2setups, thenrootreferenceauditbeforeC1.
+R/CcostincludesIOandfieldqualification; nodeps/nativebuild/cacheflush.
+FirstpairalsoverifiesP2atW3exactf, don'tclaimtwoporttimeasP2-onlytime.
+EXP215rootR1PASS3.500GHz:743.976s/60682346496B,44/44iter/raw<=9.497e-7,
+currentnative/FP64fresh2/fieldsinventory/finiteRF/P2presentPASS. Ownreference
+root-reference-check.jsonactualbytesstored.
+EXP216preregC1:sameexactconfig/native/bothports/3.500GHz/medium,
+directFP32storage/scaledFP32LU+3fixedFP64IR/reuse/defer/energy/releases/
+snapshots/RIGHT/K64/Tol1e-6/1800s/60GiB/no swap/hostguard. OwnfieldrefR1,
+no seeds/PROM/TF/profiler/cacheflush/defaultchanges. FullpairedKafterrun.
+EXP216rootpairR1C1KPASS3.500GHz/2ports:743.976→747.515s,
+60682346496→46364360704B,44/44→44/45iter, originalrawC<=8.694e-7;
+oneRHS2above-thresholdchecktriggeredcontinuationincludedincost.
+Receipt artifacts/m7-median-3500-pair-r1-qualification-20261022.json.
+Keepallresults; no causal/medianclaimfromonepair.
+EXP217preregR2:secondnewcoldfullFP64referenceat3.500GHz,bothports,same
+config/currentnative/RIGHT/K64/Tol1e-6/defer/energy/releases/snapshots,
+1800s/60GiB/no swap/hostguard. No profiler/seeds/PROM/TF/cacheflush/
+defaultchange. FollowfixedR1C1R2C2R3C3orderandownreferenceperpair.
+EXP217rootR2PASS3.500GHz:746.261s/60688879616B,44/44iter/raw<=9.497e-7,
+identicalR1config/currentnative/FP64fresh2/inventory/finiteRFenergyPASS.
+Rootreferencecheckstoredwithactualbytes; telemetry.jsonlretained.
+EXP218preregC2:ownR2fieldref,sameexactconfig/native/bothports/3.500GHz/
+medium/RIGHT/K64/Tol1e-6/directFP32storage/scaledFP32LU+3fixedFP64IR/
+reuse/defer/energy/releases/snapshots/1800s/60GiB/no swap/hostguard.
+No profiler/seeds/PROM/TF/cacheflush/defaultchange. Keepfixedrunorder.
+EXP218rootR2C2KPASS3.500GHz/2ports:746.261→752.608s,
+60688879616→46370021376B,44/44→44/45iter, finalCraw<=8.393e-7;
+RHS2truecheck>tolthencontinuationincluded, maxcoarse9.49257e-5/92apply.
+Receipt artifacts/m7-median-3500-pair-r2-qualification-20261022.json.
+EXP219preregR3:thirdnewFP64reference,sameexact3.500GHz/2ports/config/
+currentnative/medium/RIGHT/K64/Tol1e-6/fresh2/defer/energy/releases/fields,
+1800s/60GiB/no swap/hostguard. No profiler/seeds/PROM/TF/cacheflush/
+defaultchanges. Keepallrunresults; stillonepairremaining,nofinalmedianyet.
+EXP219rootR3PASS3.500GHz:745.458s/60683603968B,44/44iter/raw<=9.497e-7,
+identicalR1R2config/currentnative/FP64fresh2/inventory/finiteRFenergyPASS.
+Rootreferencecheckstoredwithactualbytes.
+EXP220preregC3:ownR3fieldreference,sameexact3.500GHz/bothports/config/
+currentnative/medium/RIGHT/K64/Tol1e-6/directFP32storage/scaledFP32LU+
+3fixedFP64IR/reuse/defer/energy/releases/snapshots/1800s/60GiB/no swap/
+hostguard. No profiler/seeds/PROM/TF/cacheflush/defaultchanges. Third
+paircannotreplacetheearlierunfavorablepairs, allthreeenterstatistics.
+EXP220rootR3C3KPASS:745.458→747.733s,60683603968→46361014272B,
+44/44→44/45iter, finalCraw<=8.221e-7, RHS2check>tolcontinuationincluded.
+Maxcoarse6.17117e-5/92apply. All3newpairedreceiptssource/config/native
+verifiedandP2exact3.500GHz/7regionsperpairseparatelychecked; W3numerical
+coveragein2portjobs, notsingle-P2timingclaim.
+Newversionscript--paired-mediansrequalifiesallinputs, requires3samef/config/
+native/countpairsand6distinctpaths/containernames, separatespairedratios
+fromratioofmedians; duplicates/mismatch/FAIL/NaN/antiprotocol/modesreject.
+179PythoncontrolsPASS, actualCLIall3pairsPASS. No nativeSHA/defaultchanges.
+Summaryartifacts/m7-median-3500-three-pairs-qualification-20261022.json:
+medianR745.457956/C747.732711s (+0.305149%),pairedtimechangemedian
++0.475673%[0.305149,0.850440],RAMcgroupmedian−23.596560%.42fields/maxE
+4.0888e-7/B8.7334e-8,ΔS2.3935e-8/ΔVSWR4.6196e-8/energy4.9630e-8.
+NativeBlockTimerpausesparent(confirmedtimer.hpp):setupmedian166.680→50.159s,
+coarse160.074→292.581s, PC256.687→253.330s, KSP79.247→62.916s,
+IO19.219→19.160s. No summingindependentphasemedians/inclusiveranges.
+InitialGPU2366–2373MiB/host84.08–84.86GB; globalNVMLpeak~15828–15845MiB
+includesdesktop, no physicalVRAMreductionclaim. Managedalloc56.943→
+41.950GB/cudssallocated25.008→13.348GBaredifferentlogicalmetrics.
+No1.5xtimespeedup, RAMshort25%ambitionby1.4034pp. Usefulmemorygainwith
+timecostexplicit. Writtenartifacts7.061GB/sixjobs, no diskhotworkspace.
+Detailsdocs/milestones/paired-medians.md, phase/background/allocartifact
+andP2proofJSON. NextM7.5meaningfulnewgeometry,thenpackage/audit;goalactive.
+M7.2checkpoint: sameLuna docs-garden PASS/no material inconsistencies;
+explicit compact Pareto table added with local rental0USD/energyunmeasured,
+logical allocations versus physicalVRAM limits retained. Rootdiffreview,
+docschecker anddiffcheck PASS. Prior179Python/8shell andactual3pairCLI
+PASS; nativeA6/defaults unchanged. Next prepare M7.5newgeometry.

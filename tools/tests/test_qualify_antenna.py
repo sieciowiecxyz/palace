@@ -124,6 +124,49 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(s['max_cgroup_saving_percent'],25)
         self.assertEqual(s['total_field_rows'],2)
 
+    def median_receipts(self):
+        rows=[]
+        for i,(a,b) in enumerate([(10,5),(20,40),(100,80)]):
+            r=self.receipt(3.5,a,b,1000+100*i,500+100*i)
+            r.update(input_paths=[f'/ref{i}',f'/cand{i}'],run_container_names=[f'ref{i}',f'cand{i}'])
+            rows.append(r)
+        return rows
+
+    def test_paired_medians_keep_pairing_and_distinguish_ratio_of_medians(self):
+        r=q.paired_medians(self.median_receipts())
+        self.assertEqual(r['reference_seconds'],dict(median=20,minimum=10,maximum=100))
+        self.assertEqual(r['candidate_seconds'],dict(median=40,minimum=5,maximum=80))
+        self.assertEqual(r['paired_speed_ratio']['median'],1.25)
+        self.assertEqual(r['ratio_of_time_medians'],.5)
+        self.assertAlmostEqual(r['paired_time_change_percent']['median'],-20)
+        self.assertEqual(r['time_change_from_medians_percent'],100)
+        self.assertEqual(r['reference_cgroup_bytes']['median'],1100)
+        self.assertEqual(r['candidate_cgroup_bytes']['median'],600)
+        self.assertEqual(r['total_field_rows'],3)
+
+    def test_paired_medians_reject_duplicates_mixed_policy_and_failed_cases(self):
+        rows=self.median_receipts()
+        for bad in [[],rows[:2],rows+rows[:1],[rows[0]]*3]:
+            with self.assertRaises(ValueError):q.paired_medians(bad)
+        for key,val in [('input_paths',rows[0]['input_paths']),('run_container_names',rows[0]['run_container_names']),
+                        ('frequency_ghz',3.3),('coarse_corrections',3),('source_sha256','different'),
+                        ('case_without_frequency_sha256','different'),('build_manifest_sha256','different'),
+                        ('passed',False),('protocol','antiresonance')]:
+            bad=json.loads(json.dumps(rows));bad[1][key]=val
+            with self.assertRaises(ValueError):q.paired_medians(bad)
+        bad=json.loads(json.dumps(rows));bad[1]['candidate']['end_to_end_seconds']=float('nan')
+        with self.assertRaises(ValueError):q.paired_medians(bad)
+
+    def test_CLI_medians_cannot_mix_modes_or_reinterpret_antiresonance(self):
+        with tempfile.TemporaryDirectory() as td:
+            p=Path(td)/'anti.json';p.write_text(json.dumps(dict(protocol='antiresonance',input_paths=['/unused','/unused'])))
+            for extra in [[],['--summary',str(p)],['--expected-frequencies','3.5'],['--protocol','antiresonance']]:
+                out=Path(td)/'out.json'
+                cmd=[sys.executable,str(Path(q.__file__)),'--paired-medians',str(p),str(p),str(p),'--output',str(out),*extra]
+                r=subprocess.run(cmd,capture_output=True,text=True)
+                self.assertNotEqual(r.returncode,0);self.assertFalse(out.exists())
+                self.assertTrue('antiresonance protocol' in r.stderr or '--paired-medians requires' in r.stderr)
+
     def test_fixed_correction_policies_are_explicit_and_never_mixed(self):
         for count in [None,True,1,5,2.0]:
             with self.assertRaisesRegex(ValueError,'fixed correction count'):q.qualify('/unused','/unused',count)
