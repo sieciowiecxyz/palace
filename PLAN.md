@@ -129,7 +129,7 @@ Szczegóły i warunki odrzucenia: `docs/milestones/M5-research.md`. Research jes
 
 ### M7 — ACTIVE: utrwalić najlepszy zaakceptowany wariant
 
-Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.4 PASS; po EXP195–202 W.5 **11/15** na obu portach PASS, maxcgroup−23.84%, suma czasu+2.95% (nie mediana). EXP183/184 rozdzielają koszt korekcji od części wpływu tłaGPU; brak gwarancji speedupu. EXP186–187 osobny antyrezonans2.900GHz S/Z/pola/rawPASS. EXP191 SIGTERM zachowany, autoryzowana referencja retryEXP193 PASS. Następne4punktyW.5:2.500/2.570/2.620/3.550GHz, potem mediany/nowageometria/pakiet. Bez przebudowy native lub luźniejszych progów pasmowych.
+Szczegółowa kolejność/coverage: docs/milestones/M7.md. Fixed2FAIL1.710GHz; fixed3 wybrany do dalszej kwalifikacji pamięciowej. W.4 i W.5 **15/15** na obu portach PASS,210regionalnychwierszy pól, maxcgroup−23.84%, suma czasu+2.58% (nie mediana). EXP211–214 ponownie kwalifikują W.2 na aktualnym native/fixed3 (tinyTEM-volumeL2, medium3freq/oba porty); starsze manifesty nie zostały uznane za aktualne. EXP186–187 osobny antyrezonans2.900GHz S/Z/pola/rawPASS. EXP191 SIGTERM zachowany, retryEXP193 PASS. Następnie trzy nowe pary3.500GHz/oba porty z oceną W.3/P2 i median, nowageometria/pakiet/audyt. Bez przebudowy native lub luźniejszych progów pasmowych.
 
 - [ ] Wykonać kwalifikację częstotliwości/portów według MILESTONES, trzy pomiary finalisty bez profilera.
 - [ ] Raport tabeli kompromisów i decyzja promote/reject; zachować działającą referencję oraz fallback.

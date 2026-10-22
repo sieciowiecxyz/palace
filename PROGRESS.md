@@ -8,9 +8,9 @@ Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176:
 
 ## Bieżący checkpoint
 
-- Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 PASS, W.5 obecnie11/15punktów1.71/1.785/1.805/1.88/1.92/1.98/2.11/2.17/2.69/3.3/3.8GHz oba porty PASS,154regionalnewierszepól; suma czasu+2.95%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/całe pasmo/produkcja. Receipt artifacts/m7-eleven-fixed3-partial-W5-summary-20261022.json.
+- Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 i W.5 **15/15**freq/oba porty PASS,210regionalnychwierszy pól; suma czasu+2.58%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/ciągłe pasmo/produkcja. Receipt artifacts/m7-full-W5-fixed3-summary-20261022.json.
 - EXP183/184: współczesny2IR→3IR przy3.3GHz +10.74%całego czasu; koszt wcoarse, wpływ tła GPU confounds starsze dane. Dwa krótkie profile PASS, nie RFkwalifikacja. UVM migruje wielokrotnie w badanym oknie; bez deklaracji unikalnego wolumenu lub fizycznej rezydencji zGPUprocesspeak.
-- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. EXP191SIGTERM niekompletny/zachowany; autoryzowana próba referencji1.88EXP193 PASS. EXP195–202 cztery nowe pary1.92/1.98/2.11/2.17KPASS, kontynuacje po true-residualcheck wliczone. **Następne:** brakujące4punktyW.5:2.500/2.570/2.620/3.550GHz. Trzyparymediany3.5GHz/nowageometria/pakiet otwarte.
+- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. EXP191SIGTERM zachowany/retryEXP193 PASS. EXP211–214current-buildW.2 PASS:tinyanalyticTEM-volumeL2, medium3freq/oba porty/RF/wholefields/TEMsamples. **Następne:** prereg wM7.md, trzy nowe pełne pary3.500GHz/oba porty, własne referencje, W.3/P2 i mediany. Nowageometria/pakiet/audyt otwarte.
 - Native SHAa6ec732f…187c3338 bez zmian, cache zachowany; Python qualifier i docs nie wymagają rebuilda. Bez płatnego compute, swapu lub hotworkspace SSD. Globalne defaulty niepromowane.
 
 ## Wcześniejsze etapy — historia wyników
@@ -4118,3 +4118,127 @@ onlysince85ea4b3,no nativebuild/unitretestneeded; previous176Python/8shell
 sourcevalidationunchanged. AllEXP195–202handlesterminal/noactivePalace
 container; no paidcompute/swap/appkills/native/defaultchange. M7ACTIVE,
 notcomplete:fourW5points,3fullpairedmedians,newgeometry,package/auditpending.
+
+## EXP203 prereg — M7/W.5 2.500GHz FP64 reference
+
+PreviousgoalturnPROGRESS:commit8b474f6, fournew1.92/1.98/2.11/2.17pairs
+KPASS/current11pointssummary, nativerebuildnotneeded. Currentworktreeclean/
+noactivePalacejobs/GPU2372MiBused/host85.12GBavailable/swap0/nativeverified
+unchangeda6ec732f…187c3338. No compatibleexact2.500GHzreferencefound.
+Cold2.500GHz/bothports/fullFP64basis+coarse/fresh2setups, samemedium/mesh/
+materials/ports/RIGHT/K64/Tol1e-6/defer/energy/releases/snapshots,1800s/
+60GiBcgroup/no swap/6GiBhostguard. NoTF/seeds/PROM/profiler/experimentalPC/
+defaultchanges. Rootchecksreferencebeforefixed3candidate.
+EXP203rootreferencePASS2.500GHz:748.584s/60862611456B,44/45iter,
+raw<=8.957e-7/nativeFP64fresh2/mesh+native/inventory4snapshots/finiteRF
+PASS; root-reference-check.jsonactualbytesstored.
+EXP204prereg:same2.500GHz/bothports/medium/native/config/RIGHT/K64/Tol1e-6,
+directFP32storage/scaledFP32LU+3fixedFP64IR/reuse/defer/energy/releases/
+snapshots,1800s/60GiB/no swap/hostguard/exactrefEXP203/frozenmatchedK.
+No seeds/PROM/TF/profiler/experimentalPC/defaultchanges.
+EXP204rootmatchedKPASS2.500GHz:768.071s/46457860096B vs748.584s/
+60862611456B,45/46vs44/45iter, raw<=8.289e-7afterreliablecontinuationboth
+RHS,costincluded.14fieldsPASS; receiptm7-2500-fixed3-qualification-20261022.json.
+
+## EXP205–207 prereg — final three W.5 FP64 references
+
+2.570/2.620/3.550GHz, three independentSEQUENTIALjobs, sameverifiednative/
+medium/mesh/physics/bothports/RIGHT/K64/Tol1e-6/fullFP64basis+coarse/
+fresh2setup/defer/energy/releases/snapshots. Each1800s/60GiBcgroup/no swap/
+6GiBhostguard; stopqueueifonefails, no automaticretry. No compatibleexact
+fulltwoportreferencesfound; rootauditscompletedresultsbeforecandidates.
+No seeds/PROM/TF/profiler/experimentalPC/defaultchanges.
+EXP205–207rootreferencesPASS:2.570GHz762.022s/61042880512B,45/46iter/
+raw<=7.889e-7;2.620GHz761.448s/61046497280B,45/46iter/raw<=9.289e-7;
+3.550GHz749.898s/60860223488B,44/45iter/raw<=7.834e-7. Allcurrentnative/
+mesh/freshFP64two setups/inventory4snapshots/finiteRFenergyPASS. Perref
+root-reference-check.jsonactualbytesstored. Workerclaimedtwo reliable
+continuationsperreference,butrootlogsproveonly2totalKSPchecks(oneperRHS),
+bothbelowthreshold,norestart1: do NOT propagateworkerclaim.
+
+## EXP208–210 prereg — final three W.5 fixed3 candidates
+
+2.570/2.620/3.550GHz, exactrespectiveverifiedreferences, sameconfigs/
+native/medium/bothports/RIGHT/K64/Tol1e-6/directFP32storage/scaledFP32LU+
+3fixedFP64IR/reuse/defer/energy/releases/snapshots. ThreeSEQUENTIALjobs,
+1800s/60GiB/no swap/hostguardeach; stopifincomplete/fieldflagFAIL/noauto
+retry. RootRFqualifiesallafterexecution. No seeds/PROM/TF/profiler/
+experimentalPC/defaultchanges.
+EXP208–210rootmatchedKPASS:2.570GHz781.432s/46550986752B versus
+762.022s/61042880512B,46/47vs45/46iter/raw<=7.809e-7;2.620GHz781.405s/
+46392844288Bvs761.448s/61046497280B,46/47vs45/46iter/raw<=8.759e-7;
+3.550GHz739.425s/46279172096Bvs749.898s/60860223488B,44/45both/
+raw<=8.875e-7. 2.57/2.62had2above-thresholdKSPchecksandcontinuation;
+3.55hadnone; allcostincluded. 14fieldsperpointPASS, noloosening.
+All15fixed3matchedpairsindependentlyrequalifiedwithversionscriptPASS:
+210fieldrows,maxΔS3.430e-8/ΔVSWR6.965e-8/energy1.004e-7,maxE6.095e-7/
+B1.308e-7. Summary artifacts/m7-full-W5-fixed3-summary-20261022.json.
+10978.169→11261.178s (+2.578%), maxcgroup61227782144→46630957056B
+(−23.840%),1289→1325iterations,35.305GBordinaryartifacts. No median/
+continuousband/physicalVRAM/newgeometryclaim. W5samplingcomplete.
+
+## EXP211 prereg — M7 integrated W.2 tiny reference
+
+Auditfoundoldfixed3W2manifest4fc32f… !=currenta6ec732f… andhistory/PROM
+policy,notcurrentcoldcombinedfinalist. NeedcurrenttinyTEML2thenmedium
+3freq2ports beforeM7.1claim. W3willbecheckedincludingP2incontemporary
+3.500GHzbothportpairedmedianruns, notsubstitutedby3.55nearbyf.
+Tiny3.550GHz/bothports/coldprocessFP64basis+coarse/fresh2,RIGHT/K64/Tol1e-6/
+defer/energy/releases/snapshots/coaxTEMprobes+volumeL2,60s/no swap/hostguard.
+GatesinheritedM1: TEMsampleRMS<=1%,point<=2%,analyticenergy<=1e-3,
+volumeE/B<=1%,q4/q6absolutechange<=5e-4; matchedRF/energy/fields/rawasK.
+Thenrootrefauditbeforefixed3tinycandidate,followmedium3.3/3.55/3.8both
+ports(noexpensivevolumeL2,probes+wholefields+S/TEM); donotrebuildnative.
+EXP211rootreferencePASS:17.746s/574173184B,39/42iter/raw<=9.594e-7,
+FP64fresh2/currentnative/inventory4snapshots/finiteRF/analyticTEMRMS+point+
+energygatesPASS; volumeL2E/B~0.4953/0.4558%,q4→q6delta~2.2e-6<5e-4.
+Storedtem-fields.jsonandroot-reference-check.jsoninclactualbytes.
+EXP212prereg:exacttinyconfig/native/3.55/2ports,directFP32storage/scaled
+FP32LU+3fixedFP64IR/reuse/defer/energy/releases/fields/TEML2,60s/no swap/
+hostguard/sameref/frozenK. No seeds/PROM/TF/profiler/defaultchanges.
+EXP212rootintegratedtinyW2PASS:versionedcold2portqualifierKPASSplus
+analyticTEMsampleRMS/point/energy/L2q4+q6gatesPASS.39/42both, originalraw
+<=9.702e-7, snapshotfields/RF/energy/nativefixed3PASSpreserved. Receipt
+artifacts/m7-w2-tiny-fixed3-qualification-20261022.json, tem-fields.json.
+
+## EXP213 prereg — integrated W.2 coax-medium FP64 3freq reference
+
+Exactcurrentnative, mediumcoaxunchanged,3.3/3.55/3.8GHz/bothports,
+FP64basis+coarse/fresh6setups,RIGHT/K64/Tol1e-6/TEMprobes/fields/defer/
+energy/releases. Explicitfrequency-port-batchBOTHvariants forNF>1defer,
+noexternalhistory/seeds/PROM/TF/profiler.180s/no swap/hostguard.
+AnalyticTEMsampleRMS<=1%,point<=2%,energy<=1e-3; noexpensivemediumvolumeL2
+(tinyL2passed). Rootreferencesixraw/inventory12snapshots/native6FP64/
+TEMauditbeforefixed3candidate; noantennaqualificationinferredfromcoaxalone.
+EXP213rootmedium3freqreferencePASS:62.980s/2967896064B,6solves/
+raw<=8.657e-7/nativeFP64fresh6/f-majoraudit/currentnative+mesh/12snapshots/
+finiteRF/TEM3freqallportsRMS+point+energygatesPASS. Rootreferencecheck+
+tem-fields.jsonstored; nofullvolumeL2claimformedium.
+EXP214prereg:same3freqcoaxmedium/f-major/config/currentnative,bothports/
+directFP32storage/scaledFP32LU+3fixedFP64IR/reuse3setups/defer/energy/
+releases/TEMprobes/fields,180s/no swap/hostguard,sameref/frozenK.
+No externalhistory/seeds/PROM/TF/profiler/defaultchanges.
+EXP214rootintegratedmediumW2PASS:6raw<=1e-6/currentnative+mesh/12snapshot
+SHA/configidentity/nativeFP64fresh6vsfixed3LUbuild3/reuse3/f-major/no
+externalhistory/allTEMsampleRMS+point+energygates/wholefields/RFenergyPASS.
+Receipt artifacts/m7-w2-medium-fixed3-qualification-20261022.json.
+W2tiny+mediumNOWcurrentbuild/currentfixed3qualified; old4fc…historytestsnot
+usedasproofcurrentbuild. No mediumvolumeL2claim,tinyvolumeL2PASSseparate.
+W3and3pairedmedians3.500GHzstillNOTRUNforfixed3; nextstepafterdoccheckpoint.
+EXP214checkpointpreparation:W5all15/currentfixed3PASS,210fieldrows;
+W2tiny+mediumcurrentbuildPASS.TinyKmaxΔS3.144e-10/ΔVSWR3.254e-10/
+energy4.252e-9,analyticTEMvolumeL2<1%/qchange<5e-4. MediumKmaxΔS4.975e-9/
+ΔVSWR9.539e-9/energy8.709e-9/12fieldrows/maxE5.870e-8/B2.404e-8,
+62.980→47.667s onepair, notantenna speedup. No native/rebuild/defaultchanges.
+Detailedpreregfor3new3.500GHzbothportfullpairsinM7.md BEFOREtimingdata;
+firstpairwillverifyexactP2W3numericalcoverage, reporttwoportcosthonestly.
+NextR1→C1→R2→C2→R3→C3eachownfieldref/fullK; retainunfavorable/failure
+dataandbackground. Thennewgeometry/package/audit. GoalM7stillACTIVE.
+EXP214checkpoint:currentW5all15KandW2tiny+mediumTEMqualified, sources/
+config/native/currentartifactsrootverified. Rootdocsdiff/checker/diffPASS,
+no code/nativechangesormandatoryunitretestsince8b474f6. AllEXP203–214
+handlesterminal/noactivePalacecontainer. SameLunareusedonlyreadyargv
+babysitting, rootdesigned/analyzed/recordsworkerreportcorrectionsfromactual
+logs. No paidresources/swap/hotSSDworkspace/appkills/rebuild. GoalM7active,
+nextthreecontemporary3.500GHzbothportR/CpairsperpreregM7.md, thenmeaningful
+newgeometry, reproduciblepackageandfullcompletionaudit.

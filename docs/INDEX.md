@@ -39,7 +39,7 @@ Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILEST
   - Opis: DirectWMMA W.1FAIL/REJECT, scopedTCproof i microgain zachowane; bezpromocji PC, ograniczenia FGMRES.
 - [M7: kwalifikacja finalisty](milestones/M7.md)
   - Czytaj gdy: planujesz W.4/W.5, mediany pełnych par, nową geometrię lub pakiet
-  - Opis: Active checklista/coverage; fixed3W.4 PASS, W.5 jedenaściez15punktów PASS z kompromisemczas/RAM; fixedcounty nie są mieszane. Mediany/nowageometria/pakiet nadal otwarte.
+  - Opis: Active checklista/coverage; fixed3W.2/W.4/W.5 PASS (15freq/oba porty), jawny kompromis czasu/pamięci. Prereg nowych par3.500GHz dlaW.3/median; nowageometria/pakiet/audyt nadal otwarte.
 - [M7: protokół antyrezonansu](milestones/antiresonance-qualification.md)
   - Czytaj gdy: kwalifikujesz osobny punkt2.900GHz lub interpretujesz S→Z przy biegunie
   - Opis: Preregistered S/power/energy/pola/raw, Zin i granica uwarunkowania; brak VSWRgate wyłącznie tutaj, bez mieszania z matched-band.
