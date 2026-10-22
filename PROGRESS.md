@@ -8,9 +8,9 @@ Aktualizacja: 2026-10-22. Mode: goal, Active: M7 (M6 assessment complete EXP176:
 
 ## Bieżący checkpoint
 
-- Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 cztery punkty1.71/2.69/3.3/3.8GHz oba porty PASS,56regionalnychwierszy pól; suma czasu+3.37%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/całe pasmo/produkcja. Receipt artifacts/m7-four-fixed3-summary-20261022.json.
+- Active **M7**. Fixed3 wybrany do dalszej kwalifikacji pamięciowej po fixed2 FAIL przy1.71GHz. W.4 PASS, W.5 obecnie7/15punktów1.71/1.785/1.805/1.88/2.69/3.3/3.8GHz oba porty PASS,98regionalnychwierszy pól; suma czasu+3.37%, maxcgroup−23.84%. Jeden pomiar perpara, nie mediana/całe pasmo/produkcja. Receipt artifacts/m7-seven-fixed3-partial-W5-summary-20261022.json.
 - EXP183/184: współczesny2IR→3IR przy3.3GHz +10.74%całego czasu; koszt wcoarse, wpływ tła GPU confounds starsze dane. Dwa krótkie profile PASS, nie RFkwalifikacja. UVM migruje wielokrotnie w badanym oknie; bez deklaracji unikalnego wolumenu lub fizycznej rezydencji zGPUprocesspeak.
-- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. **Następne:** brakujące11punktówW.5. Trzyparymediany3.5GHz/nowageometria/pakiet otwarte.
+- EXP186–187: osobny prereg 2.900GHz S/Z/pola/raw/energy bez VSWRgate, para PASS, maxΔS7.753e-8/maxΔZ3.001e-6Ω; czas+4.00%/cgroup−24.41%. Domyślne matched-band K bez zmian. EXP191SIGTERM niekompletny/zachowany; autoryzowana próba referencji1.88EXP193 PASS, kandydatEXP194KPASS. **Następne:** brakujące8punktówW.5, zaczynając1.920GHz. Trzyparymediany3.5GHz/nowageometria/pakiet otwarte.
 - Native SHAa6ec732f…187c3338 bez zmian, cache zachowany; Python qualifier i docs nie wymagają rebuilda. Bez płatnego compute, swapu lub hotworkspace SSD. Globalne defaulty niepromowane.
 
 ## Wcześniejsze etapy — historia wyników
@@ -3949,3 +3949,92 @@ docs-gardenPASS/rootdiffreview. CLIantireceipt-to-matchedsummarynegative
 controlPASS; fourfixed3pairsrecheckedwithfinalqualifierPASS. No native
 rebuildorunrelatedappchanges. Allsimulations/profilehandlesterminal, M7active
 with11W5points/3pairedmedians/newgeometry/packagepending.
+
+## EXP188 prereg — M7/W.5 1.785GHz fullFP64 reference
+
+PreviousgoalturnclassifiedPROGRESS: commite424d61, new2.69/3.3/3.8fixed3
+W4evidence,2.9antiFP64/candidatepairKPASS,176Python/8shell/docsPASS.
+Currentworktreeclean/nativeverifiedsamea6ec732f…187c3338; noactiveGPUjobs,
+GPU2349MiBused/13551MiBfree,host82.23GBavailable,swap0. No compatible
+1.785GHzreferencefound; do not substitute nearbyf.
+Cold1.785GHz/bothportsfullFP64basis/coarse/fresh2setups,RIGHT/K64/Tol1e-6,
+samemedium/mesh/materials/ports/defer/energy/release/snapshots,1800s/60GiB/
+no swap/6GiBhostguard. No seeds/PROM/TF/profiler/PCexperimentalflags.
+Rootverifiesreferencebefore3fixedIRcandidate. SameLunababysitsreadyargv.
+EXP188rootreferencePASS1.785GHz:705.073s/60150403072B,40/41iter,
+originalraw<=8.977e-7,2freshFP64setups/mesh+native/inventory4snapshots/
+finiteSenergyPASS. root-reference-check.jsonactualbytesstored.
+EXP189prereg: same1.785GHz/2ports/medium/currentnative, directFP32storage/
+scaledcomplexFP32LU+3fixedFP64IR/reuse; identicalRIGHT/K64/Tol1e-6,
+defer/energy/releases/snapshots,1800s/60GiB/no swap/hostguard. Fieldreference
+EXP188, frozenmatchedK, noTF/seeds/PROM/profiler/defaultpromotion.
+EXP189rootmatchedKPASS1.785GHz:ref705.073s/60150403072B,
+fixed3candidate726.980s/46102175744B (+3.107%time/−23.355%cgroup).
+40/41→42/43iter, originalrawfinal<=7.125e-7, maxcoarse7.60743e-4/
+89applyfixed3. Bothsolvesrequiredreliablecontinuationafterinitialtrue
+check>1e-6; noearlyacceptance/relaxation, costincluded.14fieldsPASS,
+maxΔS4.3955e-9/ΔVSWR6.1738e-9/Δpower6.4858e-10/energy2.1006e-8.
+Receipt artifacts/m7-1785-fixed3-qualification-20261022.json.
+
+## EXP190–191 prereg — W.5 1.805 and1.880GHz references
+
+Two sequentialcoldFP64referencejobs, notconcurrent, each1800s/60GiB/
+no swap/6GiBhostguard. Sameverifiednative/medium/mesh/physics, bothports,
+RIGHT/K64/Tol1e-6/nativeFP64coarse/fresh2setup/defer/energy/releases/
+snapshots. No compatibleexistingexactreferencesfound; noapproximatefreq
+substitution. Rootchecksbothexistingresultsbeforecorrespondingfixed3
+candidates. No seeds/PROM/TF/profiler/PCexperiments/defaultchanges.
+EXP190rootreferencePASS1.805GHz:709.171s/60149178368B,40/41iter,
+originalraw<=9.181e-7,2freshFP64setups/native+mesh/inventory4snapshots/
+finiteSenergyPASS. root-reference-check.jsonactualbytesstored.
+EXP191INTERRUPTEDnotRFresult:1.880referenceexit130/SIGTERMat265.387s,
+firstsolveiter19/recurrence2.289823e-2,nofinalraw/fields/containerstate.
+Partialcgroup55850786816Bnotusablefullresult. Runnerexit130/interruptedtrue
+andnoactivepodmancontainer/palaceprocessconfirmedroot; notobservationtimeout.
+AgentreportedwronglythatEXP190notstarted; actualfilesprove190complete,
+agentcorrected. EXP191handle45867terminalwrite_stdinreportedSIGTERM; agent
+usedexactargv/noshelltimeout/nokill, sourceofsignalUNKNOWN/notlabelledOOM.
+Preserveartifactandnewpathforretryafter190candidate.
+EXP192prereg:1.805GHzfixed3candidate sameprotocol/frozenK/refEXP190,
+1800s/60GiB/no swap/hostguard; no seeds/PROM/TF/profiler/defaultchange.
+GPUbackgroundnow~3.0GB(vs~2.35GBprior); retaintelemetry, noforcedappchanges
+orcausalspeedclaimfromunmatchedbackground.
+
+EXP193prereg/usersteering: userexplicitlyrequestsretry afterEXP191SIGTERM.
+Rootauthoritativestatebeforequeue: EXP1921.805candidateisLIVE, container
+palace-run-1284a65e1f20, runnerPID1816174/Palace1816297, no terminalresult.
+Do not restart192/duplicateGPUload. After192cleanterminal, retry1.880GHz
+FP64reference atnewpathm7-qualified-1880-reference-r1-20261022 withsame
+medium/config/native/RIGHT/K64/Tol1e-6/fresh2setup/bothports/snapshots/defer/
+energy/releases/1800s/60GiB/no swap/hostguard. PreserveEXP191incomplete
+artifact; unknownSIGTERMsource notnumericalFAIL/OOM/speedresult.
+EXP192rootmatchedKPASS1.805GHz:744.025s/46215004160B vs709.171s/
+60149178368B,42/43iter, originalraw<=7.514e-7/coarsemax7.37598e-4/
+89applyfixed3. Bothsolvesreliablecontinuationincluded;14fieldsPASS,
+receipt artifacts/m7-1805-fixed3-qualification-20261022.json.
+EXP193rootreferencePASS1.880GHzretry:714.022s/60146532352B,41/41iter,
+originalraw<=9.423e-7/FP64fresh2/native+mesh/inventory4snapshots/finiteRF
+PASS. root-reference-check.json includesactualbytes. EXP191oldSIGTERM
+incompletekeptunchanged; don'tmixitscost/partialmemoryintocompletedpair.
+EXP194prereg:1.880GHzdirectFP32storage/scaledFP32LU+3fixedFP64IR/reuse,
+fieldreferenceEXP193newr1path, samefullmedium/ports/RIGHT/K64/Tol1e-6/
+defer/energy/releases/snapshots/1800s/60GiB/no swap/hostguard/frozenmatchedK.
+No TF/seeds/PROM/profiler/defaultpromotion oruserappchanges.
+EXP194rootmatchedKPASS1.880GHz:728.928s/46096318464B vs714.022s/
+60146532352B,42/43vs41/41iter, finalraw8.91977e-7/7.76246e-7; initial
+checks3.17e-6/5.65e-6triggeredreliablecontinuation, includedcost.
+Fixed3maxcoarse6.36821e-4/89apply;14fieldsPASS, maxE4.5668e-8/
+B4.0458e-8. ΔS7.4986e-9/ΔVSWR3.1271e-9/power1.0226e-9/energy8.7634e-9.
+Receipt artifacts/m7-1880-fixed3-qualification-20261022.json.
+All7fixed3matchedpairs requalified withversionscript: partialW5coverage
+7/15,98fieldrowsPASS. Summary artifacts/m7-seven-fixed3-partial-W5-summary-
+20261022.json:5086.211→5257.496s (+3.368%), maxcgroup61227782144→
+46630957056B (−23.840%). Notpairedmedians/fullband/nohardwareclaim;
+unknownSIGTERMresearchcost265.387s keptseparatefromcompletedpairtimes.
+NextW5missing1.920/1.980/2.110/2.170/2.500/2.570/2.620/3.550GHz.
+No native/code/default/cachechange, no paidcompute/hotSSDworkspace.
+EXP194checkpoint: versionscriptrevalidatedall7fixed3pairsPASS; rootdocsdiff
+review/checker/diffcheckPASS. Documentationonly sincecommite424d61; no
+needfornativebuildorunitretests, previous176Python/8shellsourcevalidation
+unchanged. AllEXP188–194jobhandlesterminal; noactivePalacecontainer/process
+confirmedafter194. GoalM7active,next1.920GHzreference/candidateexactpair.
