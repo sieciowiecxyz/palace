@@ -5,7 +5,7 @@
 Linux x86-64, Python 3.11+, Podman, zstd. GPU run wymaga NVIDIA driver/CDI (`nvidia.com/gpu=all`). Nie są potrzebne pip ani systemowy CUDA toolkit: kompilatory i zależności są w builderze. Profil: CUDA 12.9.1, cuDSS 0.7.1.4, SM120, Release.
 
 ```sh
-python3 tools/dev.py build --jobs 8
+python3 tools/dev.py build --jobs 2
 python3 tools/dev.py prepare tshaped-medium
 python3 tools/dev.py run coax-tiny artifacts/coax-check --seconds 60
 ```
@@ -38,6 +38,14 @@ podman save -o palace-runtime.tar localhost/palace:local-sm120
 ```
 
 Runtime zawiera nasze binaria i adapter; `package` korzysta wyłącznie z lokalnego przypiętego obrazu. Runner developerski montuje aktualne binaria z `build/sm120/native`, więc zwykła iteracja nie wymaga pakowania obrazu.
+
+M7.3: `package --output NEW-BUNDLE --reference CURRENT-FP64-TINY-RUN` tworzy
+odrębny zestaw runner/input/native/source/manifest/reference. `reproduce.py`
+sprawdza payload i wykonuje przypięty obraz bez hostnative overlays; profil
+memory ma stałe3IR, reference pełneFP64. Oba3.55GHz/2porty/TEML2, domyślnie60s.
+Instrukcje, faktyczne kwalifikacje i ograniczenia: [lokalny pakiet](runtime-package.md).
+`--runtime-image` developerskiego run sprawdza manifest/nativebytes/baselayers
+i odrzuca profiler/Q-pool overlays. Domyślna ścieżka oraz cache bez zmian.
 
 Obrazy są **lokalne, nie w GHCR**. Aby na drugim komputerze działał także build, raz wyeksportuj builder i bazę runtime wskazane w `tools/runtime.json`:
 

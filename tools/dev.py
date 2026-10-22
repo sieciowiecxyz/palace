@@ -22,6 +22,9 @@ BUILD = ROOT / 'build/sm120'
 SETTINGS = ROOT / 'tools/runtime.json'
 CASES = ['coax-tiny', 'coax-medium', 'tshaped-medium']
 INTERRUPTED_SIGNAL = None
+NATIVE_PATHS = {'libpalace.so': '/opt/palace-cudss/lib/libpalace.so',
+                'palace-x86_64.bin': '/opt/palace-cudss/bin/palace-x86_64.bin',
+                'libcudss_fp32.so': '/opt/precision/libcudss_fp32.so'}
 
 
 def sha(path):
@@ -167,6 +170,26 @@ def verified_build():
         if sha(BUILD / 'native' / filename) != expected:
             raise ValueError('Built binary changed: ' + filename)
     return manifest
+
+
+def verified_runtime_image(image, manifest):
+    """Verify the actual image payload before an unmounted packaged execution."""
+    digest = image_id(image)
+    def inside(entrypoint, *args):
+        return subprocess.check_output(['podman', 'run', '--rm', '--network=none',
+            '--entrypoint', entrypoint, digest, *args], text=True, timeout=30)
+    if json.loads(inside('cat', '/opt/palace-local/build-manifest.json')) != manifest:
+        raise ValueError('Runtime image has a different build manifest')
+    lines = inside('sha256sum', *NATIVE_PATHS.values()).splitlines()
+    actual = {path.strip(): checksum for checksum, path in (line.split(maxsplit=1) for line in lines)}
+    expected = {path: manifest['native'][name] for name, path in NATIVE_PATHS.items()}
+    if len(lines) != len(expected) or actual != expected:
+        raise ValueError('Runtime image native bytes differ from the build')
+    base_layers = read_output(['podman', 'image', 'inspect', manifest['runtime_base_id']])[0]['RootFS']['Layers']
+    layers = read_output(['podman', 'image', 'inspect', digest])[0]['RootFS']['Layers']
+    if not base_layers or layers[:len(base_layers)] != base_layers:
+        raise ValueError('Runtime image is not based on the pinned dependency layers')
+    return digest
 
 
 def fixture(name, directory=None):
@@ -929,8 +952,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         nsys_window=None, direct_basis=False, coax_sweep=False, coax_frequency=None, basis_prefetch=False,
         setup_audit=False, port_setup_reuse=False, both_ports=False, partial_initial_fields=False, excitation=None,
         release_postprocess_energy=False, defer_postprocessing=False, cudss_hybrid_mib=None, ams_cycles=None,
-        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None, native_coarse_corrections=None, fixture_directory=None):
+        native_coarse_fp32=False, basis_audit=False, pc_basis_fp32_forward=False, pc_basis_compensated_forward=False, frequency_port_batch=False, frequencies=None, sweep_predictor=False, initial_history=None, history_frequencies=None, native_coarse_corrections=None, fixture_directory=None, runtime_image=None):
     invocation_started=time.monotonic()
+    if runtime_image and (nsys_window is not None or ceed_qpool):
+        raise ValueError('Packaged runtime execution excludes profiler and Q-pool overlays')
     sweep_predictor=sweep_predictor_mode(sweep_predictor)
     if bool(initial_history)!=(history_frequencies is not None):
         raise ValueError('History source and two source frequencies must be specified together')
@@ -983,6 +1008,8 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         raise ValueError('HYPRE pool must be an integer from 16 to 4096 MiB')
     require_host_memory()
     manifest = verified_build()
+    settings = read(SETTINGS)
+    execution_image = verified_runtime_image(runtime_image, manifest) if runtime_image else settings['runtime_image']
     qpool = verified_qpool(manifest) if ceed_qpool else None
     directory, info, config = fixture(name, fixture_directory)
     config = diagnostic_config(name, config, coax_fields or coax_l2, pc_side, krylov_size,
@@ -1031,7 +1058,6 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     if history:write(output/'history-source.json',history)
     if name in ['coax-tiny', 'coax-medium']:
         write(output / 'geometry.json', coax_geometry(name))
-    settings = read(SETTINGS)
     container = 'palace-run-' + hashlib.sha256(str(output).encode()).hexdigest()[:12]
     flags = {'MFEM_MEMORY': 'cuda', 'LD_PRELOAD': '/opt/precision/libcudss_fp32.so',
              'PALACE_CUDA_MANAGED': '1', 'PALACE_CUDSS_TRACK': '1',
@@ -1140,9 +1166,10 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
             '--unsetenv', 'PALACE_HISTORY_FREQUENCIES',
             '--unsetenv', 'PALACE_INITIAL_FIELDS',
             '--unsetenv', 'PALACE_INITIAL_FIELDS_EXCITATIONS',
-            '-v', f'{output}:/work', '-v', f'{BUILD / "native/libpalace.so"}:/opt/palace-cudss/lib/libpalace.so:ro',
-            '-v', f'{BUILD / "native/palace-x86_64.bin"}:/opt/palace-cudss/bin/palace-x86_64.bin:ro',
-            '-v', f'{BUILD / "native/libcudss_fp32.so"}:/opt/precision/libcudss_fp32.so:ro', '-w', '/work']
+            '-v', f'{output}:/work', '-w', '/work']
+    if not runtime_image:
+        for filename, destination in NATIVE_PATHS.items():
+            args.extend(['-v', f'{BUILD / "native" / filename}:{destination}:ro'])
     if qpool:
         location, metadata = qpool
         args.extend(['-v', f'{location / "libceed_qpool.so"}:{metadata["runtime_library_path"]}:ro'])
@@ -1163,16 +1190,18 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
     target = '/opt/palace-cudss/bin/palace-x86_64.bin'
     if profile:
         args.extend(['--unsetenv', 'LD_PRELOAD', '--entrypoint', '/profile-tools/'+profiler.BINARY,
-                     settings['runtime_image'], *profiler.arguments(profile),
+                     execution_image, *profiler.arguments(profile),
                      '--env-var=LD_PRELOAD='+flags['LD_PRELOAD'], target, 'config.json'])
     else:
-        args.extend(['--entrypoint', target, settings['runtime_image'], 'config.json'])
+        args.extend(['--entrypoint', target, execution_image, 'config.json'])
     try:
         command(args, stdout=subprocess.DEVNULL)
     except BaseException:
         if profile: shutil.rmtree(profile['ram_directory'])
         raise
     write(output / 'command.json', {'argv': args, 'environment': flags,
+                                   'runtime_image': execution_image,
+                                   'native_from_image': bool(runtime_image),
                                    'diagnostic': {'coax_fields': coax_fields or coax_l2,
                                                   'pc_side': pc_side, 'coax_l2': coax_l2,
                                                   'allocation_trace': allocation_trace, 'ceed_qpool': ceed_qpool,
@@ -1392,8 +1421,15 @@ def run(name, output, seconds, basis='fp32', coax_fields=False, pc_side=None, co
         raise ValueError('Field accuracy failed; see ' + str(output/'field-comparison.json'))
 
 
-def package(tag):
+def package(tag, output=None, reference=None):
+    if reference is not None and output is None:
+        raise ValueError('Package reference requires an output bundle directory')
     manifest = verified_build()
+    if output is not None:
+        import package_bundle
+        if Path(output).exists():
+            raise ValueError('Package output already exists')
+        reference = package_bundle.checked_reference(reference, manifest)
     settings = read(SETTINGS)
     context = BUILD / 'package'
     context.mkdir(exist_ok=True)
@@ -1405,16 +1441,21 @@ def package(tag):
     write(BUILD / 'runtime-image.json', {'tag': tag, 'image_id': image_id(tag),
                                        'build_manifest_sha256': sha(BUILD / 'manifest.json'),
                                        'numerically_validated': False})
+    verified_runtime_image(tag, manifest)
+    if output is not None:
+        import package_bundle
+        package_bundle.create(output, reference, manifest, read(BUILD/'runtime-image.json'))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action', required=True)
-    b = sub.add_parser('build'); b.add_argument('--jobs', type=int, default=8)
+    b = sub.add_parser('build'); b.add_argument('--jobs', type=int, default=2)
     p = sub.add_parser('prepare'); p.add_argument('case', choices=CASES)
     p.add_argument('--fixture-dir', type=Path, help='Explicit checksum-verified fixture directory of the selected case family')
     r = sub.add_parser('run'); r.add_argument('case', choices=CASES)
     r.add_argument('--fixture-dir', type=Path, help='Explicit checksum-verified geometry variant; same case family and medium checks')
+    r.add_argument('--runtime-image', help='Verify packaged image/native bytes and execute without host native overlays; local images only')
     r.add_argument('output', type=Path); r.add_argument('--seconds', type=int, default=1800)
     r.add_argument('--memory-marks', action='store_true', help='Optional allocation phase markers; no device synchronization')
     r.add_argument('--release-gmres-basis', action='store_true', help='Discard cached GMRES vectors after reconstruction, before postprocessing')
@@ -1463,6 +1504,8 @@ def main():
     r.add_argument('--nsys-window', metavar='FIRST:COUNT', help='Partial CUDA trace with calibrated host phases; FIRST=0..32, COUNT=2..8; no RF qualification')
     r.add_argument('--background', action='store_true', help='Detach bounded run from the calling tool session')
     p = sub.add_parser('package'); p.add_argument('--tag', default='localhost/palace:local-sm120')
+    p.add_argument('--output', type=Path, help='Create independent local runner/input/source bundle; pinned image must remain loaded')
+    p.add_argument('--reference', type=Path, help='Verified current full-FP64 coax-tiny3.55GHz run to include as the small reference')
     sub.add_parser('status')
     args = parser.parse_args()
     if args.action == 'build':
@@ -1501,14 +1544,14 @@ def main():
             args.complex_coarse, args.release_final_solver, args.native_complex_coarse, args.nsys_window, args.direct_basis, args.coax_sweep, args.coax_frequency, args.basis_prefetch,
             args.setup_audit, args.port_setup_reuse, args.both_ports, args.partial_initial_fields, args.excitation,
             args.release_postprocess_energy, args.defer_postprocessing, args.cudss_hybrid_mib, args.ams_cycles,
-            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies,args.native_coarse_corrections,args.fixture_dir)
-    elif args.action == 'package': package(args.tag)
+            args.native_coarse_fp32, args.basis_audit,args.pc_basis_fp32_forward,args.pc_basis_compensated_forward,args.frequency_port_batch,args.frequencies,args.sweep_predictor,args.initial_history,args.history_frequencies,args.native_coarse_corrections,args.fixture_dir,args.runtime_image)
+    elif args.action == 'package': package(args.tag, args.output, args.reference)
     else:
         print(json.dumps({'builder': container_name(), 'build': str(BUILD),
                           'manifest': read(BUILD / 'manifest.json') if (BUILD / 'manifest.json').exists() else None}, indent=2))
 
 
-if __name__ == '__main__':
+def install_signal_handlers():
     def interrupted(_signum, _frame):
         global INTERRUPTED_SIGNAL
         INTERRUPTED_SIGNAL = signal.Signals(_signum).name
@@ -1516,6 +1559,10 @@ if __name__ == '__main__':
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
+
+
+if __name__ == '__main__':
+    install_signal_handlers()
     try:
         main()
     except KeyboardInterrupt:

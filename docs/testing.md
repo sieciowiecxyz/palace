@@ -390,3 +390,18 @@ EXP221–222 pełna para3.500GHz/oba porty na tej nowej siatce K PASS,
 14regionalfieldrows, noweCSR/faktory. ZyskRAM23.779%, czas−1.065% to jedna
 para. Prereg, wyniki i zakres: [generalizacja](milestones/geometry-generalization.md).
 Pakiet/M7.3 i pełny audyt/M7.4 pozostają otwarte.
+
+## M7.3 — pakiet, obraz i cykl życia
+
+191Python/8shell PASS. Nowe testy obejmują rzeczywiste manifest/native/base
+layer mismatch, payloadchecksum/missing/path/symlink, profile/overlays i
+walltime, własny SIGTERM bez postexitstate oraz timeout−1 z oddzielnym
+image/version-bound CPUcontrol. Bez witness ten kod nie jest akceptowany.
+EXP228/229 końcowy bundleR3 z/tmp: image-native bez hostnative overlays,
+pełne pola/S/VSWR/raw/energy i niezależny TEM/L2 PASS. EXP230 kontrolowane
+1s deadline oraz SIGTERM/cleanup PASS; oba niekompletne runy pozostają
+niepoprawnymi wynikami RF. Wcześniejszy checkerFAIL137/143vs−1 zachowany,
+wyjaśniony niezależnym CPUcontrol i kodemConmon, bez zmiany physicsK.
+EXP231 zwykły developer-run z3hostnative mountami również pełneKPASS.
+[Pakiet i dowody](runtime-package.md). Native/dependencies bez przebudowy.
+Pełny audyt M7.4 (w tym binding actual reference inventory) nadal otwarty.

@@ -1,3 +1,16 @@
+## Bieżący checkpoint — M7.3 PASS / następny M7.4
+
+Końcowy pakiet artifacts/m7-sm120-bundle-r3-20261022, image43ac46f6…/
+nativeA6. EXP228/229image-native bez hostnative overlays: tiny3.55GHz/
+2ports/medium FP64i fixed3K/TEMPASS,17.412/18.414s (nie antenabenchmark).
+EXP230deadline+SIGTERMcleanupPASS z vendorsemanticscontrol; EXP231legacy
+3nativehostmountsKPASS.191Python/8shellPASS, docs/runtime-package.md.
+Globalne defaulty/native numerically_validatedbez zmian. M7.1/2/3/5zakresy
+zaliczone, goalaktywny. NastępnyM7.4: audytwszystkichwymagań i dowodów,
+automatycznebindingnativefield-referenceinventorydopodanejR, rekwalifikacja
+15W5/3median/newgeometrynanajnowszymkwalifikatorze, beznowychdużychGPUrunów
+jeślinativebez zmian. Historycznecheckpointyponiżej sąchronologią.
+
 ## Bieżący checkpoint — M7.5 PASS / następny M7.3
 
 EXP221–222 nowa geometria directora+2mm/3.500GHz/bothports/medium i pełneK
@@ -4381,3 +4394,91 @@ NativeverifiedA6/no dependencies/cacheflush/rebuild/defaultchange. M7.5
 completewithinonechangedgeometryscope;M7.3packageandM7.4auditopen.
 No simulationactive. Nextinspectpackage/reproduction/checkcleanupdeadline
 without recompilingorlargeGPUjobs; goalactive.
+
+## M7.3 package prereg — EXP223 onwards
+Previousgoalturnprogress: M7.5newgeometryKPASS committed8312390.
+NativeA6unchanged. Packagegap: oldthinimagewasstale/notcurrentM7; runner
+alwayshostmountednative, so addactualimagepayloadverificationandno-overlay
+execution. Newbundleincludescompilerinputhashsources/tools/frozenarchives/
+smallcurrentFP64reference/explicitprofilesandboundedexample; pinnedimage
+remainslocal, no3GBperrunupload. No dependency rebuild/cacheflush.
+188PythonPASS includingmanifest/native/base-layer mismatch, checksum/paths/
+missing/symlinkpayload, unsupportedprofile/overlay/walltimeguards.
+Smallimage-native examplepreregistered; runmemory thenFP64, rootK/TEMaudit,
+then1sdeadlineandcontrolledownprocessSIGTERM/cleanupcheck. Nofullantenna.
+Bundle artifacts/m7-sm120-bundle-20261022/image localhost/palace:m7-sm120-20261022,
+sourceFP64reference artifacts/m7-w2-tiny-reference-20261022.
+Goal/M7active; M7.3notcompletedbybuildalone; next docs/runtime-package.md.
+EXP223–224 initialbundle example memory/fullFP64 execution+analyticTEMPASS,
+actualimage43ac46f6…/nohostnativeoverlaysconfirmed. MemoryfullKvsincluded
+referencePASS (receipt m7-package-tiny-fixed3-qualification-20261022.json).
+Rootalsoattemptedextra bitwise-equalityassertionforFP64replay; notidentical,
+thoughraw/TEM/RFconsistent. BitwiseidentityisnotfrozenK; insteadimprove
+referenceprofiletoexplicitnativeweightedfieldcomparisonagainstincludedref.
+No accuracygateweakened; initialartifactsretained, no antenna timeclaim
+from tiny/profileverificationoverhead. Newr1bundlecapturescurrenttoolswith
+fieldrefbothprofilesandreadylifecyclecheck. EXP225memory/EXP226reference
+willbothbevalidatedagain; EXP2271sdeadline+ownwrapperSIGTERMafterlive
+coarsemarker. Newbundle artifacts/m7-sm120-bundle-r1-20261022, sameimage/
+nativeA6, no rebuild/cacheflush.188PythonPASS; notcompleteyet.
+Finalpre-runbundle r2 artifacts/m7-sm120-bundle-r2-20261022; r1PREPONLY
+retained. Referenceprofile nowalsohasnativefield-referencequalitygate.
+LifecycleunitcontrolsPASS inclSIGTERMwithoutpostexitinspectfile and
+deadlinerejectOOM;190PythonPASS. EXP225/226r2memory/reference planned
+exactwrappersfrom/tmp, thenrootauditbeforeEXP227lifecycle. NativeA6and
+image43ac46f6… unchanged. No referencebitwisecriterion: weightednormgates.
+EXP225/226 rootfullK/TEM/image-nativeauditPASS. R2memory18.344s/
+582926336B/raw[9.7162623e-7,7.7029075e-7],coax4regionalrows,
+maxE7.1847e-7/B1.2419e-8; reference18.410s/568180736B/raw[9.5930524e-7,
+7.6820681e-7], maxE1.1968e-13/B3.2156e-13. Workerabbreviatedrawforboth
+as~9.716e-7; rootreadcorrectdistinctvalues. TEMvolumeL2~.4953%/.4558%,
+q4→6delta2.17445e-6, samples/points/energyfrozengatesPASSbothprofiles.
+Actualargvimage-native/nohostnativeoverlaysconfirmed. Receiptm7-package-r2-
+example-qualification-20261022.json andtiny-fixed3 receipt. Tinycostincludes
+image/payloadchecks, no antennaspeedclaim. EXP227nextdeadline/SIGTERM.
+M7.4auditnote: inspectqualifierbindingbetweenactualnativefield-reference
+mountinventoryandprovidedR; previousrootpairsuseownRbutautomatedparser
+shouldnotacceptanotherreferencewithcompatibleidentityalone.
+EXP227firstdeadlinecheckFAILretained: appstopped~.855s/cleanupPASS/noOOM,
+Podmanattach255/StateExitCode-1 didn'tmatchpreassumed137/143; SIGTERMnotrun.
+IndependentCPUsleep30/timeout1onSAMEimage reproduces255/-1/1.95s; versions
+Podman6.1.4/conmon2.2.1recorded, upstreamconmon.cmainkeeps exit_status=-1
+in timeoutbranch. NoaccuracyKchanged. Lifecyclecheckeraccepts-1onlywith
+separateCPUwitnessmatchingimage/version/timeout1/sleep30/noOOM/shorttime/
+attach255 plusactualtarget1sconfig/shortduration/cleanup/incomplete.
+OriginalFAILnotrewritten; nextnewlifecycle-r1. Source/control inartifact
+m7-podman-timeout-control-20261022.json; no fixed-install-source claim.
+Package r3 inventoryverified: comparedr2, onlylifecycleexperimentanditsunit
+controls changed; allruntimesources/native/fixtures/reference/imageidentical.
+191PythonPASS. Finalbundle artifacts/m7-sm120-bundle-r3-20261022.
+EXP228memory/EXP229FP64repeat finalbundlefrom/tmp anyway, thenEXP230
+lifecycle-r1 withseparateCPUcontrol witness; noaccuracygatechanges.
+
+EXP228/229rootfullK/TEM/image-native/source/native/inventory/cleanupPASS;
+rootreceipt artifacts/m7-package-r3-example-qualification-20261022.json,
+fullcombinedtinyreceipt m7-package-r3-tiny-fixed3-qualification-20261022.json.
+EXP230rootreadactualdeadline&SIGTERMreceiptsandcontainerabsencePASS;
+przerwaniawciężniesąRFsuccess. EXP231legacyfullKand3hostnativeoverlays
+PASS,16.861s/raw<=9.715e-7. R3payload745files206881879Bbeforecompanion
+evidence. Fourstagingbundles+allsmallruns~0.904GBordinaryartifacts; no
+nativebuild/cacheflush/hotSSDworkspace/cloud. Finaldoc/evidencecompanions
+maychangeonlydocumentation/receipts, nevertestedruntime/native/inputbytes.
+M7.3PASS, nextM7.4completeauditandreferencebinding.
+FinalR3bundle docsupdatedaftertests (whitelistedMDonly), VALIDATION.md/json
+companionsadded; manifestinventoryrefreshed andverified. Rootassertedall
+testedruntime/source/native/fixture/referencebytesunchanged. SourceGitHEAD
+isprovenanceonly, filehashesbindworkingtree. Buildglobalflagfalse/defaults
+unchanged, M7.4pending. Evidence m7-package-final-doc-update-20261022.json.
+M7.4additionalauditnote: inspectearlySIGTERMduringpodmancreate/command
+metadatawrite beforemaincleanupscope; currentsuccessfullifecyclecovers
+afterlivecoarsemarkerand1scontainerdeadline, notallpreparationphases.
+M7.3finalcheckpoint: sameLuna docs-garden PASS/no edits/materialgaps;
+reported75BpayloadcountdriftwaslastPLANMDcheckboxedit, notcode/inputchange.
+Currentauthoritativeimmutablepayload 747files/206901199B; derived
+pycache/unpackedmesh excluded (fixtureSHAstillchecksmesh). Pointerstored
+build/sm120/runtime-bundle.json, finalaudittestpending explicit.
+Rootdiffreview and191Python/8shell/docschecker/diffcheckPASS; nativeA6
+verifiedunchanged. No simulationactive, builder/cachepreserved, no cloud.
+NextM7.4referencebinding/earlypreparecleanup/fullrequirementaudit, then
+recheck15W5+3medians+newgeometryonfinalqualifierwithoutnativeGPUrerun
+unlesscodechangesneedone. Goalactive; no completionclaim.
