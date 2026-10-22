@@ -1,6 +1,7 @@
 # Lokalny pilot PR do Palace
 
-Stan: patch i testy przygotowane lokalnie. Niczego nie opublikowano.
+Stan 2026-10-23: fork `sieciowiecxyz/palace` i branch pilota są na GitHubie.
+PR do `awslabs/palace` nie został otwarty. Opis PR nadal lokalny.
 Badawczy fork zachowany; PR zawiera wyłącznie trzy pliki z czystego upstream.
 
 ## Co jest do wysłania
@@ -112,28 +113,28 @@ wymaga aktualnej bazy i sprawdzenia duplikacji. Po czasie sprawdź ponownie otwa
 PR-y; [#793](https://github.com/awslabs/palace/pull/793) pokazuje, dlaczego mały diff
 musi mieć mierzalną korzyść. Nie ma gwarancji merge. Żadnej rozmowy nie rozpoczęto.
 
-## 4. Ręczna publikacja — dotąd NIC z tej sekcji nie wykonano
+## 4. Fork i branch wysłane; PR jeszcze nieotwarty
 
-1. Utwórz własny fork `awslabs/palace` na GitHubie (albo użyj istniejącego).
-2. Poniżej przykład dla konta `sieciowiecxyz`. Najpierw sprawdź remotes; jeśli
-   `origin` już istnieje, zweryfikuj go zamiast nadpisywać.
+Na polecenie użytkownika 2026-10-23 utworzono
+[fork](https://github.com/sieciowiecxyz/palace) i wysłano tylko
+`pr/driven-release-workspace`. `origin` wskazuje ten fork; nie dodawaj go ponownie.
+GitHub potwierdza **1 commit, 3 pliki, +47/−4**:
+[porównanie](https://github.com/awslabs/palace/compare/main...sieciowiecxyz:pr/driven-release-workspace).
+Brancha badawczego nie wysłano. Nie utworzono PR, issue ani komentarza.
+
+Podczas przygotowania upstream main przesunął się do `c3c77f83e` (2 nowe commity,
+zmiana tabeli opisów timerów). Pilot pozostaje na przetestowanym commicie `8b5d4a1f8`.
+Przed PR sprawdź drift, w razie aktualizacji bazy ponów adekwatne testy i odśwież opis.
+Rebase zmieni SHA; stare wyniki opisują pierwotny commit. Nie wykonano rebase ani
+force-push. Pełny zapis operacji: `artifacts/upstream-pr/fork-publication.json`.
+
+Gdy branch i wyniki będą zaakceptowane, ręczne otwarcie PR wygląda tak
+(polecenie **niewykonane**):
 
 ```sh
 cd /home/sieciowiec/dev/cpp/palace-pr-driven-release
-git remote -v
-git remote add origin git@github.com:sieciowiecxyz/palace.git
-git fetch upstream
-```
-
-Jeżeli `upstream/main` zmienił się od zapisanej bazy, zrób lokalny rebase
-`git rebase upstream/main`, obejrzyj diff i ponów adekwatne testy na nowym buildzie.
-Jeśli coś się nie zgadza, wróć do lokalnej pracy przed push. Popraw opis wyników
-po rebase. Dalsze komendy wysyłają dane i są do ręcznego wykonania:
-
-```sh
-git push -u origin pr/driven-release-workspace
 gh pr create --repo awslabs/palace --base main --head sieciowiecxyz:pr/driven-release-workspace --title 'Release final uniform driven solve state before postprocessing' --body-file /home/sieciowiec/dev/cpp/palace/artifacts/upstream-pr/pr-description.md
 ```
 
-Wyślij tylko pilot. Reuse RHS, GMRES FP32 storage i mixed-cuDSS pozostają w kolejce
+Reuse RHS, GMRES FP32 storage i mixed-cuDSS pozostają w kolejce
 [PLAN](../PLAN.md); każdy wymaga osobnej deduplikacji, brancha i dowodów.

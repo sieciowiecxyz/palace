@@ -19,6 +19,16 @@ FAIL i ograniczenia zachowane; disclosure pomocy Codex. Kod/testy i commit pilot
 bez zmian. Bez nowego buildu/runu i bez publikacji. Poprzedni opis oraz review notes
 w artifacts/upstream-pr; manifest z aktualnymi SHA. [Szczegóły](docs/upstream-prs.md).
 
+### Fork i branch pilota — 2026-10-23
+
+Użytkownik autoryzował przygotowanie GitHuba. Fork `sieciowiecxyz/palace` utworzony;
+branch `pr/driven-release-workspace` wysłany. Server-side compare potwierdza1commit,
+3pliki/+47−4, SHA8b5d4a1f8. Żadnej historii badawczej nie wysłano, PR nieotwarty.
+Upstream dostał2nowe commity (timer descriptions constexpr table); pilot świadomie
+pozostaje na przetestowanym SHA. Przed upstream PR: przegląd driftu/ewentualny
+rebase+retest. Manifest i `fork-publication.json` uaktualnione, testy bez zmian.
+[Porównanie](https://github.com/awslabs/palace/compare/main...sieciowiecxyz:pr/driven-release-workspace).
+
 ## Historia zakończonych badań M0–M7
 
 Wszystkie statusy, instrukcje kolejnego kroku i oznaczenia goal poniżej są zapisami historycznymi. Obecny tryb i kolejka: PLAN.md.

@@ -6,8 +6,11 @@ Active: none
 ## Cel i granice
 
 Przygotować małe, niezależne zmiany do upstream, sprawdzone lokalnie.
-Bez pushowania, tworzenia PR-ów, forków ani kontaktowania maintainerów.
-Lokalny pilot ukończony 2026-10-22; niczego nie opublikowano.
+Pierwotny etap był lokalny. Na polecenie użytkownika 2026-10-23 utworzono fork
+`sieciowiecxyz/palace` i wysłano tylko branch pilota. PR do upstream nieutworzony;
+kontakt/publikacja PR wymagają kolejnego polecenia.
+Lokalny pilot ukończony 2026-10-22. Fork i branch opublikowane 2026-10-23.
+GitHub potwierdza jeden commit/3pliki; upstream wyprzedził bazę o2commity.
 Pakiet i ręczna publikacja: [instrukcja](docs/upstream-prs.md).
 
 ## Milestones
