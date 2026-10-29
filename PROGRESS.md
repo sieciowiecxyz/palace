@@ -1,4 +1,28 @@
-## Bieżący checkpoint — lokalny pilot PR ukończony (2026-10-22)
+## 2026-10-29 — nowy plan optymalizacji faz (planowanie zakończone)
+
+PLAN/MILESTONES zastąpione planem M0–M6; dawny plan PR i checkpoint M0
+zachowane w docs/optimization-stages/previous-pr-plan.md. Goal obliczeniowy
+pozostaje wstrzymany (Mode normal / Active none). Żadnej nowej symulacji,
+kompilacji, zmiany solvera lub cloud w tym zadaniu.
+
+Źródła e288fe163 przejrzane przez wykonawców preprocessing i operators równolegle;
+limit sesji uniemożliwił trzeci równoległy agent, I/O wykonał ponownie pierwszy.
+Trzy worktree/branche i 15 hipotez PRE/OP/IO; stan TODO_TO_CHECK lub DEFERRED,
+nie wyniki optymalizacji. Root zweryfikował exclusive BlockTimer i rewrite CSV,
+poprawił błędne ostrzeżenie audytu o dodawaniu kategorii timerów.
+
+Dowody czasów: run-local-stages-20261029/STAGES.md (pełna ścieżka w workflow).
+Operator construction 121,501 s lokalnie; preprocessing35,992; IO19,612,
+łącznie21,45% z825,783 s. Najpierw uzgodnienie build-source M0 i subphase profiling M1.
+Najciekawsze hipotezy: współdzielenie rzeczywiście powtórnego setupu operatorów,
+redukcja przebiegów/reordering mesh, pełny rewrite CSV po każdej aktualizacji.
+Hotspot kodu nieudowodniony; przyspieszenie niezmierzone. Frozen bundle nietknięty.
+Docs-garden (ta sama Luna high): wykryto błędne linki relatywne archiwum, root poprawił; check.sh i kontrola linków ponowione.
+Dokumenty per-track są pamięcią agenta; shared docs tylko root. Pomiary sprzętowe
+sekwencyjnie, cache przyrostowych buildów zachować. Strata nie została wyłączona.
+
+
+## Historia — lokalny pilot PR ukończony (2026-10-22)
 
 M0–M4 zakończone w jawnym zakresie. Branch `pr/driven-release-workspace`, commit
 `8b5d4a1f87e7ceb5d4fe5fcacb7849aa17dc54b7`, baza main29ad351f9, czysty worktree.

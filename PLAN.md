@@ -1,33 +1,45 @@
-# Plan przygotowania PR-ów do Palace
+# Plan: preprocessing, operatory i I/O
 
-Mode: goal
+Mode: normal
 Active: none
 
-## Cel i granice
+## Cel i zakres
 
-Przygotować małe, niezależne zmiany do upstream, sprawdzone lokalnie.
-Pierwotny etap był lokalny. Na polecenie użytkownika 2026-10-23 utworzono fork
-`sieciowiecxyz/palace` i wysłano tylko branch pilota. PR do upstream nieutworzony;
-kontakt/publikacja PR wymagają kolejnego polecenia.
-Lokalny pilot ukończony 2026-10-22. Fork i branch opublikowane 2026-10-23.
-GitHub potwierdza jeden commit/3pliki; upstream wyprzedził bazę o2commity.
-Pakiet i ręczna publikacja: [instrukcja](docs/upstream-prs.md).
+Skrócić czas przygotowania i obsługi wyników Palace na RTX 5070 Ti 16 GB / 96 GB RAM,
+bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obiecywać
+zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
+Plan przygotowany 2026-10-29; goal obliczeniowy pozostaje wstrzymany. Ten etap obejmuje
+audyt kodu i dokumentację, bez nowych symulacji, wynajmowania GPU lub wyłączania Straty.
 
 ## Milestones
 
-- [x] M0 — Pobrać upstream i ustalić aktualną gałąź domyślną (`main`/`master`), SHA oraz możliwe duplikaty zmian. Zachować fork badawczy.
-- [x] M1 — Na aktualnym upstream utworzyć lokalny branch pierwszej małej zmiany: skrócenie życia buforów / ograniczenie nakładania pamięci postprocessingu. Przenieść wyłącznie potrzebny patch.
-- [x] M2 — Przetestować patch względem czystego upstream: poprawność, regresje i osobno czas/pamięć. Zacząć od krótkiego przypadku; większy tylko gdy potrzebny.
-- [x] M3 — Przeczytać zasady contribution i ostatnie review upstream. Dopasować kod oraz lokalny opis PR-a do praktyk projektu.
-- [x] M4 — Przygotować lokalny pakiet do przeglądu i instrukcję: jak sprawdzić diff/testy, wypchnąć branch do własnego forka i otworzyć PR. Niczego nie publikować.
+- [ ] M0 — Zamrozić zgodną referencję, źródła/build, testy krótkie i kontrakt pomiaru.
+- [ ] M1 — Zintegrować minimalne profilowanie trzech faz, zmierzyć narzut i wybrać rzeczywiste hotspoty.
+- [ ] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
+- [ ] M3 — Oddzielnie zakwalifikować każdy patch: poprawność, pamięć, czas; odrzucić nieudane hipotezy.
+- [ ] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
+- [ ] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
+- [ ] M6 — Zamknąć rejestry, wskazać build rekomendowany, rollback i ograniczenia.
 
-## Kolejka kolejnych PR-ów
+## Organizacja
 
-Po zakończeniu pierwszego: reuse setup/faktoryzacji dla wielu RHS → FP32 storage bazy GMRES z arytmetyką FP64 → mixed precision cuDSS z refinement.
-Każdy osobno z aktualnego upstream; kolejność zweryfikować po przeglądzie kodu.
-Duplikat, brak mierzalnej korzyści lub zbyt duża zmiana oznacza odłożenie z uzasadnieniem.
+Trzech wykonawców pracuje w osobnych worktree, na wspólnej przypiętej bazie.
+M2 jest etapem równoległym; M3 wymaga zakończenia oceny wszystkich ścieżek
+(PASS lub uzasadnione REJECTED/DEFERRED). M4 dopiero po M3. Agent nie przeskakuje bramki.
+Kod/research równolegle; ciężkie kompilacje i pomiary sprzętowe kolejno.
+Wspólną instrumentację, runner, manifesty, plan i integrację posiada koordynator.
+Każdy agent aktualizuje swój ledger przed i po próbie, także przy FAIL/timeout.
 
-## Dokumentacja
+Szczegóły: [kontrakt](MILESTONES.md), [workflow i szablon wpisu](docs/optimization-stages/workflow.md),
+[preprocessing](docs/optimization-stages/preprocessing.md), [operatory](docs/optimization-stages/operators.md),
+[I/O](docs/optimization-stages/io.md), [checkpoint](PROGRESS.md).
+Najpierw operator construction, potem preprocessing; I/O ma mały udział, więc zaczyna od taniego replay.
+Nie należy rezygnować z niezależnego, taniego audytu I/O z powodu niższego priorytetu.
 
-[Bramki](MILESTONES.md), [checkpoint](PROGRESS.md), [wyniki zakończonych badań](docs/milestones/final-audit.md), [dawny kontrakt](docs/milestones/optimization-contract.md).
-Dawny plan zachowany w Git: `git show 8425a1b:PLAN.md`.
+## Historia
+
+[Poprzedni plan PR i jego M0](docs/optimization-stages/previous-pr-plan.md) zachowany.
+Stare docs/milestones/M1–M4 i optimization-M* dotyczą wcześniejszych kampanii,
+nie zaliczają bramek obecnego planu. Nowe M0–M6 mają dowody w ledgerach tej kampanii
+oraz PROGRESS.md. Obecne zamrożone runtime/bundle pozostają nietknięte.
+Bez push i publikacji; wdrożenie do antenowego workflow dopiero po M5.

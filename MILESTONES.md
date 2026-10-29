@@ -1,34 +1,47 @@
-# Bramki przygotowania lokalnego PR-a
+# Bramki kampanii optymalizacji faz — 2026-10-29
 
-Postęp wyłącznie w [PLAN](PLAN.md). Etapy kolejno; pierwszy PR jest pilotażem.
-Bez publikacji na GitHubie. Poniższe kryteria są do wykonania, nie potwierdzają gotowości zmian.
+Checkboxy są wyłącznie w PLAN.md. PASS oznacza wskazane dowody, nie sam build.
+Przejście między etapami zatwierdza koordynator. Brak zysku jest poprawnym wynikiem badania.
 
-## M0 - Aktualny upstream
+## M0 - Zgodna referencja i krótka ścieżka testów
 
-- M0.1: pobrano upstream; zapisano domyślną gałąź i SHA, bez resetowania forka badawczego.
-- M0.2: sprawdzono, czy kandydat nadal jest potrzebny i nie powiela istniejącej zmiany/PR-a.
+- M0.1: Powiązać Git SHA, diff źródeł, hash binarki/adaptera, obraz, zależności, flagi CUDA/precision/UVM i fixture. Audyt e288fe163 nie dowodzi zgodności z używaną binarką; uzgodnić manifest źródeł przed buildem. Nie nadpisywać frozen bundle.
+- M0.2: Przypiąć mesh/config/geometry/material/output hashes, oba porty, liczbę rang/wątków i precyzje. Za referencję wydajności wziąć medium SMA-only 1,92 GHz, bez uznawania go za dobry projekt anteny. Dane i ścieżki w workflow.
+- M0.3: Przygotować krótkie testy wybranych funkcji: preprocess na istniejącej siatce bez solve, konstrukcja/operator action bez GMRES, replay I/O na zachowanych danych. Wyników synthetic nie przedstawiać jako przyspieszenia całej anteny. Jeśli harness wymaga kodu, implementację najpierw sprawdzić na tiny.
+- M0.4: Ustalić kontrolę wolnej pamięci, zakaz aktywnego LLM, cgroup/no-swap, cleanup, timeouty oraz bazowe testy poprawności. Nie zabijać usług bez aktualnego upoważnienia. Bez płatnego compute w tej kampanii bez nowego zlecenia.
 
-## M1 - Jeden niezależny patch
+## M1 - Profilowanie i wybór kandydatów
 
-- M1.1: lokalny branch z ustalonego upstream; jedna przyczyna, mały diff i zwykłe mechanizmy Palace, bez zależności od lokalnego adaptera i narzędzi benchmarkowych.
-- M1.2: krótki przypadek odtwarza problem; zachowano licencje, styl i dotychczasowe zachowanie poza deklarowaną zmianą.
+- M1.1: Jeden wspólny patch instrumentacji, zakresy bez podwójnego liczenia: load/transform/partition/refine, FE hierarchy/K/C/M/Curl/CEED, serializacja/transfer/write. Istniejący BlockTimer daje exclusive czasy; phase trace inclusive. Nie dodawać synchronizacji CUDA do standardowego timera.
+- M1.2: CPU sampling i timery najpierw w krótkim harness, potem najwyżej jeden potrzebny profil medium. Narzut sprawdzić w sparowanym teście (cel ≤1%); profilowane wykonanie nie jest wynikiem benchmarku. Czasy reconcile do rodzica z wyjaśnioną różnicą, orientacyjnie ≤2%.
+- M1.3: Każda ścieżka wskazuje najwyżej jeden pierwszy prototyp na podstawie czasu/bytes/alokacji, oczekiwany maksymalny zysk i test obalający hipotezę. Małe lub nieaktywne koszty oznaczyć DEFERRED. Znane 24,3 s JIT na CMP nie wyjaśnia 400 s budowy operatorów.
 
-## M2 - Dowody poprawności i korzyści
+## M2 - Niezależne prototypy na trzech branchach
 
-- M2.1: adekwatne testy upstream i regresja problemu przechodzą; zakres CPU/CUDA/MPI jawny, niewykonane testy oznaczone NOT RUN.
-- M2.2: upstream kontra upstream + ten patch, te same wejścia, ustawienia i warunki. Zapisane polecenia, wyniki oraz ograniczenia; czas i pamięć mierzone oddzielnie. Dawne −23,6% RAM całego profilu nie jest wynikiem tego PR-a.
-- M2.3: build przyrostowy z cache; krótki smoke przed droższym pomiarem. Brak zmiany fizyki/medium, progów dokładności i domyślnych precyzji dla uzyskania zysku.
+- M2.1: Preprocessing: PRE-02/PRE-04/PRE-05 tylko według profilu; zachować topologię, atrybuty, orientację, BC, przypisanie portów i równoważność DOF po permutacji. Reordering on/off liczyć w E2E, nie tylko setup.
+- M2.2: Operatory: usunąć potwierdzone powtórne przygotowanie/kopie lub serial bottleneck. Najpierw istniejące API; cache tylko z pełnym kluczem i testem invalidation. Zachować curl/div structure, coarse sparsity, constraints, operator action oraz aktualne precyzje. Nie wprowadzać TF32/nowego solvera w ramach tej kampanii.
+- M2.3: I/O: najpierw sprawdzić pełny rewrite CSV przy sweepie. Append/buforowanie musi obsługiwać częściowe wiersze obu portów, restart/adaptive sweep, header, kolejność, precyzję i błąd zapisu. Samo wyłączenie pól/logów lub przeniesienie zapisu poza timer nie jest optymalizacją.
+- M2.4: Osobne małe commity i build-dir na ścieżkę, wspólny bezpieczny compiler cache. Nie modyfikować współdzielonych dependency build trees ani zamrożonych artefaktów. Jedna przyczyna zmiany na eksperyment, bez równoczesnego tuningu anteny.
 
-## M3 - Zgodność z praktykami maintainerów
+## M3 - Kwalifikacja oddzielnych patchy
 
-- M3.1: przeczytano aktualne CONTRIBUTING, dokumentację developer/testów i kilka podobnych review; zapisano konkretne źródła oraz wymagania.
-- M3.2: lokalny opis po angielsku: problem, rozwiązanie, zakres, testy, wyniki i ograniczenia. Tematy wymagające konsultacji zapisane do decyzji użytkownika; żadnych wysłanych wiadomości.
+- M3.1: Tanie testy strukturalne/readback/operator action PASS; błędy i próby przerwane zapisane. Dla równoważnego FP64 operator action cel relL2 ≤1e-10 na stałym zestawie wektorów, zero/near-zero oceniane również absolutnie. Uzasadnić próg przed testem, nie po niepowodzeniu.
+- M3.2: Jeśli mikrotest daje korzyść, A/B na nieprofilowanym medium i identycznych wyjściach; minimum 3 sparowane wykonania tylko dla finalistów. Zbalansowana kolejność AB/BA, takie same warunki cache i brak konkurencyjnego obciążenia. Raport mediany i rozrzutu, nie najlepszej próbki.
+- M3.3: Każdy port: raw residual ≤1e-6, max |Δcomplex S| ≤1e-5, |ΔVSWR| ≤0,001, istniejący bilans mocy i FF/flux ≤2%. Kontrolować pola/phase w tej samej bazie/fizycznych punktach (relL2 cel ≤1e-5); dla samego I/O wymagać zgodnego numerycznego readback. Używać również ostrzejszych obowiązujących testów referencji; ich wersję przypiąć w M0.
+- M3.4: Mierzyć peak cgroup RAM, VRAM i UVM osobno, zwykłe I/O bytes, czas całkowity i faz. Brak OOM/swap i istotnej regresji w solve. Orientacyjnie ≥5% fazy i ponad rozrzut to kandydat; zysk wyłącznie syntetyczny nie upoważnia do promocji E2E. Koszt wzrostu pamięci >2% wymaga jawnej decyzji, nie automatycznej promocji.
 
-## M4 - Pakiet do ręcznej publikacji
+## M4 - Kontrolowana integracja
 
-- M4.1: wskazano branch, bazowe SHA, commity, diff/stat, polecenia testów i plik z opisem PR-a; lokalny przegląd i dokumentacja zakończone.
-- M4.2: instrukcja zawiera sprawdzenie zmian, dodanie własnego forka jako origin, push tylko wybranego brancha i utworzenie PR-a do ustalonej gałęzi upstream. Polecenia publikujące pozostają niewykonane.
+- M4.1: Po M3 branch opt/stages-integration-20261029 z tej samej uzgodnionej bazy. Koordynator przegląda i cherry-pickuje wyłącznie zakwalifikowane commity, po jednym z regresją. REJECTED/DEFERRED pozostają w ledgerze, kod nie trafia do rekomendowanego buildu.
+- M4.2: Rozstrzygnąć nakładanie mesh parser/preprocessing i HostRead/operator-memory z I/O. Sprawdzić combined vs base i vs najlepszy pojedynczy patch; sumowanie oddzielnych oszczędności nie dowodzi ich addytywności.
 
-## Historia
+## M5 - Reprezentatywna walidacja
 
-Zakończone badania optymalizacji mają osobne [kryteria](docs/milestones/optimization-contract.md) i [audyt](docs/milestones/final-audit.md). Historyczne M0–M7 nie oznaczają zaliczenia powyższych etapów.
+- M5.1: Zintegrowany build na 5070 Ti: ten sam medium 1,92 GHz oba porty, 3 pary A/B; poprawność M3 i zysk E2E ponad zmienność. Wynik bez speedupu opisać uczciwie, ewentualne korzyści I/O/pamięci nazwać osobno.
+- M5.2: Krótki sweep 1,71 / 2,69 / 3,80 GHz oba porty i jedna druga geometria ze zmienionym reflektorem/directorem z własną referencją. To test generalizacji i invalidation, nie nowe strojenie anteny. Sprawdzić zapis/reload, restart i cache miss po zmianie materiału, mesh, BC, order/backend.
+- M5.3: CPU/MPI small regressions według zmienionego kodu. Wyniki A100/CMP/multi-GPU pozostają NOT RUN bez rzeczywistej kwalifikacji; lokalne przyspieszenie nie dowodzi zysku na słabszym CPU Vast. Nie kupować GPU do domknięcia tabelki.
+
+## M6 - Zamknięcie i rekomendacja
+
+- M6.1: Ledger każdej hipotezy ma wynik, artefakty i powód ewentualnego ponowienia. Brak nierozstrzygniętego IN_PROGRESS. Podsumowanie czasy/pamięć/accuracy per patch i combined, w tym negatywne wyniki.
+- M6.2: Reprodukowane komendy, manifest rekomendowanego buildu, rollback do frozen bundle, zakres kwalifikacji i NOT RUN. Docs-garden, root review, lokalny commit; bez push/PR. Cel zamykany dopiero po rzeczywistym audycie bramek, nie z powodu końca czasu.

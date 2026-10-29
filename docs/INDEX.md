@@ -4,25 +4,25 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M4 dotyczą lokalnego przygotowania PR-a. Checkpointy M0–M7 poniżej opisują zakończone badania optymalizacji, według dawnego kontraktu.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; plan gotowy, wykonanie nieaktywne. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
   - Opis: Zakres zmian, pomiary, artefakty i niewykonane polecenia push/PR.
-- [Przygotowanie PR: M0](milestones/M0.md)
-  - Czytaj gdy: wykonujesz etap M0 obecnego planu lokalnych PR-ów
+- [Optymalizacja faz: M0](milestones/M0.md)
+  - Czytaj gdy: ustalasz referencję i krótkie testy obecnej kampanii optymalizacji faz
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Przygotowanie PR: M1](milestones/M1.md)
-  - Czytaj gdy: wykonujesz etap M1 obecnego planu lokalnych PR-ów
+  - Czytaj gdy: sprawdzasz historyczny etap M1 planu lokalnych PR-ów
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Przygotowanie PR: M2](milestones/M2.md)
-  - Czytaj gdy: wykonujesz etap M2 obecnego planu lokalnych PR-ów
+  - Czytaj gdy: sprawdzasz historyczny etap M2 planu lokalnych PR-ów
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Przygotowanie PR: M3](milestones/M3.md)
-  - Czytaj gdy: wykonujesz etap M3 obecnego planu lokalnych PR-ów
+  - Czytaj gdy: sprawdzasz historyczny etap M3 planu lokalnych PR-ów
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Przygotowanie PR: M4](milestones/M4.md)
-  - Czytaj gdy: wykonujesz etap M4 obecnego planu lokalnych PR-ów
+  - Czytaj gdy: sprawdzasz historyczny etap M4 planu lokalnych PR-ów
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Archiwum: kontrakt optymalizacji](milestones/optimization-contract.md)
   - Czytaj gdy: sprawdzasz kryteria i tolerancje zakończonych badań M0–M7
@@ -303,3 +303,21 @@ Bieżące M0–M4 dotyczą lokalnego przygotowania PR-a. Checkpointy M0–M7 pon
 - [Praca podczas długich sesji](workflow.md)
   - Czytaj gdy: prowadzisz długie zadanie lub goal mode
   - Opis: Wznawianie, sekwencyjne etapy i delegowanie.
+
+## Optymalizacja faz 2026-10-29
+
+- [Workflow trzech agentów](optimization-stages/workflow.md)
+  - Czytaj gdy: wznawiasz kampanię optymalizacji faz.
+  - Opis: Referencja, własność plików, rejestr prób, deduplikacja i zasady pomiarów.
+- [Preprocessing: hipotezy i wyniki](optimization-stages/preprocessing.md)
+  - Czytaj gdy: badasz odczyt/przekształcenia/partycjonowanie siatki.
+  - Opis: Audyt geodata i PRE-01–05; eksperymenty jeszcze NOT RUN.
+- [Operatory: hipotezy i wyniki](optimization-stages/operators.md)
+  - Czytaj gdy: badasz koszt FE/CEED/assembly.
+  - Opis: Miejsca w kodzie i OP-01–05; przyczyna kosztu nieustalona.
+- [I/O: hipotezy i wyniki](optimization-stages/io.md)
+  - Czytaj gdy: badasz CSV/VTK/reload i czas zapisu.
+  - Opis: Rozdzielenie serializacji od I/O; IO-01–05 i testy readback.
+- [Archiwum poprzedniego planu PR](optimization-stages/previous-pr-plan.md)
+  - Czytaj gdy: potrzebujesz zastąpionych PLAN/MILESTONES i M0 PR.
+  - Opis: Zapis stanu sprzed nowej kampanii; nie aktualny status GitHub.
