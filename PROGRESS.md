@@ -1,3 +1,14 @@
+## Aktywny checkpoint — kampania faz, M0 (2026-10-29)
+
+Użytkownik uruchomił wykonanie: trzy GPT-6.1 Sol high, osobne branche,
+koordynator zbiera wyniki i zamyka bramki. PLAN Mode goal / Active M0.
+System create_goal odrzucony: poprzedni paused goal nadal unfinished;
+nie zamykano go fikcyjnie. Nowa kampania działa według repo workflow.
+Strata localai-nvfp4.service aktywna, zgoda na zatrzymanie oczekuje;
+GPU/EM nie uruchamiać do odpowiedzi. Cloud i publikacja niedozwolone.
+M0: uzgodnić source-runtime, fixture i tanie harnessy; nie przechodzić do M1
+bez dowodów M0.1–M0.4. Badawcze patche pozostają izolowane.
+
 ## 2026-10-29 — nowy plan optymalizacji faz (planowanie zakończone)
 
 PLAN/MILESTONES zastąpione planem M0–M6; dawny plan PR i checkpoint M0

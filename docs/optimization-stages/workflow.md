@@ -2,7 +2,10 @@
 
 ## Stan i dowody początkowe
 
-2026-10-29: audyt źródeł, nie nowe optymalizacje. Goal obliczeniowy wstrzymany.
+2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M0.
+Wykonawcy: GPT-6.1 Sol high. Strata aktywna, zgoda na zatrzymanie oczekuje.
+Panel systemowy goal wciąż ma stary paused goal; create_goal odrzucone
+z powodu unfinished goal. Nie zamykać starego celu bez osiągnięcia jego kryteriów.
 Root checkout: `/home/sieciowiec/dev/cpp/palace`, branch `codex/local-cuda`,
 audytowane HEAD `e288fe1639cef892b4cbfae0d98046a0afa62ae1`.
 Sprawdzić zgodność tego źródła z runtime przed M0 PASS.

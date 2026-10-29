@@ -1,15 +1,17 @@
 # Plan: preprocessing, operatory i I/O
 
-Mode: normal
-Active: none
+Mode: goal
+Active: M0
 
 ## Cel i zakres
 
 Skrócić czas przygotowania i obsługi wyników Palace na RTX 5070 Ti 16 GB / 96 GB RAM,
 bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obiecywać
 zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
-Plan przygotowany 2026-10-29; goal obliczeniowy pozostaje wstrzymany. Ten etap obejmuje
-audyt kodu i dokumentację, bez nowych symulacji, wynajmowania GPU lub wyłączania Straty.
+Wykonanie uruchomione na polecenie użytkownika 2026-10-29. Trzej wykonawcy:
+GPT-6.1 Sol high, każdy na swoim branchu; koordynator zbiera i weryfikuje wyniki.
+Aktywny M0: referencja i krótkie harnessy. Strata aktywna; zgoda na jej zatrzymanie
+przed symulacjami oczekuje. Bez cloud i publikacji.
 
 ## Milestones
 
