@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; plan gotowy, wykonanie nieaktywne. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M1. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -12,8 +12,8 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Optymalizacja faz: M0](milestones/M0.md)
   - Czytaj gdy: ustalasz referencję i krótkie testy obecnej kampanii optymalizacji faz
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
-- [Przygotowanie PR: M1](milestones/M1.md)
-  - Czytaj gdy: sprawdzasz historyczny etap M1 planu lokalnych PR-ów
+- [Optymalizacja faz: M1](milestones/M1.md)
+  - Czytaj gdy: profilujesz aktualny koszt preprocessingu, operatorów i zapisu
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Przygotowanie PR: M2](milestones/M2.md)
   - Czytaj gdy: sprawdzasz historyczny etap M2 planu lokalnych PR-ów

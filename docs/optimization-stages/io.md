@@ -1,6 +1,6 @@
 # Audyt i plan: odczyt oraz zapis wyników
 
-Status: przegląd źródeł ukończony; brak nowych pomiarów.
+Status: M0 archived readback i native CSV regression PASS; performance/RF NOT RUN.
 Owner: agent I/O, branch `opt/io-20261029`.
 Granica ownership: parser siatki i odczyt wejściowego mesha są współdzielone z preprocessingiem; koordynator wybiera właściciela ewentualnego patcha. Ten branch może audytować output i timery, ale nie zmienia `geodata.cpp`/`meshio.cpp` bez uzgodnienia.
 
@@ -17,7 +17,7 @@ W znanym medium runie „Disk IO” wyniósł 19,612 s z 825,783 s, około 2,37%
 | Miejsce | Obserwacja | Kandydat | Status |
 |---|---|---|---|
 | `palace/utils/timer.hpp:35-57,241-289`; `palace/utils/outputdir.hpp:147-205` | `IO` jest wall timerem nazwanych scope’ów. Timer nie liczy bajtów ani syscalls. `WriteRootOutputFile` obejmuje całą funkcję serializującą. | Ujawnić osobne wall/CPU/bytes/read-write, aby nazwa „Disk IO” nie prowadziła do błędnego wniosku. | `IO-01` TODO |
-| `palace/models/postoperatorcsv.cpp:1141-1164` (oraz analogiczne metody tabel) i `palace/utils/tablecsv.cpp:278-308` | Każdy `PrintPortS()` dopisuje wiersz do tabeli w pamięci, po czym `WriteFullTableTrunc()` formatuje i zapisuje całą tabelę od nowa. Dla N częstotliwości może to robić łączny zapis/formatowanie rzędu O(N²) wierszy. | Mierzyć liczbę zapisów, bajty i koszt dla liczby częstotliwości. Sprawdzić append/buforowanie jako osobny prototyp, zachowując bezpieczne wznowienie adaptive/reload. | `IO-02` TODO |
+| `palace/models/postoperatorcsv.cpp:1141-1164` (oraz analogiczne metody tabel) i `palace/utils/tablecsv.cpp:278-308` | Każdy `PrintPortS()` uzupełnia kolumny źródła (także w istniejącym wierszu), po czym `WriteFullTableTrunc()` formatuje i zapisuje całą tabelę od nowa. Dla N częstotliwości może to robić łączny zapis/formatowanie rzędu O(N²) wierszy. | Mierzyć liczbę zapisów, bajty i koszt dla liczby częstotliwości. Sprawdzić append/buforowanie jako osobny prototyp, zachowując bezpieczne wznowienie adaptive/reload. | `IO-02` TODO |
 | `palace/models/postoperator.cpp:1133-1202`; `palace/utils/ceedparaviewdatacollection.cpp:200-229` | Paraview zapis wykonuje skalowanie/pole pochodne i `Save`; domenowe pole pobiera `HostRead()` i serializuje dane element po elemencie do bufora/strumienia. `HostRead` może wymagać transferu/synchronizacji. Całość widoczna jako `POSTPRO_PARAVIEW`, niekoniecznie `Disk IO`. | Rozdzielić compute, host transfer, serializację i write; następnie sprawdzić VTK binary/compression/precision oraz batching. | `IO-03` TODO |
 | `palace/utils/tablecsv.cpp:278-299` | Przy `load_existing_file` CSV jest wczytywany do `stringstream`, następnie kopiowany do `string` i parsowany przez `Table`. To może powodować duplikaty bufora i peak RAM dla dużych tabel. | Zmierzyć użycie reload w docelowym runie i peak/bajty; rozważyć streaming parser dopiero jeśli ten koszt jest mierzalny. | `IO-04` TODO |
 | `palace/utils/outputdir.hpp:163-205,207+` | Startup może usuwać poprzedni katalog rekurencyjnie; tworzenie/usuwanie katalogów i filesystem coordination również zalicza się do IO timerów. | Zmierzyć cold/warm output dir i liczbę plików; nie usuwać sprzątania, dopóki test nie potwierdzi bezpiecznego rozdzielenia starego wyniku. | `IO-05` DEFERRED do raportu IO-01 |
@@ -36,7 +36,7 @@ Zaliczenie: rozliczenie największych scope’ów do ±2% ich właściwego nadrz
 
 Na małej tabeli i potem istniejącym sweepie porównać koszt/bytes przy N i 2N wierszy; rejestrować częstotliwość wywołań `WriteFullTableTrunc`, czas formatowania i zapis, rozmiar finalnego pliku, reload/adaptive restart. Oczekiwanie O(N²) wynika z kodu, ale rzeczywisty udział E2E zależy od liczby częstotliwości i tabel. Prototyp append dopuszczalny dopiero po teście niezmienionej kolejności kolumn, precyzji, kompletności po przerwaniu i możliwości reload.
 
-### IO-03 — VTK/Paraview i GPU→host (`TODO_TO_CHECK`)
+### IO-03 — VTK/Paraview i GPU→host (`DEFERRED`: brak VTK w referencji M0)
 
 Testować z tym samym mesh/polem włączone/wyłączone Paraview oraz dostępne formaty: zmierzyć `POSTPRO_PARAVIEW`, HostRead/transfer, CPU serializacji, bajty i wall write oddzielnie. Sprawdzić output geometry/field equality oraz możliwość odczytu przez ParaView/MFEM. Asynchroniczne kopiowanie/buffering tylko jeśli profil potwierdzi host transfer lub serializację jako znaczący koszt; zabezpieczyć lifetime bufora, synchronizację i MPI outputu.
 
@@ -63,4 +63,182 @@ Zwykły cache wejść/wyników oraz sporadyczne odczyty i niewielkie zapisy SSD 
 
 ## Wyniki nowych eksperymentów
 
-Brak — wykonano tylko audyt źródeł. Przed pierwszą próbą uzupełnij wpis według [workflow](workflow.md). Nie oznaczać hipotezy PASS za samo przeczytanie kodu.
+### IO-01-E01 — M0: odczyt archiwum i kontrakt replay (`PASS`, zakres: archived readback)
+
+Owner: GPT-6.1 Sol high I/O; branch `opt/io-20261029`; baza `ab4b3a6dbd`; 2026-10-29.
+Historia: IO-01/02 źródła przejrzane wcześniej; brak wcześniejszego native replay.
+Nie jest to pomiar kosztu natywnego writera ani zaliczenie IO-01/02 performance.
+Źródła: `tablecsv.cpp:164–179` formatuje wszystkie wiersze; `:301–308`
+usuwa poprzedni plik i pisze pełną tabelę. `postoperatorcsv.cpp:1143–1164`
+wywołuje pełny zapis po każdej aktualizacji S; `:341–355` pozwala ponownie
+wypełnić ten sam index częstotliwości dla kolejnego źródła. `:376–445`
+waliduje zgodność nagłówków i długości grup kolumn przy restart/reload.
+
+Kluczowy niezmiennik: drugi port uzupełnia istniejący wiersz. Przy source-major
+sweepie może uzupełniać wcześniejsze wiersze tabeli, podczas gdy późniejsze już
+istnieją dla pierwszego źródła. Zwykłe append-row jest niepoprawne. Native reader
+pomija NULL i odbudowuje prefixy kolumn; nie wolno zmieniać semantyki częściowych
+kolumn, kolejności nagłówków, precyzji oraz restart/adaptive cursor.
+
+Dodano read-only `tools/stage_io_reference.py` oraz 4 testy w
+`tools/tests/test_stage_io_reference.py`. Helper sprawdza rzeczywiste małe outputy:
+shape, finite values, trailing NULL bez dziur wewnętrznych, final newline,
+pełny schemat S dla obu portów i kolejność częstotliwości. Zapisuje hashe
+metadata/CSV/źródeł I/O, źródłowy build manifest i dokładny image z argv.
+Hash mesh jest odczytany z istniejącego fixture, nie przeliczany ponownie;
+zgodność mesh/source/binary należy także do wspólnego M0.1/M0.2.
+
+Polecenia wykonane bez GPU, builda, zmian usług lub cloud:
+
+```sh
+python -m unittest discover -s tools/tests -p test_stage_io_reference.py
+python tools/stage_io_reference.py /home/sieciowiec/dev/python/anteny/artifacts/tshaped/port-repair-20261028/rear-route-sma-only/run-local-stages-20261029 --output artifacts/optimization-stages/io-m0/archive-readback.json
+```
+
+Wynik: 4/4 Python PASS, archiwum readback PASS; 10 output files,
+2 828 843 B ogółem, 8 CSV / 2 723 651 B, S 480 B / 1 wiersz / 9 kolumn / 0 NULL.
+Brak VTK w tym runie. Odczyt inspekcyjny Python ≈0,032 s, **nie czas natywnego I/O**.
+Jedyny zapis to JSON raportu 193 844 B poza Git. Nie mierzono peak RAM,
+systemowych read/write bytes ani wydajności funkcji C++; wszystkie te pomiary NOT RUN.
+Referencja nadal O2/PA1, GPU/UVM, FP32 basis/FP64 arithmetic, cuDSS native complex
+coarse, 1,92 GHz / oba źródła; helper nie zmienia konfiguracji.
+
+Artefakt: `artifacts/optimization-stages/io-m0/archive-readback.json`.
+Źródłowy manifest SHA a6ec732f11cc7fe920365ba2aae354b68fe97e81f732d5afd4659ed5187c3338;
+image faktycznego runu 43ac46f6430cf44d7a2da0a618a0f5c67c6965cca2fde510f2a96116333e6d76.
+Port-S SHA b4e4fcdf9dfdbc3f6b9499a9b0ee9b5dd7f34011be701a40c99f4a90ff3677ee.
+Pozostałe hashe i native build fingerprints w raporcie.
+
+### IO-02-E01 — M0: natywny micro bez solve (`TODO_TO_CHECK`; test przygotowany)
+
+Istniejący target `unit-tests` / binarka `palace-unit-tests` obejmuje
+`test/unit/test-tablecsv.cpp` i `test-postoperatorcsv.cpp`. Native table tests
+sprawdzają format/parse/reload; PostOperatorCSV ma dokładne regresje restartów
+jednego i dwóch źródeł, niezgodne nagłówki, liczbę i wyrównanie kolumn.
+Nie tworzyć drugiego silnika tabel w Pythonie do porównania wydajności.
+
+Dopisano native regression `TableCSV_WriteFullTableTrunc_PartialExcitations`
+do istniejącego `test-tablecsv.cpp`: po cztery małe snapshoty source-major i frequency-major
+(zapełnianie NULL w poprzednich lub bieżących wierszach), byte-for-byte porównanie writera
+z natywnym formatterem i reload wszystkich kolumn po każdym zapisie.
+Istniejący fixture PerRankTempDir zapewnia cleanup; output < kilka kB. To zachowuje obecną
+semantykę, nie zmienia kodu produkcyjnego. **Test C++ nie zbudowany i NOT RUN**.
+
+Prośba do koordynatora o slot/build-cache: uruchomić istniejący cached
+`palace-unit-tests` (jeśli obejmuje tę rewizję testu), albo przyrostowo
+przebudować tylko test TU/target po uzgodnieniu Catch2 i native dependencies.
+Nie dotykać wspólnego build dir/cache bez przydzielonego slotu.
+Przygotowana komenda (ścieżkę ustala koordynator):
+
+```sh
+timeout 60s <cached-build>/palace-unit-tests '[tablecsv],[postoperatorcsv]' --device cpu --backend /cpu/self
+```
+
+Jeśli GPU-enabled build inicjalizuje HYPRE/CUDA nawet dla tego wyboru,
+koordynator musi zastosować ustalony guard i zgodę na usługę przed wykonaniem;
+worker nie uruchamiał binarki. Nie wykonywać testów `[Regression]`/pełnej anteny.
+Po tym mierzyć native N vs 2N małych snapshotów, liczby bytes/calls i formatting
+oddzielnie. Obecny pojedynczy punkt S ma tylko 480 B; wzrost O(N²) w sweepie to
+hipoteza opłacalności, nie dowód, że to istotne 19,6 s z logu.
+
+Ponowienie: zmiana schema/output schedule/native writer lub wejść; identycznego
+archive readback nie powtarzać bez powodu. IO-01 performance i IO-02 speedup
+pozostają TODO_TO_CHECK; IO-03 bez aktywnego VTK DEFERRED do realnego profilu.
+Dalsze wykonanie po zintegrowaniu M0/M1 i przydzieleniu slotu przez root.
+
+
+### IO-02-E02 — M0 light review / minimal Catch main (`PASS`, scope: review; native NOT RUN)
+
+Na polecenie root ponownie sprawdzono semantykę NULL: `Column::format_row` daje
+tekst NULL dla indeksu poza `data.size()`, a parser nie dopisuje żadnego elementu.
+To brak wartości/prefix kolumny, nie NaN. Finite wartości całkowite w regression
+pozwalają dokładnie porównać wektory; dodano jawne porównanie długości prefixów
+oraz kontrolę obecności NULL w niekompletnej kolumnie. Test obejmuje teraz oba
+porządki source-major i frequency-major. Cleanup zastąpiono istniejącą konwencją
+`palace::test::PerRankTempDir` z test/unit/fixtures.cpp; bez nowego API tempdir.
+
+Przygotowany `tools/stage_io_unit_main.cpp` to Catch Session + MPI Init/Finalize.
+Nie inicjalizuje Device/HYPRE/CEED; odpowiada filtrowi `[tablecsv]` (8 test cases
+z nowym testem) bez całej regresji/EM. Nie zastępuje pełnego PostOperatorCSV
+restart testu: ten wymaga istniejącego normalnego unit-tests targetu lub później
+wspólnego operator-aware main przygotowanego przez koordynatora.
+
+Po przydzieleniu slotu/root środowiska: skompilować tylko nowy main,
+test/unit/test-tablecsv.cpp i test/unit/fixtures.cpp, z bieżącymi headerami
+Palace + dokładnie obecne MFEM/fmt/scn/MPI ABI oraz Catch2. Linkować z obecną
+biblioteką M7, nie z historycznymi bibliotekami/headers PR60. Ustawić istniejącą
+makrościeżkę PALACE_TEST_DATA_DIR na test/data tej rewizji. Nie rebuild dependency.
+Nie skopiowano operator main ani nie zmodyfikowano wspólnych ustawień buildu.
+
+Komenda po zbudowaniu: `timeout 60s <io-native-tests> '[tablecsv]'`.
+Bez `--device`/`--backend`, bo ten minimalny main nie rejestruje takich opcji.
+Sam build i native test nadal **NOT RUN**, brak slotu i celowo brak kompilacji.
+Python 4/4 PASS oraz diff/docs check ponowione po zmianie testu/ledgeru.
+
+### IO-02-E03 — M0 root integration review (`PASS`, scope: review; native NOT RUN)
+
+2026-10-30, Sol high: docs-garden i source review integracji w root Palace.
+Sprawdzono opt-in PALACE_STAGE_STOP, guard single-rank, fixed-mesh/uniform Driven
+operator case i stop przed ComplexKspSolver; sidecar/marker jawnie wykluczają RF.
+Sprawdzono native CSV regression (prefixy NULL i oba harmonogramy) oraz minimalne
+mains. Nie znaleziono blokującego błędu C++; normal flow nadal wymaga runtime smoke.
+21 lekkich Python testów w root, docs checker i diff check PASS; build/native NOT RUN
+w zakresie tego review. Źródła wspólne nietknięte podczas równoległego slotu buildu.
+Root otrzymał konkretną usterkę dokumentacji: INDEX nadal opisywał wykonanie
+jako nieaktywne, mimo Mode goal / Active M0. Naprawa wspólnego pliku należy do root.
+Guard diagnostyki operatorów odrzuca liczniki LinearSolve/EigenvalueSolve; waveport
+normalization może w przyszłości wymagać osobnego zakresu. Obecna kwalifikacja
+jest planowana dla znanego lumped-only fixture; nie twierdzić ogólnej obsługi waveport.
+
+### IO-02-E04 — M0 natywne CSV testy (`PASS`, scope: parser/writer/readback correctness)
+
+2026-10-30, root udzielił osobnego slotu build/test. Wykonanie w root checkout
+`/home/sieciowiec/dev/cpp/palace`, bez rebuild libpalace/dependencies i bez solve.
+Nowe source fingerprint **131d5da3bf54eea5375ce41dfcf718aa9d2e466b8bf6a2abedcb60e152e2d8eb**;
+aktualna libpalace **d1887e64cbd7a0045475b8f84b220f3b8d49666bb3edbf5503ae4987a9002f1b**.
+Image **219cb96c3b3956f78beaf037f3ebb52bd02ab014765ab3918c9d21a72dae7e9e**.
+Pełne hashe main/test-tablecsv/fixtures/Catch2/current native w `inputs-before.json`;
+sprawdzone ponownie po kompilacji i teście: bez zmiany source/native/test inputs.
+
+Zachowany M7 CXX flags + bieżące Palace/MFEM4.9/fmt11/scn4/MPI headers,
+wyłącznie Catch2 z stage/deps. Przebudowano trzy TU: `stage_io_unit_main.cpp`,
+`test-tablecsv.cpp`, `fixtures.cpp`; link jawnie z `/stage/native/libpalace.so`.
+Nie zbudowano ani nie uruchomiono starej binarki PR. Macro danych to rzeczywiste
+`PALACE_TEST_DATA_DIR="/src/palace/test/data"` (nie test/unit/data).
+
+Izolowany kontener `palace-stage-m0-io-20261030`: network none, CDI NVIDIA bez
+szerokiego host bind, OMP1/OpenBLAS1, cpus2, memory8GiB=memorySwap8GiB,
+core0. Loader: `libcuda.so.1` → `/usr/lib/libcuda.so.615.78.08`, 112 668 520 B;
+ldd potwierdza current `/stage/native/libpalace.so`, fmt11/scn4/MFEM4.9.
+Nie inicjalizowano MFEM Device/HYPRE/CEED, nie wywołano EM/GMRES.
+Przed startem: usługa inactive/dead/MainPID0, actual inference guard [].
+
+Wykonane native argv wewnątrz kontenera:
+
+```sh
+env LD_LIBRARY_PATH=/stage/native:/opt/view/lib:/opt/cudss/lib:/usr/local/cuda/lib64 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 timeout -k 3 60 /stage/io-native/io-unit-tests '[tablecsv]'
+```
+
+**8 test cases / 182 assertions PASS, exit0**, w tym nowa regresja obu harmonogramów
+z trailing NULL i ponownym wypełnianiem wcześniejszych wierszy. Runtime testu
+0,214 s; łączna kompilacja/link 7,231 s (limit120s, jobs1); cały slot10,172 s.
+To czasy smoke, **nie benchmark natywnego I/O ani speedup anteny**.
+Native test EXE SHA **9bed794345c19cfec664571dbcec2f4b85ed1fc81e99926e2c730859b1bf03b6**.
+Zwykłe małe snapshoty CSV; osobnego systemowego pomiaru bytes/read/write/peak
+RAM nie wykonano. Pełne PostOperatorCSV restart tests nadal NOT RUN w tym slocie.
+
+Dowody: `/home/sieciowiec/dev/cpp/palace/build/optimization-stages-m0-20261030/io-native/`:
+`commands.jsonl`, `events.jsonl`, `compile-result.json`, `test-results.json`,
+`resource-policy.json`, `io-unit-test.log`, `io-unit-ldd.log`, `loader-proof.log`,
+`inputs-before.json`, `cleanup.json`. Kontener po slocie exited; żaden Palace
+container nie pozostał aktywny. Oryginalne cache/buildery pozostawiono zatrzymane.
+
+Pierwszy preflight przed utworzeniem kontenera miał błąd wrappera `check_output`
+dla oczekiwanego systemctl inactive/exit3; nie rozpoczęto wtedy kompilacji/testu.
+Zapisano `preflight-attempt1.json`, poprawiono jawne sprawdzanie statusu oraz
+inference guard, root potwierdził kontynuację tego samego slotu. To korekta harnessu,
+nie negatywny wynik performance i nie fallback na inne biblioteki.
+
+Decyzja: natywna semantyka table/partial rows zakwalifikowana w CPU smoke,
+M0 I/O gotowe do integracji. IO-01 profiling, IO-02 opłacalność/speedup i pełne RF
+pozostają TODO_TO_CHECK. Następny etap dopiero po zatwierdzeniu M0 przez root.

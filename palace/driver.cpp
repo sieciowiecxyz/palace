@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 #include <mfem.hpp>
+#include <nlohmann/json.hpp>
 #include "drivers/basesolver.hpp"
 #include "drivers/boundarymodesolver.hpp"
 #include "drivers/drivensolver.hpp"
@@ -19,6 +20,8 @@
 #include "utils/geodata.hpp"
 #include "utils/iodata.hpp"
 #include "utils/memoryreporting.hpp"
+#include "utils/outputdir.hpp"
+#include "utils/stageprobe.hpp"
 #include "utils/timer.hpp"
 
 namespace palace
@@ -28,6 +31,18 @@ void Run(IoData &iodata, MPI_Comm comm, int omp_threads, const char *git_tag)
 {
   const bool world_root = Mpi::Root(comm);
   const int world_size = Mpi::Size(comm);
+  const auto stage_probe = RequestedStageProbe();
+  if (stage_probe != StageProbe::None)
+  {
+    MFEM_VERIFY(world_size == 1, "Stage diagnostics require exactly one MPI rank!");
+    if (stage_probe == StageProbe::Operators)
+    {
+      MFEM_VERIFY(iodata.problem.type == ProblemType::DRIVEN &&
+                      iodata.solver.driven.adaptive_tol <= 0.0 &&
+                      iodata.model.refinement.max_it == 0,
+                  "Operator diagnostics require a driven uniform fixed-mesh solve!");
+    }
+  }
 
   std::unique_ptr<BaseSolver> solver = [&]() -> std::unique_ptr<BaseSolver>
   {
@@ -78,7 +93,53 @@ void Run(IoData &iodata, MPI_Comm comm, int omp_threads, const char *git_tag)
     }
   }
 
-  solver->SolveEstimateMarkRefine(mesh);
+  bool stage_complete = (stage_probe == StageProbe::Preprocess);
+  if (!stage_complete)
+  {
+    try
+    {
+      solver->SolveEstimateMarkRefine(mesh);
+    }
+    catch (const StageProbeComplete &complete)
+    {
+      MFEM_VERIFY(stage_probe == StageProbe::Operators &&
+                      complete.stage == StageProbe::Operators,
+                  "Unexpected diagnostic completion stage!");
+      stage_complete = true;
+    }
+  }
+  if (stage_probe != StageProbe::None)
+  {
+    MFEM_VERIFY(stage_complete, "Requested diagnostic stage did not complete!");
+    const char *stage = stage_probe == StageProbe::Preprocess ? "preprocess" : "operators";
+    WriteRootOutputFile(
+        fs::path(iodata.problem.output) / "stage-diagnostic.json", comm,
+        [&](auto &stream)
+        {
+          nlohmann::json levels = nlohmann::json::array();
+          for (const auto &m : mesh)
+          {
+            const auto &pm = m->Get();
+            levels.push_back(
+                {{"elements", pm.GetNE()},
+                 {"boundary_elements", pm.GetNBE()},
+                 {"vertices", pm.GetNV()},
+                 {"attributes",
+                  std::vector<int>(pm.attributes.begin(), pm.attributes.end())},
+                 {"boundary_attributes",
+                  std::vector<int>(pm.bdr_attributes.begin(), pm.bdr_attributes.end())}});
+          }
+          nlohmann::json diagnostic = {{"schema", 1},
+                                       {"stage", stage},
+                                       {"diagnostic_only", true},
+                                       {"complete", true},
+                                       {"solve_executed", false},
+                                       {"rf_result", false},
+                                       {"mpi_ranks", world_size},
+                                       {"mesh_levels", levels}};
+          stream << diagnostic.dump(2) << '\n';
+        });
+  }
 
   auto peak_mem = memory_reporting::GetPeakMemoryStats(comm);
   auto peak_node_mem = memory_reporting::GetPeakNodeMemoryStats(comm);
@@ -90,6 +151,13 @@ void Run(IoData &iodata, MPI_Comm comm, int omp_threads, const char *git_tag)
   solver->SaveMetadata(BlockTimer::GlobalTimer());
   solver->SaveMetadata(peak_mem);
   solver->SaveMetadata(peak_node_mem);
+  if (stage_probe != StageProbe::None)
+  {
+    Mpi::Print(comm,
+               "PALACE_STAGE_DIAGNOSTIC: stage={} complete=1 solve_executed=0 "
+               "rf_result=0\n",
+               stage_probe == StageProbe::Preprocess ? "preprocess" : "operators");
+  }
   Mpi::Print(comm, "\n");
 }
 

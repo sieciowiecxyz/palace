@@ -1,9 +1,12 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+#include <fstream>
 #include <iterator>
+#include <utility>
 #include <scn/scan.h>
 #include <catch2/catch_test_macros.hpp>
+#include "fixtures.hpp"
 #include "utils/communication.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/tablecsv.hpp"
@@ -293,5 +296,59 @@ TEST_CASE("TableCSV_LoadFromFile", "[tablecsv][Serial]")
     CHECK(table_w.table.n_cols() == 8);
     CHECK(table_w.table[0].data == std::vector<double>{2, 8, 14, 20, 26, 32});
     CHECK(table_w.table[1].data == std::vector<double>{1, 1, 1, 1, 1, 1});
+  }
+}
+
+// A second excitation fills an existing row; an output update must preserve this.
+TEST_CASE_METHOD(palace::test::PerRankTempDir,
+                 "TableCSV_WriteFullTableTrunc_PartialExcitations", "[tablecsv][Serial]")
+{
+  if (!Mpi::Root(Mpi::World()))
+  {
+    return;
+  }
+  const auto path = temp_dir / "port-S.csv";
+  TableWithCSVFile output(path.string());
+  output.table.insert("frequency", "f (GHz)", 0);
+  output.table.insert("source1", "source 1", 1);
+  output.table.insert("source2", "source 2", 2);
+
+  std::vector<std::pair<int, int>> schedule;
+  SECTION("Source-major rewrites earlier rows")
+  {
+    schedule = {{1, 0}, {1, 1}, {2, 0}, {2, 1}};
+  }
+  SECTION("Frequency-major fills the current row")
+  {
+    schedule = {{1, 0}, {2, 0}, {1, 1}, {2, 1}};
+  }
+  for (const auto &[source, step] : schedule)
+  {
+    if (output.table["frequency"].n_rows() == std::size_t(step))
+    {
+      output.table["frequency"] << 1.0 + step;
+    }
+    REQUIRE(output.table["frequency"].data.at(step) == 1.0 + step);
+    output.table[source] << 10.0 * source + step;
+    output.WriteFullTableTrunc();
+    std::ifstream file(path);
+    REQUIRE(file.good());
+    std::string bytes{std::istreambuf_iterator<char>(file),
+                      std::istreambuf_iterator<char>()};
+    CHECK(bytes == output.table.format_table());
+    if (output.table[2].n_rows() < output.table.n_rows())
+    {
+      CHECK(bytes.find("NULL") != std::string::npos);
+    }
+    TableWithCSVFile reloaded(path.string(), true);
+    REQUIRE(reloaded.table.n_cols() == output.table.n_cols());
+    REQUIRE(reloaded.table.n_rows() == output.table.n_rows());
+    for (std::size_t col = 0; col < output.table.n_cols(); col++)
+    {
+      CHECK(reloaded.table[col].header_text == output.table[col].header_text);
+      // NULL represents absent values, not NaN entries: compare prefix lengths too.
+      CHECK(reloaded.table[col].n_rows() == output.table[col].n_rows());
+      CHECK(reloaded.table[col].data == output.table[col].data);
+    }
   }
 }

@@ -39,6 +39,7 @@
 #include "utils/prettyprint.hpp"
 #include "utils/timer.hpp"
 #include "utils/sweepprojection.hpp"
+#include "utils/stageprobe.hpp"
 
 extern "C" void PalacePCBasisRelease() __attribute__((weak));
 
@@ -115,6 +116,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   auto C = space_op.GetDampingMatrix<ComplexOperator>(Operator::DIAG_ZERO);
   auto M = space_op.GetMassMatrix<ComplexOperator>(Operator::DIAG_ZERO);
   const auto &Curl = space_op.GetCurlMatrix();
+
+  if (RequestedStageProbe() == StageProbe::Operators)
+  {
+    throw StageProbeComplete{StageProbe::Operators};
+  }
 
   // Set up the linear solver.
   // The operators are constructed for each frequency step and used to initialize the ksp.

@@ -92,3 +92,16 @@ Zakończone badania optymalizacji mają osobne [kryteria](../milestones/optimiza
 - `CONTRIBUTING.md` z bazowego SHA: małe skupione zmiany, aktualny main, lokalne testy, konsultacja istotnych funkcji. Na tym etapie tylko odczyt, żadnych publikacji.
 
 Następny etap: wyizolować finalny lifetime KSP w uniform driven, bez flag PALACE_*, adaptera i zmiany numeryki. Historyczne badania: [archiwum](../milestones/optimization-M0.md).
+
+## Dawny docs/milestones/M1.md
+
+# PR preparation M1 — PASS (2026-10-22)
+
+- M1.1: worktree `/home/sieciowiec/dev/cpp/palace-pr-driven-release`, branch `pr/driven-release-workspace`, baza `29ad351f916e47e005a43730513f155eeb634e3e`. Diff obejmuje tylko `drivensolver.cpp`, testy regresji i changelog: 47 dodanych / 4 usunięte linie.
+- M1.2: uniform driven zwalnia KSP oraz A/P/A2/K/C/M dopiero po ostatniej częstotliwości ostatniego pobudzenia. Metadata zapisywane przed destrukcją KSP. Bez flag, adaptera, zmiany równań, precyzji lub tolerancji; adaptive frequency/PROM bez zmian. AMR używające uniform sweep pozostaje objęte patchem.
+- Reproducer: oryginalna siatka coax upstream, 1 częstotliwość/1 pobudzenie oraz 2 częstotliwości/2 pobudzenia; pola i estymator aktywne. Pierwszy poprawny smoke upstream: 1 solve/9 iteracji, 5,210 s; 4 solves/50 iteracji, 3,711 s. To reprodukcja nakładania workspace, nie dowód zysku pamięci.
+- Przyrostowe buildy z cache PASS. Izolowany builder wymagał fmt 12.1.0, C++20, Catch2 v3.8.1 i PRE_TEST discovery; brak tych dostosowań w diff produktu. MFEM 4.9 zachowany zamiast przebudowy całego toolchaina do4.10.
+
+Historia nieudanych prób zachowana w `artifacts/upstream-pr/`: fmt11 powodował błąd kompilacji; odziedziczony GPU backend poprawiono dla CPU. Timeout starego MFEM 4.9/Umpire przy2OMP zdiagnozowany GDB w PrintMeshInfo/host QuickPool. Wszystkie kwalifikowane próby używają1OMP. Nie jest to ogólna diagnoza wszystkich wersji MFEM.
+
+Dalsze dowody: [M2](../milestones/M2.md). Historyczne badania: [archiwum](../milestones/optimization-M1.md).

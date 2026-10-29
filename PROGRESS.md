@@ -1,11 +1,64 @@
+## Aktywny checkpoint — M0 CLOSED, M1 ACTIVE (2026-10-30)
+
+Root sprawdził natywne raporty i zamknął M0.1–M0.4 w jawnym zakresie.
+Solhighdocs-garden PASS po korekcie historycznegoM1 i jawnego timergap0,0561s.
+35 Python PASS w root po finalnym rozszerzeniu runnera, native
+operator CPUOMP1 48assertions, CSV182assertions/8cases. Tiny2stops i pełna siatka
+mediumGPUoperators-onlyPASS: elapsed167,685s, Palace166,2728s,
+Init6,4594/Mesh27,7484/Ops113,3123/IO18,6966; Setup/GMRES/PC/FF/post0.
+Sourcemanifest131d5da3..., libd1887e64..., config9f068..., mesh2af1...;
+18bazowychflagśrodowiska preserved, OMP1/nativeFP64complex/pool256, brakRFclaim.
+323próbkiGPU mean0,1269% median0 max9%, globalpeak6276MiB (nie processUVMpeak),
+cgrouppeak13657325568B, hostfree>=70,97GB. Wszystkie kontenery posprzątane.
+
+Rootreviewknownpre-exec harnessfailures zachowane: libcuda stub, OCIbind/CDIconflict,
+globalLDpreload; poprawione scopedpreload/CDIonly z regresjami. OMP2allocatorcrash
+obecny także frozenM7r3: OP05TODO, bez zmiany productionthreads lub solverprecision.
+Nowy diagnostic build nie zastępuje zamrożonego RFbaseline.
+ActiveM1: podfazy hostmesh/FE/assembly/serializacja, bez profilowania całego solve.
+Następnie pomiar narzutu, wybór konkretnego kandydata dla 3ścieżek. Dotychczas brak
+nowej optymalizacji ani zmierzonego speedupu; wyłącznie szybsze narzędzia badań.
+Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić.
+System goalpanel nadalstarypaused; repo goalaktywny na jawne polecenie użytkownika.
+
+## M0 — review i pierwszy slot cachedbuild (2026-10-30)
+
+Trzyśrodowiskowe kontrole root21PythonPASS w0,026s; docscheckerPASS.
+SolhighI/O wykonał docs-garden: bez blokującego błęduC++; wskazane nieaktywneINDEX
+poprawione. Weryfikator stopuoperators ma zakres obecnego fixture lumpedports;
+waveport setup może legalnie wykonywać Linear/EigenvalueSolve i wymaga osobnegocase.
+Slotnative przydzielony operatorworker: snapshot cachedr3builder, max2jobs,
+32GiB/noSwap/600sbuild/900stotal; żadnego MFEM/HYPRE/libCEEDrebuild.
+Nowebuild/native i krótkie CPUtesty oczekują na wynik; brak nowegospeedupclaim.
+
+## M0 — gotowe patche diagnostyczne i lekkie kontrole (2026-10-30)
+
+Wszyscy trzej wykonawcy jawnie GPT-6.1 Sol high. Limit równoczesnych sesji
+wymusił start I/O po pierwszym raporcie operatorów; zachowano trzy osobne branche.
+Root odebrał i przejrzał ich patche. Jeszcze żadnego speedupu ani native RF PASS.
+Source400plików baseline == frozenSM120r3 == a6ec732f...c3338; source/native/settings/
+image43ac/config provenance11PASS. Po dodaniu driverhooków hash zmienia się celowo.
+Przypięty aktualny MaxSize64, nie fixture240. ArchivedIO readback10plików2,828,843B
+PASS; dwa źródła mogą uzupełniać już zapisane wiersze, więc naiveCSVappend niedopuszczalne.
+
+M0 diagnostyka: PALACE_STAGE_STOP=preprocess/operators, explicitnoRF sidecar/marker,
+shared stageprobe.hpp i single-rank guard. Python testy13+4+4PASS w worktree;
+natywny parser5wariantówPASS. Pełna kompilacja, nativeoperatoraction i nativeCSVregression
+NOT RUN. Stary PRunitbinary jest ABI-niezgodną niewykazaną referencją (60różnychheaderów,
+innefmt); wolno odzyskać sam Catch2 do świeżej kompilacji. Zachowany devbuilder ma
+identyczne nativeM7r3, więc sklonować cache i rebuild tylko zmienionych TU.
+Następny krok: izolowany bounded cachedbuild i tiny native harnessy w jednym slocie.
+M0 pozostaje aktywny; M1/optimizacje jeszcze nierozpoczęte.
+
 ## Aktywny checkpoint — kampania faz, M0 (2026-10-29)
 
 Użytkownik uruchomił wykonanie: trzy GPT-6.1 Sol high, osobne branche,
 koordynator zbiera wyniki i zamyka bramki. PLAN Mode goal / Active M0.
 System create_goal odrzucony: poprzedni paused goal nadal unfinished;
 nie zamykano go fikcyjnie. Nowa kampania działa według repo workflow.
-Strata localai-nvfp4.service aktywna, zgoda na zatrzymanie oczekuje;
-GPU/EM nie uruchamiać do odpowiedzi. Cloud i publikacja niedozwolone.
+Użytkownik zatwierdził zatrzymanie Straty dla tej kampanii. Root wykonał stop;
+localai-nvfp4.service inactive/dead MainPID0, GPU tylko Zed182MiB, RAM78GiB dostępne.
+Po zakończeniu pomiarów przywrócić usługę; kontrolować guard przed każdym runem. Cloud i publikacja niedozwolone.
 M0: uzgodnić source-runtime, fixture i tanie harnessy; nie przechodzić do M1
 bez dowodów M0.1–M0.4. Badawcze patche pozostają izolowane.
 

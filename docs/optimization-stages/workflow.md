@@ -2,8 +2,8 @@
 
 ## Stan i dowody początkowe
 
-2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M0.
-Wykonawcy: GPT-6.1 Sol high. Strata aktywna, zgoda na zatrzymanie oczekuje.
+2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M1; M0 zamknięty 2026-10-30.
+Wykonawcy: GPT-6.1 Sol high. Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić usługę.
 Panel systemowy goal wciąż ma stary paused goal; create_goal odrzucone
 z powodu unfinished goal. Nie zamykać starego celu bez osiągnięcia jego kryteriów.
 Root checkout: `/home/sieciowiec/dev/cpp/palace`, branch `codex/local-cuda`,
@@ -103,8 +103,8 @@ Każdy benchmark ma identyczny zestaw outputów; test output on/off to diagnosty
 nie dowód równoważnego przyspieszenia.
 
 Autor ścieżki przygotowuje patch i proponuje test, główny agent zatwierdza case,
-komendy i manifest. Ta sama Luna high tylko wykonuje już przygotowany run,
-czeka i zbiera dowody. Nie oddawać jej projektowania solvera. Nie uruchamiać
+komendy i manifest. Jeden z trzech Sol high w tej kampanii wykonuje już przygotowany run,
+czeka i zbiera dowody (nowsze polecenie użytkownika zastępuje tu dawną Lunę). Nie oddawać jej projektowania solvera. Nie uruchamiać
 trzech benchmarków jednocześnie. Strata/inference musi być nieaktywna;
 wyłączenie wymaga bieżącej zgody. Zero swap/solver spill na SSD. Cache i zwykły
 zapis wyników dozwolone; zmierzyć bajty i unikać sztucznego wielkiego stress-write.
