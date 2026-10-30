@@ -1,5 +1,16 @@
 # Operator construction: source audit and experiment ledger
 
+## Bieżąca decyzja M6 — PROMOTE_PROFILE / M6 CLOSED
+
+OP-06 zakwalifikowano dla uniform Restart1, obu portów i opisanych medium na5070Ti.
+TrzyparyOP i combined oraz1,71/2,69/3,80GHz+inna geometria RF PASS.
+Kod po lokalnymmerge root: source95822/lib048f; exactflags i ograniczenia w
+[wynikach](results.md) i [audycie](../milestones/stages-final-audit.md).
+DefaultGSLIB i konserwatywnefallbacki pozostają. LegacyRestartCSVFAIL odziedziczony,
+poza profilem; nie poprawiono go ani nie kwalifikowano jakoPASS.
+Historyczne IN_PROGRESS poniżej są rozstrzygnięte kolejnymi wpisami/raportami.
+
+
 ## Stan bieżący po kwalifikacji prototypu M2 — 2026-10-30
 
 Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.

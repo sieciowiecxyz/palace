@@ -8,6 +8,13 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 
 ## Mapa
 
+- Kwalifikowana optymalizacja faz (2026-10-30): `palace/fem/probelocator.hpp` i opt-in
+  `PALACE_PROBE_LOCATOR=mfem` omijają ciężki GSLIBSetup wyłącznie dla bezpiecznych wnętrz;
+  stare GSLIB pozostaje default/fallback. `PALACE_SINGLE_RANK_DIRECT_MESH=1` pomija rank1
+  MeshPart ASCII roundtrip. Nie zmieniają metody FEM ani precyzji operatora.
+  Profil/reprodukcja/ograniczenia: `docs/milestones/stages-final-audit.md`;
+  scopedqualification nie kwalifikuje legacy Restart>1 (odziedziczony defekt CSV).
+
 - `palace/`, `cmake/`, `test/`: źródła i testy upstream. Zaimportowane rozszerzenia są w zwykłym kodzie C++, nie stosowane ponownie jako patche.
 - `tools/dev.py`: lokalny przyrostowy build, manifesty, rozpakowanie fixtures, ograniczony runner i pakowanie. Python stdlib, Podman, zstd; Linux x86-64.
 - `tools/package_bundle.py`/`package_example.py`: odrębny lokalny bundle z checksum payload/source/native/reference i explicit FP64/memory3IR profiles. `--runtime-image` sprawdza rzeczywisty manifest/native i prefix pinnedbase, uruchamia image po digest bez hostnative overlays; legacy mounty pozostają domyślne. `package_lifecycle.py` sprawdza własne małe deadline/SIGTERM, nigdy RF PASS. Pin obrazu lokalnie, bez registry/per-run uploadu zależności; docs/runtime-package.md.

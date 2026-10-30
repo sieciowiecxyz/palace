@@ -1,5 +1,16 @@
 # Audyt i plan: preprocessing siatki
 
+## Bieżąca decyzja M6 — PROMOTE_PROFILE / M6 CLOSED
+
+PRE-03 zakwalifikowano dla uniform Restart1/rank1 w badanym profilu; defaultoff,
+AMR/NURBS/MPI pozostają na oryginalnej ścieżce. Tiny55986 i MPI2fallbackPASS.
+Trzy paryPRE dają~1%full/~24%mesh; fullpeakRAMbezistotnejzmiany. CombinedM5
+14,62%full/13,67%cgroupRF PASS. Dokumentacja [wyniki](results.md).
+Oryginalny controllerFAIL/recovery pozostają;3nativeparyPRE≠3cleanwallpary.
+Root source95822/lib048f, nie dodano IOcache ani zmianystackup/geometrii.
+Historyczne IN_PROGRESS rozstrzygnięte w kolejnych wpisach/artefaktach.
+
+
 ## Stan bieżący po kwalifikacji M3 — 2026-10-30
 
 Bieżący wynik PRE-03: **kandydat opt-in zakwalifikowany w M3 dla jednego punktu 1,92 GHz**, domyślnie wyłączony.

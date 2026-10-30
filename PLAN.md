@@ -1,50 +1,35 @@
-# Plan: preprocessing, operatory i I/O
+# Optymalizacja preprocessingu, operatorów i I/O
 
 Mode: goal
-Active: M6
+Status: complete_scoped
+Active: none
 
-## Cel i zakres
+## Cel i wynik
 
-Skrócić czas przygotowania i obsługi wyników Palace na RTX 5070 Ti 16 GB / 96 GB RAM,
-bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obiecywać
-zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
-Wykonanie uruchomione na polecenie użytkownika 2026-10-29. Trzej wykonawcy:
-GPT-6.1 Sol high, każdy na swoim branchu; koordynator zbiera i weryfikuje wyniki.
-M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; M3 zamknięte zakresowo; M4 zamknięte zakresowo; M5 sprawdzone dla uniform Restart1; aktywny M6: audyt i rekomendacja. Użytkownik zgodził się na zatrzymanie
-Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez cloud i publikacji.
+Zakończono kampanię dla jawnego profilu medium na jednej RTX 5070 Ti16GB/96GBRAM:
+Driven, rank1/OMP1, jeden Point na run, Restart1. Nie jest to kwalifikacja wszystkich
+funkcji Palace ani projektu anteny do produkcji.
 
 ## Milestones
 
-- [x] M0 — Zamrozić zgodną referencję, źródła/build, testy krótkie i kontrakt pomiaru.
-- [x] M1 — Zintegrować minimalne profilowanie trzech faz, zmierzyć narzut i wybrać rzeczywiste hotspoty.
-- [x] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
-- [x] M3 — Oddzielnie zakwalifikować każdy patch: poprawność, pamięć, czas; odrzucić nieudane hipotezy.
-- [x] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
-- [x] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
-- [ ] M6 — Zamknąć rejestry, wskazać build rekomendowany, rollback i ograniczenia.
+- [x] M0 — Referencja, źródła/native, krótkie testy i kontrola zasobów.
+- [x] M1 — Profil faz i wybór istotnych kosztów.
+- [x] M2 — Oddzielne prototypy PRE/OP/IO; negatywne hipotezy zachowane.
+- [x] M3 — Oddzielna kwalifikacja: PRE i OP po trzy pary; IO cache DEFER.
+- [x] M4 — Lokalna integracja tylko OP/PRE i kontrola interakcji.
+- [x] M5 — Trzy pary combined,1,71/2,69/3,80GHz, druga geometria, CPU/MPI2,
+  invalidation oraz zapis/reload/restart sprawdzone z jawnymi wynikami negatywnymi.
+- [x] M6 — Audyt22punktów, manifest profilu, komendy, rollback i lokalny commit.
 
-## Organizacja
+Mediana pełnego1,92GHz/oba porty:738,280→630,324s (−14,62%);
+peak cgroup66,056→57,029GiB (−13,67%). Wszystkie14par RF w progach.
+Kompilacja integracji8,43s z cache, bez przebudowy zależności.
 
-Trzech wykonawców pracuje w osobnych worktree, na wspólnej przypiętej bazie.
-M2 jest etapem równoległym; M3 wymaga zakończenia oceny wszystkich ścieżek
-(PASS lub uzasadnione REJECTED/DEFERRED). M4 dopiero po M3. Agent nie przeskakuje bramki.
-Kod/research równolegle; ciężkie kompilacje i pomiary sprzętowe kolejno.
-Wspólną instrumentację, runner, manifesty, plan i integrację posiada koordynator.
-Każdy agent aktualizuje swój ledger przed i po próbie, także przy FAIL/timeout.
+Wykryty istniejący błąd nativeRestart2 CSV pozostaje niezakwalifikowany;
+rekomendowany wrapper odrzuca Restart!=1 od czasu sprzed tej próby.
+Nie wprowadzono IOcache, zmiany medium/precision, nowego solvera ani TF32.
 
-Szczegóły: [kontrakt](MILESTONES.md), [workflow i szablon wpisu](docs/optimization-stages/workflow.md),
-[preprocessing](docs/optimization-stages/preprocessing.md), [operatory](docs/optimization-stages/operators.md),
-[I/O](docs/optimization-stages/io.md), [checkpoint](PROGRESS.md).
-Najpierw operator construction, potem preprocessing; I/O ma mały udział, więc zaczyna od taniego replay.
-Nie należy rezygnować z niezależnego, taniego audytu I/O z powodu niższego priorytetu.
-
-## Historia
-
-[Poprzedni plan PR i jego M0](docs/optimization-stages/previous-pr-plan.md) zachowany.
-Poprzedni checkpoint PR M4 zachowano w
-[archiwum](docs/optimization-stages/previous-pr-checkpoint-M4.md), a pliki optimization-M*
-dotyczą wcześniejszych kampanii; obecne docs/milestones/M2–M5 opisują tę kampanię.
-poprzednie checkpointy M1 i M2 zachowano w archiwum. Te dokumenty
-nie zaliczają bramek obecnego planu. Nowe M0–M6 mają dowody w ledgerach tej kampanii
-oraz PROGRESS.md. Obecne zamrożone runtime/bundle pozostają nietknięte.
-Bez push i publikacji; wdrożenie do antenowego workflow dopiero po M5.
+[Wyniki](docs/optimization-stages/results.md),
+[audyt i komendy](docs/milestones/stages-final-audit.md),
+[szczegółowe wymagania](MILESTONES.md), [checkpoint](PROGRESS.md).
+Źródła scalono lokalnie; bez push/PR i płatnego compute.

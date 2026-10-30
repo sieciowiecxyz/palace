@@ -2,8 +2,8 @@
 
 ## Stan i dowody początkowe
 
-2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M5; M0/M1/M2/M3/M4 zamknięte zakresowo 2026-10-30.
-Wykonawcy: GPT-6.1 Sol high. Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić usługę.
+2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active none; Status complete_scoped; M0–M6 rozliczone dla profilu Restart1 2026-10-30.
+Wykonawcy: GPT-6.1 Sol high. Strata była zatrzymana za zgodą użytkownika na czas pomiarów; po zakończeniu kampanii przywrócona.
 Panel systemowy: get_goal 2026-10-30 potwierdził active objective
 „kontynułuj. Monitoringsub agentów i dokoń optymalizacje zgodnie z planem”.
 Wcześniejsza odmowa create_goal dotyczyła historycznego stanu panelu.

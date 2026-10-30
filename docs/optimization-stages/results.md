@@ -1,6 +1,6 @@
 # Optymalizacja faz — wyniki i zakres kwalifikacji
 
-Stan: **M6 audyt RF PASS; native Restart2 FAIL odziedziczonego CSV; finalizacja root PENDING**.
+Stan: **kampania zamknięta zakresowo, profil uniform Restart1 zakwalifikowany**.
 To wyniki solvera na jednej RTX 5070 Ti 16 GB / 96 GB RAM,
 CUDA/UVM/MAGMA, rank1/OMP1, medium. Nie jest to kwalifikacja projektu anteny do produkcji.
 
@@ -54,7 +54,7 @@ CSV kosztowało milisekundy. Binarny mesh zachował strukturę i pola tiny,
 lecz konwersja34,049s + walidacja0,441s daje szacowany zwrot dopiero od22
 wczytań identycznej siatki. **IO-06 DEFER**, brak automatycznego cache w zalecanym kodzie.
 
-## Co zostało przed zamknięciem
+## Audyt, ograniczenie restartu i profil
 
 1. Niezależny pełny replay **14 unikalnych par PASS**, w tym director+2mm:
    niezmieniony `compare_runs`, rzeczywiste hashy siatek/native/źródeł,
@@ -80,7 +80,9 @@ wczytań identycznej siatki. **IO-06 DEFER**, brak automatycznego cache w zaleca
    **TODO osobno:** naprawa legacy reload; positive restart nie jest zakwalifikowany.
    Nie blokuje to predeklarowanego uniform Restart1: wrapper odrzuca Restart!=1
    już od4b9652a58, a Restart1 omija reload. Nie rozszerzać profilu po tym FAIL.
-3. Root review/integracja i nowy **scopedqualification.json**, związany z SHA
+3. Kod scalono lokalnie w `130c7819c`; source root jest identyczny z testowanym
+   `95822ec5...`, więc nie przebudowywano ponownie tych samych źródeł.
+   Zapisano manifest **scopedqualification.json** po niezależnym przeglądzie, związany z SHA
    oryginalnego manifestu i dokładnymi18flagami+2featureflags. Nie nadpisywać
    `numerically_validated=false`, historycznych planów ani wyników. Sidecar jawnie
    odrzuca Restart!=1 i zmianę20flag; reuse/defer wymagają Restart1, a energy-release
@@ -95,3 +97,6 @@ Dowody lokalne: `artifacts/optimization-stages/M6-final-audit-20261030/full-audi
 `M5-combined-repeat-20261030/repeated-performance.json`,
 `M5-sweep-geometry-20261030/`, `M3-PRE03-full-20261030/three-pair-summary.json`.
 Dokładne argv są w planach per-run. Nie wykonywać ponownie ukończonych planów.
+
+Rekomendowany build: `build/optimization-stages-m4-integration-20261030/native/`.
+Komendy uruchomienia i rollback: [audyt M6](../milestones/stages-final-audit.md).

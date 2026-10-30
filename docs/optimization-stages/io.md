@@ -1,5 +1,15 @@
 # Audyt i plan: odczyt oraz zapis wyników
 
+## Bieżąca decyzja M6 — DEFER_CACHE / LEGACY_RESTART_NOT_QUALIFIED
+
+IO-06 strictGmsh/MFEMreadbackPASS, optymalizacja niepromowana (cold34s/zwrot22loads).
+CSV writer nieprzepisany;8actualCSVnative→reload+hashcheck+RFw14parachPASS.
+NativeRestart2FAIL w oryginalnej ścieżceA: znany odziedziczonyidxmapdefekt;
+niekwalifikowany i poza wcześniej zdefiniowanym profilemRestart1. SzczegółyIO-07poniżej.
+[Wyniki](results.md), [audyt](../milestones/stages-final-audit.md).
+Nowy manifest profilu nie unieważnia tego ograniczenia ani niezmienionego buildmanifestfalse.
+
+
 ## Stan bieżący po zamknięciu M2 — 2026-10-30
 
 Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.

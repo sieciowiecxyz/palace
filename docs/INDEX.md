@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M6; M5 sprawdzone zakresowo dla Restart1. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; kampania zakończona zakresowo, M6; rekomendowany profil Restart1. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -341,3 +341,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Optymalizacja faz: wyniki i zakres](optimization-stages/results.md)
   - Czytaj gdy: oceniasz rzeczywisty zysk, bramki RF i ograniczenia kwalifikacji.
   - Opis: Wyniki trzech par combined, świadome IO DEFER i otwarte bramki M6 preaudit.
+
+- [M6: audyt i rekomendowany profil optymalizacji faz](milestones/stages-final-audit.md)
+  - Czytaj gdy: odtwarzasz build, uruchamiasz szybki profil lub wykonujesz rollback.
+  - Opis: Macierz bramek, lokalna integracja, manifest i komendy; jawny legacy Restart2 FAIL.
