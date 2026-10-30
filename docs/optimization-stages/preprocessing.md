@@ -1,8 +1,21 @@
 # Audyt i plan: preprocessing siatki
 
-Status: M0 w wykonaniu. Preflight tożsamości wejścia PASS; native preprocessing i pomiary nowych wariantów NOT RUN.
+## Stan bieżący po zamknięciu M1 — 2026-10-30
+
+Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.
+PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
+
+| ID | Stan i zakres |
+|---|---|
+| PRE-01 | PASS — profil M1/E08–E09, bez speedup/RF claim |
+| PRE-02 | TODO_TO_CHECK — reorder nadal niebadany |
+| PRE-03 | TODO_TO_CHECK — wznowione dla rank1 po koszcie19,5s, M2 |
+| PRE-04 | TODO_TO_CHECK — duplikaty topologii, tylko po sourceaudit |
+| PRE-05 | TODO_TO_CHECK — koordynacja z IO-06, parser18,75s |
+
+Status: M0 zamknięte przez root; aktywny M1. Instrumentacja i testy runnera gotowe, nowy native build/profil oraz narzut NOT RUN.
 Owner: agent preprocessing, branch `opt/preprocessing-20261029`.
-Koordynator scala plan i wspólny checkpoint. Proponowany zakres kodu: `palace/utils/geodata.cpp`, ewentualnie `palace/utils/meshio.cpp`; nie dotykać solverów, wspólnych plików planu ani I/O outputu.
+Koordynator scala plan i wspólny checkpoint. Proponowany zakres kodu: `palace/utils/geodata.cpp`, ewentualnie `palace/utils/meshio.cpp`; nie dotykać solverów, wspólnych plików planu ani I/O outputu. M1 rozszerzenie przydziału root: `palace/fem/mesh.cpp` (Update), `tools/stage_probe_run.py` i jego testy; współdzielony stageprofile.hpp oraz driver.cpp pozostają root-owned.
 
 ## Granica fazy i dane bazowe
 
@@ -142,7 +155,7 @@ Wznowić PRE-01-E01 tylko po zmianie wejść/manifestu/narzędzia; zwykły kolej
 odczytuje zapisany raport. Kolejna konieczna akcja: root M0 runtime/dependencies
 qualification i minimalny native harness, potem PRE-01 profiling w M1.
 
-### PRE-01-E02 — M0: opt-in driver harness (`IN_PROGRESS`, native NOT RUN)
+### PRE-01-E02 — M0: opt-in driver harness (`PASS` w M0; dalsze dowody E04/E05)
 
 Koordynator przekazał własność `palace/driver.cpp` dla tego kroku oraz zatwierdzenie
 człowieka na zatrzymanie Straty; według jego kontroli usługa inactive/dead MainPID0,
@@ -396,3 +409,185 @@ CPU override oraz parsowanie GPU z N/A=null. Raw logs/plan/resource-policy/
 container-state/telemetry i wynik zachowane; nie raportować przyspieszenia względem
 825s pełnego solve. To kwalifikuje diagnostyczne wejście i zatrzymanie na tej siatce,
 nie default RF flow ani M1 hotspot profile. Slot zwolniony; dalszy etap ustala root.
+
+### PRE-01-E06 — M1: rozbicie preprocessing / parser (`PASS` zakres instrumentacji; final E08/E09)
+
+2026-10-30, aktywny M1 po zamkniętym M0 (`febdc6eb9`). Hipoteza diagnostyczna:
+18,6966s `DiskIO` przy operators-only może zawierać MFEM parsing/orientation,
+ponieważ istniejący IO BlockTimer obejmuje całe `LoadMesh`, nie wyłącznie read syscalls.
+To wniosek z zakresu kodu, nie zmierzony koszt parsera. Bieżący mesh to355MB Gmsh2.2
+ASCII; ścieżka Comsol/Nastran dla niego nie wykonuje się.
+
+Plan implementacji: niewielka liczba stałych host-inclusive scopes przez współdzielony
+`StageProfile` z root-owned `utils/stageprofile.hpp`. Load/Partition/Refine,
+cleanup/finalize/interfaces, LoadMesh native-read/MFEM constructor/conversion oraz
+Palace Mesh::Update. Żadnych per-element logów, CUDA sync ani optymalizacji M2.
+Zmienna/stream/vector ma zachować pierwotny zakres życia i kolejność operacji.
+
+Runner otrzyma jawne `--stage-trace`; domyślnie brak PALACE_STAGE_TRACE i takie samo
+baseline env. Tryb on dodaje wyłącznie PALACE_STAGE_TRACE=1, a flagę zapisuje plan
+oraz kanoniczny argv/env fingerprint. Baseline whitelist nie będzie akceptować
+profilowania odziedziczonego z archiwalnego command/env.
+
+Testy przygotowania: domyślne/off vs explicit on, brak zmiany config/baseline env,
+wykrycie driftu trace flag/argv i odrzucenie niejawnego trace w baseline. Następnie
+root musi zbudować scalenie wszystkich trzech ścieżek, wykonać A/B narzutu, sparsować
+scope tree i dopiero mierzyć medium. Ten worker nie posiada build/GPU/EM slotu.
+M0 native source131d i artefakty pozostają zamrożonym odniesieniem; nowe compiler
+inputs wymagają nowego manifestu/buildu. Szczegóły i wynik przygotowania poniżej.
+
+#### PRE-01-E06 — wynik przygotowania
+
+Gotowe lokalne patche: palace/utils/geodata.cpp, palace/fem/mesh.cpp,
+tools/stage_probe_run.py i test_stage_probe_run.py. Root-owned stageprofile.hpp
+jest tylko odczytany z głównego checkoutu, nie skopiowany/zmieniony w tej gałęzi.
+Native build/run nadal NOT RUN; brak slotu. Nie zmieniono algorytmu, kolejności
+operacji, solverów, konfiguracji ani lifetime istniejących mesh/stream/vector.
+
+11 stałych nazw scope, najwyżej jedna para begin/end na wywołanie funkcji/bloku:
+
+| Label | Zakres i ograniczenia interpretacji |
+|---|---|
+| preprocess.load | Całe Load, razem z zagnieżdżonymi scope; nie sumować inclusive z dziećmi |
+| preprocess.load.clean | Istniejący CleanUnusedElements blok, wraz z przygotowaniem attr_list |
+| preprocess.load.finalize | Istniejący Finalize(refine=true, fix_orientation=false) |
+| preprocess.load.check_interfaces | CheckMesh i ewentualne AddInterfaceBdrElements, cały istniejący blok |
+| preprocess.load_mesh | Całe LoadMesh, również EnsureNodes/remove curvature i ewentualne periodic |
+| preprocess.load_mesh.convert | Wyłącznie istniejący Comsol/Nastran converter; w Gmsh oczekiwana nieobecność |
+| preprocess.load_mesh.native_read | Zakres istniejącego ifstream (open, streaming parse, close), nie czysty czas dysku |
+| preprocess.load_mesh.mfem_parse | MFEM Mesh constructor; includes stream reads, parsing/topology/orientation; ten sam label w rozłącznych ścieżkach |
+| preprocess.partition | Całe Partition, bez zmiany MPI flow |
+| preprocess.refine | Istniejący RefineMesh, również checki gdy uniform levels0 |
+| mesh.update | Palace Mesh::Update: face-neighbor exchange i mapy atrybutów; także inne wywołania poza preprocessing identyfikować po rodzicu |
+
+Nie rozdzielamy fizycznych read syscalls od parsera MFEM przez sztuczny kopiujący
+preload pliku ani zmianę strumienia. native_read minus mfem_parse oznacza w przybliżeniu
+pozostały open/close, nie disk vs CPU. Dokładny podział read syscalls wymaga
+odrębnego lekkiego pomiaru systemowego. Domniemany koszt parsera18,7s pozostaje
+hipotezą do sprawdzenia. W standardowej Gmsh ścieżce konwerter jest nieaktywny.
+
+Dla pokrycia całego driver init root może dodać wspólny scope wokół
+solver->Preprocess (units/nondimensionalization) oraz samego make_unique<Mesh>.
+Ten worker mierzy Mesh::Update; jego caller EnsureNodes w inline konstruktorze
+pozostaje poza tym scope. Nie edytowano shared driver.cpp.
+
+Runner: `prepare --stage-trace` dodaje wyłącznie PALACE_STAGE_TRACE=1 i Boolean
+stage_trace w planie/diagnostic-result. Bez flagi nie ma nowego env klucza, również
+gdy host ma PALACE_STAGE_TRACE=1. Wartość musi być jawnym bool; inherited trace w
+archiwalnym GPU env jest nadal odrzucany. Konfiguracja/baseline env/hash i scoped
+LD_PRELOAD zachowane; zmiana trace flag po prepare unieważnia argv/env fingerprint.
+Zmiana samego pliku runnera jak zawsze wymaga nowego planu, a stare wyniki historyczne
+pozostają poprawnie związane ze swoim starym hashem. Runner kwalifikuje diagnostic
+stop; root osobno waliduje coverage/pairing/narzut trace, nie uznaje samych markerów
+za zaliczenie M1.
+
+Testy stdlib: 18 runner+13 preflight/output=31 PASS; nowe cztery testy on/off,
+host inheritance, config/hash preservation, flag drift i odrzucone baseline trace/
+string value. Py_compile i diff-check PASS. Dowody testów w lokalnym
+artifacts/optimization-stages/preprocessing/M1-E06/; nie są pomiarem wydajności.
+
+Wniosek o run do koordynatora (nie wykonano): najpierw nowy cached build i zgodna
+referencja native/source z wszystkimi trzema trackami. Sparowane tiny preprocess/
+operators off/on z tą samą binarką, tym samym config/backendem i tą samą telemetrią,
+limit120s każdy; bez reuse starych planów/hash. Potem jeden medium operators-only
+trace ON na tej samej 355MB siatce, GPU/MAGMA/OMP1/baseline env, limit300s/64GiB,
+z matching OFF control gdy potrzebny do narzutu/atrybucji. Przykład po wskazaniu
+przez root faktycznie nowego M1 build-dir:
+
+```sh
+python tools/stage_probe_run.py prepare --source /home/sieciowiec/dev/cpp/palace --build <M1_BUILD_DIR> --run /home/sieciowiec/dev/python/anteny/artifacts/tshaped/port-repair-20261028/rear-route-sma-only/run-local-stages-20261029 --output <NOWY_KATALOG_TRIAL> --driver-record /home/sieciowiec/dev/cpp/palace/build/optimization-stages-m0-20261030/driver-injection/host-driver.json --stage operators --seconds 300 --memory-gib 64 --threads 1 --stage-trace
+python tools/stage_probe_run.py execute <NOWY_KATALOG_TRIAL>/plan.json
+```
+
+To szablon oczekujący nowego manifestu M1, nie gotowy wykonany plan. Root/Luna
+mają sprawdzić explicit noRF, counts, scope tree bez podwójnego liczenia i porównanie
+narzutu (cel≤1%, rozliczenie timerów≤2% z wyjaśnionymi lukami). Jeśli trace narzuca
+większy koszt, poprawić pomiar, nie optymalizować M2 na zniekształconym profilu.
+Ponowić E06 dopiero po zmianie scope/helper/build/config albo błędzie coverage.
+
+#### PRE-01-E07 — M1 native qualification OFF/ON (PASS wykonania; pokrycie domknięte E08)
+
+2026-10-30 root granted sole native slot: tiny operators CPU OMP1 OFF/ON (120s/8GiB), then medium operators GPU OFF/ON (300s/64GiB), total series <=900s. No solve/RF. Integrated build optimization-stages-m1-20261030 source3bae7f768d18d24545c110e0f8bf8d46e7467cbb5ce07879ba37da014a2eb2c3, lib30747059009a6f0cc3c52b4662d7a67d255f4b4c678667faf340608d37435714. Fresh root runner plans; same fixture/config/env, only trace flag differs within pair. Driver record from M0 remains current and is revalidated. Parent stage_profile_report.py must parse balanced nested trace and explicit noRF before medium. Gate reports after tiny pair and medium OFF. Preserve raw logs/resources/CPU/GPU, no overhead PASS from single noisy pair, no speedup comparison with old M0 or full solve. No M2 optimization or build. Artifact series /home/sieciowiec/dev/cpp/palace/artifacts/optimization-stages/M1-profile-pair-20261030-r1. Native/source/helper drift aborts; native failure stops, no retries/reuse.
+
+E07 tiny gate PASS: OFF/ON operatorsCPU exit0, noRF/solvefalse and cleanup; same identity/env except trace, OFF0 events, ON43 balanced scope instances/31 labels. Root parser PASS. PalaceTotal .545048991/.544669930s, Ops .071393207/.071069497, Mesh .110198897/.111016037, IO .085050200/.086109140. Hostcovered .331228909s. Single tiny noisy pair does not qualify overhead. Initial post-run analysis requested metadata.json (absent); corrected read-only reader to actual palace.json; no native failures/retries. Parent received required gate; proceeding authorized mediumOFF.
+
+E07 mediumOFF PASS: exit0 noRF/solvefalse/cleanup, 0trace events, Init2/Mesh2/Ops1/IO6 and allPC/solve/FF0; unchanged source3bae/lib307470/configall18baselineflagsOMP1. Runner169.540340s, PalaceTotal167.945280s, Mesh27.823336, Ops114.835746, IO18.717746, Init6.513597. 326 telemetry samples; cgrouppeak13,656,379,392B, hostmin71,169,466,368B, globalGPUpeak6276MiB/utilmean0.0859%/max13%. Parent received required mediumOFF gate; proceeding only authorized ON. Not an overhead/speedup verdict.
+
+#### PRE-01-E07 — native qualification result (PASS diagnostic; M1 coverage INCOMPLETE)
+
+Four authorized runs completed once each, no native failures/retries. MediumOFF/ON PalaceTotal167.945280197/168.560026030s (+0.3660%); runner169.540340034/169.921320517s. Ops114.835746092/115.034512038, Mesh27.823336404/28.279284321, IO18.717745522/18.636255203, Init6.513597196/6.554157306. TinyTotal .545048991/.544669930. One sequential pair is not statistical overhead PASS. Source3bae7f.../lib307470.../native/config/helper/environment identical within pair except trace; configMaxSize64 and18 original baseline flags retained.
+
+Both medium exit0, stage operators complete, noRF/solvefalse, noCSV, Init2/Mesh2/Ops1/IO6, allPC/GMRES/FF0, same1,700,660elements/510,048boundary/402,647vertices/materials/boundaryattrs. ON65balanced completed scope instances,31labels,130events; root stage_profile_report parserPASS. Four own containers removed; podman ps has only unrelated rapidmaker-catalog-postgres, no active Palace. Series runner time342.282739s (<900s), no mediumpreprocess/fullsolve duplicate.
+
+Measured PRE hotspots ON (host wall/process CPU seconds):
+
+| Phase | Host wall | Process CPU |
+|---|---:|---:|
+| Partition |19.423675|19.380008|
+| MFEM parsing/mesh constructor |18.635826|18.596096|
+| Finalize |5.096528|5.085532|
+| RefineMesh incl checks even refinement0 |4.746250|4.735897|
+| CheckMesh/interfaces |3.722409|3.713563|
+| Mesh::Update |1.484495|1.480933|
+
+Loadinclusive27.491479 includes parse/finalize/interfaces; do not add it to children. PRE roots53.173554s vs legacy Init+Mesh+IO53.469697s: ~0.296143s outside PRE scopes (initialization/wrapper gaps). **IO18.636255 is almost fully MFEM constructor18.635826**, including streaming reads/topology/orientation/parsing. CPU18.596096 ~ wall18.635826 supports CPU-heavy work in that warm local run; it does not isolate physical disk/read syscalls.
+
+Important M1 coverage deficit: all root scopes cover63.885281s/processCPU63.738402 of Total168.560026. Operators roots10.711727s vs legacyOps115.034512 (~104.322785s uncovered). Root timestamps isolate one104.295120816s gap between final root operators.ceed_finalize and operators.K; all other inter-root gaps <=0.000244s. Source brackets this in SweepUniform PostOperator construction beforeK; internal partial assembly logs terminate before remaining work. This is a location hypothesis, not attribution of algorithm. Parent notified; root/operator worker must add enclosing PostOperator/downstream assembly scopes before full M1 coverage PASS. No M2/unauthorized reruns done.
+
+Memory/telemetry OFF/ON:326/327samples, cgrouppeak13,656,379,392/13,680,394,240B; hostavailable minimum71,169,466,368/71,274,016,768B; globalGPUpeak6276MiB both, utilmean0.0859/0.2936%, max13/27%, median0. SMclockmean1276.9/988.1MHz, median225, max2587/2595; desktop/global samples not process-specific residency. Process CPU summed only for instrumented ON roots, not full process/OFF. No swap/core/network,64GiB cgroup/8CPUquota/OMP1, same GPU/MAGMA/UVM env. Raw logs, telemetry, resource-policy, container-state, plans/identities, diagnostics and reports under ROOT/artifacts/optimization-stages/M1-profile-pair-20261030-r1; tiny-qualification.json/medium-off-qualification.json/medium-qualification.json are machine-readable. Slot returned. Two read-only analysis path typos (metadata.json vs palace.json, worktree relative artifact path vs ROOT path) were corrected without native retries or source changes.
+
+#### PRE-01-E08 — M1 R2 PostOperator/GSLIB coverage (PASS)
+
+Root grants exactR2build/source0341e50051ac29e585c3b211d73fd44e89beb1fb583280541bae743589e3372b/lib0546c1cf8855d26a656a9c5791a03bb3882201095104ac0a7b04436fc213fcf9. New evidence justifying repeat: seven enclosing/internal PostOperator/GSLIB scopes added to account for104.3s uncovered inE07. Scope is measurement only, no M2 optimization. Authorized tinyCPUOMP1OFF/ON120s8GiB then single mediumGPUON300s64GiB/8CPUquota/OMP1 with18baselineflags; no mediumOFF/retry/sourcechanges. Beforemedium require tinybalancedtraceparser+true noRF/stop+cleanup. Target explain phasecoverage discrepancy<=2%, not claim speedup orR2formaloverhead fromdifferentbuild. Artifactseries ROOT/artifacts/optimization-stages/M1-profile-coverage-r2-20261030. PreserveallCPU/GPU/wall/provenance logs, strictguard/noSwap/core0.
+
+E08 tiny gate PASS: OFF/ON source0341/lib0546/identity/config/envtraceonly; both exit0/operatorsstop/noRF/noCSV/allsolvePCFF0/cleanup. OFF0events, ON48balancedinstances36labels, parserPASS; fivePostscopepresent, GSLIBabsent on tinyconfig. PalaceTotal .535895469/.542917498s; Ops .071118522/.071730752s, PostconstructorON .020629972s/domain .020410252s. Not formal overhead qualification. Parent notified; proceed only singlemediumON300s64GiB.
+
+#### PRE-01-E08 — result (PASS native diagnostics and measured coverage)
+
+Three exactauthorizedR2runs completed once each; no retries/native failures. MediumONrunner170.402894284s, PalaceTotal169.044521576s. TimerIO18.752758415, Init6.561784830, Mesh28.525818083, Ops115.148940169. Source0341e500.../lib0546c1cf... strictmanifest/native/config/helperunchanged before/after; mediumconfig+all18flags unchanged fromR1, onlyinstrumentationbuilddifferent. No newR2mediumOFF; do NOT compare speedup acrossbuilds or callformaloverhead<=1%PASS.
+
+ON72balancedcompletedinstances/38labels/144events, rootreportparserPASS. Coveredhost168.712082479s andinstrumentedCPU168.329686s. PREroots53.590374452 vsTimerInit+Mesh+IO53.840361328 (~.249987s initializationgaps); operatorroots115.121708027 vsTimerOps115.148940169 (gap .027232142s = .0236495%, below2%coveragegoal). Totaluncovered .332439097s (.197%); largestbetweenrootgap .00021122s. E07missing104s explained bynewscope, no unaccountedlargeinterval.
+
+Measured exclusiveleaf wall/processCPU (seconds):
+
+| Leaf | Wall | CPU |
+|---|---:|---:|
+| operators.probes.gslib_setup |104.519725928|104.314396|
+| preprocess.partition |19.506679205|19.463181|
+| preprocess.load_mesh.mfem_parse |18.752279465|18.709451|
+| preprocess.load.finalize |5.223341047|5.179823|
+| preprocess.refine |4.780144694|4.769649|
+| preprocess.load.check_interfaces |3.759346155|3.750903|
+| operators.materials |3.318622171|3.311881|
+| operators.restrictions_suboperators (18) |3.052589917|3.044697|
+| operators.hierarchy.nd |2.080273477|2.075026|
+| mesh.update |1.488234747|1.484870|
+| operators.probes.find_points |.001888219|.001884|
+
+Postconstructorinclusive107.369961658s includesdomain2.843812663 andinterpolator104.521777787 (includesGSLIBsetup104.519725928+FindPoints.001888219). Do notsumparentswithchildren. GeometricGSLIBSetup is61.83%ofentiretruncateddiagnostic/~90.77%ofOperatorConstruction; measuredCPU~wall supportsCPUheavySetup, notslowGPUorCSV/diskwrite. ExactalgorithmwithinMFEM/GSLIB stillresearchTODO, notoptimized. ParentownsnextM2gate; no changetoprobes/materials/precision/solveflowinthistrial. Parsing18.75228vsIO18.75276againshowslegacyIOcontainsMFEMconstructor.
+
+NoRF/resultfalse, solveexecutedfalse, exit0, Init2/Mesh2/Ops1/IO6, allPC/GMRES/FF/setup0, noCSV, same1,700,660mesh/510,048boundary/402,647vertices+attrs. Cgrouppeak13,675,798,528B, hostavailablemin71,391,223,808B,328samples. GlobalGPUpeak6276MiB,utilmean.07012%/max4%/median0,SMclockmean1249.48/median225/max2587MHz; globaldesktopinclusive, notperprocessUVMresidency. All3owncontainersremoved; onlyunrelatedrapidmakerpostgresremains. NoSwap/core0/networknone/64GiB/8CPUquota/OMP1,driver/Strata0guardrevalidated.
+
+Evidence ROOT/artifacts/optimization-stages/M1-profile-coverage-r2-20261030/{tiny-qualification.json,medium-qualification.json,medium-phase-wall-cpu.csv}; eachcase rawstdout/stderr/telemetry/resourcepolicy/containerstate/noRFsidecar+identity/config andONstage-profile.json preserved. Necessarytinygateandfinalcoverage/GSLIBfinding sentparent. Slotreturned; waitingM2authorization.
+
+#### PRE-01-E09 — M1 R2 mediumOFF control (PASS dla obserwowanej jednej pary)
+
+Root authorizes exactlyoneadditionalmediumOFF300s/64GiB/noSwap/OMP1/8CPUquota, source0341/lib0546 sameR2build/config/all18flags asE08ON. Newbasis: unresolvedM1.2overhead ofsevenR2markers, r1pair notsamebuild. Compare previousR2ON169.044521576s tothisOFF (sequentialONthenOFF), noanotherON/retry/probe/sourcechange. Sameexistingguards/driver/pinnedimage andrawtelemetry. Target observedpairdelta<=1%; noise>1% isINCONCLUSIVE/no retries, notnewrequirements. Onepair neverstatisticaloverheadproof orRFqualification. Newoutput ROOT/artifacts/optimization-stages/M1-profile-coverage-r2-20261030/medium-operators-gpu-off-control.
+
+#### PRE-01-E09 — result (PASS observed single-pair target; not statistical proof)
+
+AuthorizedadditionalR2OFF completed once, exit0/noRF/solvefalse/samemesh/Init2Mesh2Ops1IO6/allPCGMRESFF0/noCSV, noPALACE_STAGE_PROFILEevents, native/source0341/lib0546/config/all18flags strictsame aspriorONexcepttrace. Runner170.396110977s, PalaceTotal168.979466720s; priorON169.044521576s => ONminusOFF .065054856s = +.0384987%, observedwholetruncatedrun target<=1% met. PairorderONthenOFF; noanotherON/OFFretry.
+
+| Timer | R2ON | R2OFFcontrol | ONminusOFF % |
+|---|---:|---:|---:|
+| Total |169.044521576|168.979466720|+.038499|
+| Ops |115.148940169|115.673315484|-.453324|
+| Mesh |28.525818083|28.085608754|+1.567384|
+| IO |18.752758415|18.608975198|+.772655|
+| Init |6.561784830|6.556392758|+.082241|
+
+IndividualphaseMeshdifference>1%, whileOpsnegative, illustratessequentialrunnoise/cache/thermalcontext: thissinglepairisnotformal/statisticaloverheadproofnorevidenceofspeedup. Cachewarmstate notflushed, noOFFwholeprocessCPUclock; ONscopedCPUalreadyarchived. Samebackend/OMP1/GPU/cgroup/native/input, timestamps andtelemetryallowreview. RootdecidesfinalM1gatewiththishonestscope.
+
+OFF328telemetrysamples,cgrouppeak13,676,187,648B,hostavailablemin71,128,174,592B,globalGPUpeak6276MiB/utilmean.088415%/median0/max9;powermean40.0935W;SMclockmean1263.55/median225/max2595MHz. PriorONmeanSM1249.48/median225/max2587,desktop/global notprocessresidency. GuardStratainactive/deadPID0/noSwap/core0/networknone64GiB8CPUquotaOMP1. Owncontainerremoved; podmanpsonlyunrelatedrapidmakerpostgres. NoactivePalace;slotreturned.
+
+Evidence ROOT/artifacts/optimization-stages/M1-profile-coverage-r2-20261030/r2-medium-on-off-comparison.json plusnewmedium-operators-gpu-off-control/{plan,diagnostic-result,resource-policy,container-state}.json +rawlogs/telemetry/postpro; priorONuntouched. NoRFsolve/M2/sourcechange/retries.

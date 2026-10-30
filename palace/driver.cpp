@@ -22,6 +22,7 @@
 #include "utils/memoryreporting.hpp"
 #include "utils/outputdir.hpp"
 #include "utils/stageprobe.hpp"
+#include "utils/stageprofile.hpp"
 #include "utils/timer.hpp"
 
 namespace palace
@@ -79,7 +80,10 @@ void Run(IoData &iodata, MPI_Comm comm, int omp_threads, const char *git_tag)
     // timers under it, matching the "  Mesh Preprocessing" row's indentation.
     BlockTimer bt(Timer::INIT);
     auto smesh = mesh::Load(iodata, comm);
-    solver->Preprocess(iodata, smesh, comm);
+    {
+      StageProfile profile("preprocess.units");
+      solver->Preprocess(iodata, smesh, comm);
+    }
     std::vector<std::unique_ptr<mfem::ParMesh>> mfem_mesh;
     mfem_mesh.push_back(mesh::Partition(iodata, std::move(smesh), comm));
     mesh::RefineMesh(iodata, mfem_mesh);
@@ -87,9 +91,12 @@ void Run(IoData &iodata, MPI_Comm comm, int omp_threads, const char *git_tag)
     memory_reporting::PrintMemoryUsage(comm, memory_reporting::GetCurrentMemoryStats(comm));
     memory_reporting::PrintMemoryUsage(comm,
                                        memory_reporting::GetCurrentNodeMemoryStats(comm));
-    for (auto &m : mfem_mesh)
     {
-      mesh.push_back(std::make_unique<Mesh>(std::move(m)));
+      StageProfile profile("preprocess.mesh_wrappers");
+      for (auto &m : mfem_mesh)
+      {
+        mesh.push_back(std::make_unique<Mesh>(std::move(m)));
+      }
     }
   }
 

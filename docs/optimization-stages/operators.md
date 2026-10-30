@@ -1,9 +1,23 @@
 # Operator construction: source audit and experiment ledger
 
+## Stan bieżący po zamknięciu M1 — 2026-10-30
+
+Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.
+PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
+
+| ID | Stan i zakres |
+|---|---|
+| OP-01 | PASS — M1 pełne pokrycie i para ON/OFF; brak nowego speedupu |
+| OP-02 | TODO_TO_CHECK — reuse danych tylko przy nowym potwierdzonym koszcie |
+| OP-03 | DEFERRED — JIT nie wyjaśnia GSLIB104,52s |
+| OP-04 | DEFERRED — K/C/M mały koszt względem geometrySetup |
+| OP-05 | TODO_TO_CHECK — Umpire/OMP2 baseline crash; oddzielnie od nowego locatora |
+| OP-06 | TODO_TO_CHECK — M2 tańszy dokładny locator sond; GSLIB oracle/default |
+
 **Worker:** operator-construction track
 **Branch:** `opt/operators-20261029`
 **Base:** `e288fe1639cef892b4cbfae0d98046a0afa62ae1`
-**Status:** source audit complete; every performance hypothesis below is `TODO_TO_CHECK` (no new code or performance experiment has been run).
+**Status:** M0 closed by coordinator; M1 instrumentation prepared. OP-01 `IN_PROGRESS`; optimization hypotheses OP-02–05 remain `TODO_TO_CHECK`. M0 and integrated M1 CPU/OMP1 tiny tests passed with profiling OFF. M1 timing attribution, profiling-ON and overhead remain NOT RUN; no speedup claim.
 
 ## Why this track exists
 
@@ -28,7 +42,7 @@ Every candidate begins with a phase profile that attributes time; implement only
 
 | ID | State | Hypothesis and minimal test | Promotion gate / rejection condition |
 |---|---|---|---|
-| OP-01 | `TODO_TO_CHECK` | Add opt-in low-overhead timers around FE hierarchy construction, each K/C/M getter, coarse/fine assembly, quadrature-data assembly, and CEED operator finalization. One representative medium run and one small supported case; record CPU time, wall time, rank count, JIT calls/time, bytes allocated, backend and timer overhead. | Keep instrumentation if overhead is below 1% and phase times reconcile to existing timer within 2%. If not, revise instrumentation before interpreting hotspots. Never treat profiled timing as the performance result. |
+| OP-01 | `IN_PROGRESS` | Add opt-in low-overhead timers around FE hierarchy construction, each K/C/M getter, coarse/fine assembly, quadrature-data assembly, and CEED operator finalization. One representative medium run and one small supported case; record CPU time, wall time, rank count, JIT calls/time, bytes allocated, backend and timer overhead. | Keep instrumentation if overhead is below 1% and phase times reconcile to existing timer within 2%. If not, revise instrumentation before interpreting hotspots. Never treat profiled timing as the performance result. |
 | OP-02 | `TODO_TO_CHECK` | If repeated compatible geometry/coefficient preparation is material, identify exact immutable data that can be shared across K/C/M or levels (quadrature geometry, basis/restriction data, coefficient samples). Probe an existing backend/API reuse path before considering a cache. | Must be keyed by mesh, FE collection/order, mapping, attributes, material/BC values, device/backend, and relevant precision. Compare assembled operator actions and final complex S/residual/energy. Reject if data invalidation is ambiguous, added memory exceeds measured savings, or end-to-end speedup is not above run-to-run noise. |
 | OP-03 | `TODO_TO_CHECK` | Test whether CEED/JIT setup or repeated kernel specialization is a significant part of operator construction. Correlate OP-01 phases with NVRTC calls. Compare cold and warm execution in the same pinned image and record module/cache state. | Do not add a Palace cache unless repeated compilation dominates and cache correctness/invalidation is demonstrable. JIT-only time is not sufficient; require total runtime improvement and identical numerical outputs. |
 | OP-04 | `TODO_TO_CHECK` | Inspect the full-assembly vs partial-assembly decision and per-level coarse/fine path. If the benchmark uses an expensive path, compare supported existing paths on one deliberately small representative fixture, with identical FE order, mesh, coefficients and solver tolerances. | No lowering FE order, changing mesh/medium, or relaxing solver tolerance. Require operator-action agreement, solver residual and RF checks. Reject a path change that saves construction time but makes repeated operator applies or total solve slower. |
@@ -340,3 +354,246 @@ GetAxisAlignedBoundingBox. Root cause nie jest jeszcze udowodniony, więc nie
 promować mutexa, serializacji ani przebudowy dependency na podstawie samego stacka.
 Przed nowym eksperymentem użyć tego wpisu: OMP2 na obecnym CPU runtime jest znanym
 niekwalifikowanym wariantem; prostych powtórek bez nowej hipotezy nie wykonywać.
+
+
+### OP-01-M1-E01 — named operator construction instrumentation (`IN_PROGRESS`)
+
+Owner GPT-6.1 Sol high, `opt/operators-20261029`; base **febdc6eb9**, 2026-10-30.
+Sprawdzono E01–E06/M0, nie powtarzano testów OMP2 ani profilu JIT. Koordynator
+zamknął M0. Działa tylko M1: instrumentacja, bez optymalizacji/reassembly/cache zmian.
+Baseline native: source131d5da3… / libd1887e64… z poprzednich artefaktów;
+nowe CPP i root-owned stageprofile.hpp wymagają nowego manifestu po integracji.
+
+Patch dotyka **3 CPU CPP**, nie nagłówków API/FEM ani dużych CUDA TU:
+`models/spaceoperator.cpp`, `fem/bilinearform.cpp`, `drivers/drivensolver.cpp`.
+Wspólny `utils/stageprofile.hpp` należy do roota i musi wejść przy integracji.
+`StageProfile` mierzy host inclusive wall/processCPU; nie synchronizuje CUDA,
+nie mierzy czasu zakończenia kolejkowanych kerneli. Włączanie tylko
+`PALACE_STAGE_TRACE=1`. Bez tej flagi pozostaje wyłączony.
+
+**22 stałe etykiety**, inwentarz `artifacts/optimization-stages/operators-m1/labels.json`:
+
+| Etykieta | Granica pomiaru |
+|---|---|
+| operators.fec.nd / h1 / rt | Każdy istniejący ConstructFECollections, osobno |
+| operators.hierarchy.nd / h1 / rt | Każdy ConstructFiniteElementSpaceHierarchy, osobno |
+| operators.boundary_attributes | SetUpBoundaryProperties dla PEC |
+| operators.materials | Konstruktor MaterialOperator, przed pozostałymi boundary objects |
+| operators.lumped_ports | Konstruktor LumpedPortOperator, obejmuje geometrię/atrybuty portów |
+| operators.wave_ports | Konstruktor WavePortOperator; empty config nadal może dać bliski zeru czas |
+| operators.constructor_body | Tylko body po initializers: optional2D L2, BC check/print; nie cały constructor |
+| operators.K / C / M | Całe główne getters, włącznie z coefficient setup/wrapperem BC |
+| operators.Curl | GetCurlMatrix w uniform driven, jawny const Operator& zachowany |
+| operators.restrictions_suboperators | Jeden aggregate wokół całego CEED parallel region: restriction/basis lookup i integrator/suboperator setup |
+| operators.ceed_finalize | CeedOperatorCheckReady/finalize, poza workerami |
+| operators.quadrature_data | Całe AssembleQuadratureData, brak zmian wywołań integratorów |
+| operators.full_assembly | CeedOperatorFullAssemble, gdy wybrana ścieżka FA |
+| operators.bilinear_hierarchy | Całe Assemble po hierarchy, bez nowych logów perlevel |
+| operators.interpolator_setup | DiscreteLinearOperator restriction/interpolator/suboperator parallel region |
+| operators.interpolator_finalize_multiplicity | Finalize + istniejąca multiplicity host-build/device-copy/reciprocal |
+
+Żaden StageProfile nie jest wewnątrz OpenMP workera ani pętli per-element,
+per-integrator/geometrię. Restriction i suboperator setup są celowo jednym
+bucketem: rozdzielanie worker-local scope’ów bez thread IDs dawałoby niejednoznaczne
+zagnieżdżenie przy CPU parallel. Jeśli ten bucket dominuje, kolejny M1 profil
+może zawęzić go do istniejących funkcji/stacków, zamiast logować każdy element.
+Raw K/C/M initial path z4 partial assemblies daje szacunkowo25 scope instances
+przed operators-only stop; **rzeczywiste count jeszcze NOT RUN**. PC/hierarchy lub
+inne materiały mogą dać więcej wywołań, choć liczba etykiet pozostaje22.
+
+Member construction używa małego lokalnego helpera + immediate lambda. Każdy
+builder wywołany dokładnie raz; C++17 return-value elision zachowuje bezpośrednią
+konstrukcję, także klas bez copy/move. Nie dodano pól do SpaceOperator, zmiany
+kolejności członków, limitów/tolerancji, assembly policy ani precision. Jawny
+returntype const Operator& w Curl chroni dotychczasową referencję. Scope’y
+bilinear mają tylko dodatkowe braces i RAII, pętle i ich kolejność bez zmian.
+
+Wykonane kontrole lekkie: diffcheckPASS, static inventory22unikalne fixedlabelsPASS,
+brak worker-local logging i dodanych device sync sprawdzony w kodzie;
+docscheckerPASS. To nie dowodzi poprawności nowego buildu ani jego narzutu.
+Bez nowej kompilacji, symulacji lub zmiany usług/kontenerów w tym kroku.
+
+**Prośba test/build do koordynatora:** zintegrować wspólny header i3CPP raz z innymi
+ścieżkami; przyrostowo odbudować potrzebne TU w nowym cache, zachować M0native.
+Najpierw dwa istniejące operator action tests CPU/OMP1 (20+28assertions,
+2e-13) oraz tiny operators-only trace. Zweryfikować kompletny trace, runtimecounts,
+labelcoverage i inclusive nesting; porównać trace off/on na tej samej binarce,
+backend/threads/config. Profilowane timings nie promują speedupu. Dopiero po
+narzut≤1%/jasnej granicy powtarzalności wykonać jeden wymagany medium
+operators-only profile, rozliczyć największe bucket/y względem istniejącego
+construction timera (bez dodawania nested durations). Jeśli hot bucket pozostanie
+nienazwany, wrócić do sampling zamiast przechodzić do M2 na podstawie intuicji.
+Wszystkie M1 numerical/timing gates obecnie `NOT RUN`.
+
+
+### OP-01-M1-E02 — integrated instrumentation build + CPU tiny OFF (`PASS`, narrow scope)
+
+Root wydał slot na jeden wspólny build trzech ścieżek, potem dwa testy operatorów.
+Wyłącznie root integrated źródła: hash
+`3bae7f768d18d24545c110e0f8bf8d46e7467cbb5ce07879ba37da014a2eb2c3`,
+settings0d605d50…. Zweryfikowano niezmienność przed/po całym zadaniu.
+Nowy izolowany snapshot image
+`4a314d49b81c31ef6b99fde45a12ceb1ad823083ba68d3eb3cb1feb51e5aba19`
+z zatrzymanego M0 cache; stare /opt, frozen M0/r3 i root build/sm120 zachowane.
+
+Dry-run **8 Palace TU**: driver/drivensolver/bilinearform/mesh/spaceoperator/geodata/
+tablecsv i mainstamp. `mesh.cpp` jest w tej konfiguracji kompilowany jako CUDA TU,
+ale to istniejący plik Palace, nie rebuild MFEM/libCEED/HYPRE. Wykonano jedynie
+library+executable,2jobs,32GiB/noSwap/core0/noGPU/networknone i shared ccache.
+**Native build23,852s**, setup+native25,895s; pierwsze wykonanie z cleanup30,936s.
+C++17 helper konstruktorów skompilował się poprawnie, zero zmian ABI/headerów klas.
+
+Nowe native w `/home/sieciowiec/dev/cpp/palace/build/optimization-stages-m1-20261030/native`:
+libpalace30747059009a6f0cc3c52b4662d7a67d255f4b4c678667faf340608d37435714,
+program ee866d11a21c101ceebc3a9c79e745b0b43f1acd130925494b6b85ddc3962c47,
+adapter unchanged3f25ec81…. Manifest zawiera source/settings/native i referencję43ac…,
+`numerically_validated:false` pozostaje; nie nadpisuje dawnych kwalifikacji.
+
+Wolno było ponownie użyć unit executable01789d80… po dowodzie:
+Gitfebdc źródła dokładnie odpowiadają M0hash131d; **122 istniejące publiczne nagłówki
+bez różnic**, nowe stageprofile.hpp nie zmienia layoutu klas używanych przez test;
+aktualny test-spaceoperator i tiny main identyczne z kompilowanymi źródłami.
+Dowód `unit-abi-reuse-proof.json`. Stary PR unit binary nieużyty.
+
+Zapisana pomyłka setupu: `shutil.copyfile` zachował payload unit executable,
+ale zgubił executable bit (0644 zamiast0755); pierwsze uruchomienie zwróciło126
+`Permission denied` przed testem. Przywrócono **wyłącznie tryb pliku0755** według
+istniejącego unit binary, SHA niezmieniony. Brak rebuilda/source/backend/threads/
+precision fallbacku. Pierwotny błąd zachowany w `operator-unit-results-initial-permission.json`
+i surowym logu; poprawka i kolejne dokładnie te same testy w osobnym
+`executable-mode-correction/`.
+
+CPU/CDI, OMP1/core0, profiler jawnie **OFF**, obecna M1lib sprawdzona przez ldd:
+- Test coarse support: **PASS20assertions,0,464s**.
+- Test independent multilevel/QData/curvedtet+hex: **PASS28assertions,0,514s**, gate2e-13.
+- Brak PALACE_STAGE_PROFILE output w obu logach; wykonano same operatory bez EM solve.
+
+Artifacts: `build-summary.json`, `manifest.json`, `source-before/after.json` (równe),
+`events.jsonl`/timestampowane argv/start/end/exit, raw build/unit/ldd logs,
+`builder-environment.json`, ccache stats, saved build-script, unit ABI proof i
+osobne dowody poprawki praw pliku. Wszystkie nowe M1 i zachowane M0 kontenery
+zakończone jako exited. Żadnego medium/harness phaseRun/cloud w tym slocie.
+
+**Zakres PASS:** kompilacja i CPU/OMP1 tiny operator action z profileOFF.
+Profil ON, runtime liczba scope’ów, narzut/attribution i RF/medium/CUDA nadal
+**NOT RUN**. Nie wyciągać speedupu z tych czasów testów lub builda. Next decyzja
+koordynatora o tiny stage trace i porównaniu tej samej binarki OFF/ON.
+
+
+### OP-01-M1-E03 — uzupełnienie niepokrytych104s: PostOperator / GSLIB (`IN_PROGRESS`)
+
+Koordynator r1 odnotował poprawne diagnostic exit i niezaliczone pokrycie faz.
+Odczytano niezależnie native log/JSON/config z
+`/home/sieciowiec/dev/cpp/palace/artifacts/optimization-stages/M1-profile-pair-20261030-r1/medium-operators-gpu-on`:
+po `operators.ceed_finalize` end jest **104,295120816s** do `operators.K` begin.
+Config ma **164 probes i6Energy**; stdout:1 700 660elementów, mesh curvature order2.
+Przyczyna nie wynika jeszcze z samej luki. GetStiffnessMatrix ma w r1inclusive0,152s,
+więc bez brakującego outer scope nie przypisywać tych104s do samego K/C/M.
+
+Source path: `SweepUniform` tworzy `PostOperator<DRIVEN>` przed K/C/M. W jego member
+initializers są kolejno CSV, DomainPostOperator, SurfacePostOperator,
+InterpolationOperator; dopiero potem body z fields/directory/CSV initialization.
+Probe InterpolationOperator przy niepustej mapie zawsze wywołuje GSLIB `Setup`
+na całej przestrzeni mesh i dopiero `FindPoints` dla punktów. Hipoteza:
+koszt jest globalnym przygotowaniem point locator, nie164operacjami interpolacji.
+**Czasów poszczególnych metod jeszcze nie zmierzono.**
+
+Root compiler inputs w tym zadaniu **nietknięte** (IO worker używał stabilnego M1).
+Dopisano w childworktree wyłącznie instrumentację, bez lazy-init/cache/zmian probe:
+
+| Nowy fixed label | Granica |
+|---|---|
+| operators.post.constructor | Całe utworzenie PostOperator w SweepUniform, C++17 elision |
+| operators.post.domain | Istniejąca immediate lambda DomainPostOperator, std::move zachowane |
+| operators.post.surface | SurfacePostOperator member constructor |
+| operators.post.interpolator | Cały InterpolationOperator member constructor, także op initializer |
+| operators.post.body | PostOperator body po member initializers |
+| operators.probes.gslib_setup | Dokładnie dotychczasowe op.Setup(mesh,bb_tol,newton_tol,npts) |
+| operators.probes.find_points | Dokładnie dotychczasowe op.FindPoints(xyz,ordering) |
+
+Łącznie **29 fixed operator labels**, poprzednie22 zachowane; bez per-probe/
+per-element logging. CSV member ctor pozostaje w reszcie outer constructor;
+body InitializeCSVDataCollection objęte post.body i istniejącymi I/O scope’ami.
+Jeśli r2 pokaże dominującą resztę outer constructor, dopiero wtedy oddzielić
+post_op_csv; nie trzeba dodawać jego scope na zapas. Powrót z lambda ma ten sam
+typ/te same argumenty i gwarantowane C++17 elision, nie zmienia lifetime/ABI.
+Nowe pliki scope: models/postoperator.cpp i fem/interpolator.cpp; outer w już
+zmienianym drivensolver.cpp. Żadnych zmian klas/headerów/danych/tolerancji.
+
+**Dodatkowy source research z faktycznego pinned MFEM4.9.0** (bez uruchamiania
+kontenera, podman cp ze stopped M1 builder do ignored artifacts):
+`/tmp/root/spack-stage/spack-stage-mfem-4.9.0-nucrpyipn2tktie6vyzz2hakdcgklpd6/spack-src/fem/gslib.cpp`,
+SHA bdb21dcde44a1d3e880b0a9247707b7433eb14fd0f66b3a3abcba5794b776dcf;
+installed gslib.hpp SHA126d800810c11b5b342d320fd5f7756cde5ea20093c5d1b48e6e19ef88ae0181.
+Kopie z zachowaną licencją tylko artifacts, nie Git. Próba dostępu web do źródła
+była niedostępna; oparto wniosek na rzeczywiście zainstalowanym źródle.
+
+- `Setup`: gslib.cpp183–235 wywołuje SetupSplitMeshesAndIntegrationRules,
+  GetNodalValues, ustawia local_hash_size=mesh_points_cnt, potem findpts_setup_3.
+- `SetupSplitMeshes`:1207–1244 tworzy4 reference hex pieces dla tetrahedra;
+ 1436–1470 dodaje4internal split entries na każdy tetrahedron. To reprezentacja
+  wewnętrzna GSLIB; FEM mesh anteny nie jest zmieniany.
+- `GetNodalValues`:1472–1487 alokuje `vdim * NE_split_total * (meshOrder+1)^dim`
+  współrzędnych, a następnie oblicza je po elementach źródłowego mesh.
+- Dla all-tetra N=1 700 660/order2/FP64/3D daje to **6 802 640internal pieces,
+  183 671 280sample points i4 408 110 720B ≈4,11GiB** samych coordinates.
+  To wyliczenie logicznego bufora na podstawie kodu, nie pomiar peak/RAM/VRAM.
+- Argument164 to `npt_max`, liczba punktów przetwarzanych jednocześnie podczas
+  iteracji (installed header229–234), nie limit elementów/mapowania całego Setup.
+
+Wniosek source: globalna rozbudowa tetrahedra dla locate164punktów jest
+wiarygodnym kandydatem na koszt CPU/pamięci, ale udział104s wymaga r2timing.
+Nic nie optymalizowano ani nie usunięto. Przy potwierdzeniu następny etap może
+badać reprezentację/cache point locator z pełnym zachowaniem mapowania probes;
+nie uznawać redukcji liczby probes za równoważny test performance.
+
+Dowody statyczne: `artifacts/optimization-stages/operators-m1/labels-r2.json`,
+`post-probe-source-evidence.json`, zarchiwizowane MFEMsource. Diffcheck/docscheckerPASS.
+Nowy build, trace, poprawność/coverage/overhead r2 **NOT RUN**. Rootowi przekazać
+nowe2CPP i incremental outer wrapper; nie nadpisać jego późniejszych własnych
+zmian drivera lub operator ledger. Wymagany jeden wspólny przyrostowy build,
+tiny proof i potem uzasadniony medium operators-only trace dla attribution;
+bez przechodzenia do M2 na podstawie samego source.
+
+
+### OP-01-M1-E04 — R2 cached build / CPU tiny OFF (`PASS`, narrow scope)
+
+2026-10-30 root zintegrował nowe PostOperator/GSLIB scope’y i zamroził źródła.
+Przydzielony pojedynczy build slot, bez phaseRun/medium. Nowy katalog:
+`/home/sieciowiec/dev/cpp/palace/build/optimization-stages-m1-r2-20261030`.
+
+Source **0341e50051ac29e585c3b211d73fd44e89beb1fb583280541bae743589e3372b**,
+settings0d605d50…, wszystkie fingerprinty source-before/after równe.
+Snapshot zatrzymanego M1 buildera do nowego image
+`7d6096526275f2f56de270768a3ad29f8d774f9efa5a4f756b0cc6799063ea9e`;
+nowy builder palace-stage-m1-r2-build-20261030,32GiB/noSwap/2CPU/core0,
+networknone/noGPU, rootsources readonly i sharedccache. Starsze M1/M0/r3
+cache/native nietknięte.
+
+Dry-run: **3 CXX TU** (drivensolver/interpolator/postoperator), brak mainstamp
+lub MFEM/HYPRE/libCEED rebuild. Native build **14,186s**, setup+native15,357s,
+pełny slot z oboma testami i cleanup **21,322s**. C++17 PostOperator/member
+value-elision skompilował się poprawnie. Adapter3f25ec81… zweryfikowany unchanged.
+
+Native library:
+`0546c1cf8855d26a656a9c5791a03bb3882201095104ac0a7b04436fc213fcf9`;
+executable nadal ee866d11… (główna funkcja nietknięta), adapter3f25ec81….
+Manifest zachowuje reference43ac/source/settings/native i globalfalse qualification.
+Kopiowanie executable przez copy2/explicit0755; znany błąd praw z E02 nie powtórzony.
+
+Po ponownym dowodzie122publicheaders i unit main/cases sources identycznych
+użyto unit01789d80… z właściwą nową biblioteką (ldd potwierdza /stage/native).
+Osobny CDI runtime CPU/cpuself/OMP1,8GiB/noSwap/core0, profile jawnieOFF:
+**PASS20assertions + PASS28assertions**, każdy0,514s. Brak profile output.
+Testy potwierdzają aktualne małe operatory; nie uruchamiają nowej pełnej ścieżki
+PostOperator/GSLIB, więc jej runtime qualification czeka na tiny phaseRun.
+Nie wykonano attribution/overhead/performance ani RF checka.
+
+Wszystkie nowe R2 i stare M1/M0 kontenery zakończone jako exited. Root dostał
+native/manifest ready dla preprocessing workera R2 profile. Przepis, komplet
+argv/timestamps/rawbuild/unit/ldd logs, ABI proof i build-summary w artefaktach.
+Kolejny krok należy do roota: tiny proof i pomiar Setup vsFindPoints z zachowaniem
+tej samej konfiguracji. Nie przypisywać104s do GSLIB przed nowym timingiem.
+Wyliczenie183,7Mpunktów próbkowania bazuje na **potwierdzonym mesh curvature order2**
+z rzeczywistego stdout, nie na samym solver FEorder; nadal jest logiczne,
+warunkowe dlaallTet/FP64, a nie measuredpeak.

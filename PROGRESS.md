@@ -1,3 +1,23 @@
+## Aktywny checkpoint — M1 CLOSED / M2 ACTIVE (2026-10-30)
+
+M1 Solhighdocs-garden i rootreview PASS po doprecyzowaniu IO06gate, zamknięciu stanówPRE E08/E09 i czasachR2; pokrycie99,80%, operatorgap0,024%; ta sama binarkaR2 traceON/OFF
+169,0445/168,9795s(+0,0385% w jednej parze, nie statisticalguarantee).
+Przyczyna104,52s: GSLIBSetup (CPU104,31s). FindPoints0,0019s. Curvature2,
+1,700,660tet i164sondy → conditional183,67Msampledpoints/4,11GiB coords logical,
+nie zmierzony peakVRAM. NadalFEM objętościowy; to locator geometrii, nie nowy wavesolver.
+
+PRE Partition19,42s i MFEMparse18,64s prawie1CPU; IOtimer obejmuje parser,
+nie dowodzi wolnegoSSD. CSV nativeN16/N32 write0,85/2,38ms, 76,6/282,2kB,
+1920assertionsOFF iONPASS, normal182PASS; writer opt odłożona. Microtrace narzut~16,7%
+małego3msworkloadu; profiler nie jest włączony do pomiarów wydajności prototypów.
+
+M2wybór: OP06 tańszy dokładny locator; PRE03/04 potwierdzić możliwośćrank1fastpath;
+IO06 binarny/cacheinput zachowujący order2/topologię/attrs (cold conversion liczony).
+Każdy zaczyna od API/source i cheaptest; brak sensownego patcha dozwolony REJECT/DEFER.
+NowyR2native0546c1cf/source0341e500, CPUtiny48PASS, stageonlymediumPASS; RFNOTRUN.
+Strata zatrzymana za zgodą na kampanię, wszystkie Palacekontenery posprzątane.
+Następnie trzySol6.1high na osobnychbranchach z aktualną wspólnąbazą; buildslotyroot.
+
 ## Aktywny checkpoint — M0 CLOSED, M1 ACTIVE (2026-10-30)
 
 Root sprawdził natywne raporty i zamknął M0.1–M0.4 w jawnym zakresie.

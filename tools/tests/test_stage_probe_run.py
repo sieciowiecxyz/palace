@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -117,6 +118,43 @@ class StageProbeRunnerTests(unittest.TestCase):
         self.assertEqual(plan['identity']['command_sha256'],runner.dev.sha(self.run/'command.json'))
         self.assertEqual(plan['environment']['PALACE_STAGE_STOP'],'preprocess')
         self.assertNotIn('PALACE_PHASE_TRACE',plan['environment'])
+
+    def test_stage_trace_off_is_default_even_with_host_environment_set(self):
+        with mock.patch.dict(os.environ, {'PALACE_STAGE_TRACE':'1'}):
+            plan=self.prepare()
+        self.assertFalse(plan['stage_trace'])
+        self.assertNotIn('PALACE_STAGE_TRACE',plan['environment'])
+        self.assertNotIn('PALACE_STAGE_TRACE=1',plan['argv'])
+        expected=runner.make_environment('preprocess',1,False,self.baseline)
+        self.assertEqual(plan['environment'],expected)
+
+    def test_stage_trace_is_only_an_explicit_extra_flag_without_config_drift(self):
+        plan=self.prepare(stage_trace=True)
+        self.assertTrue(plan['stage_trace'])
+        self.assertEqual(plan['environment']['PALACE_STAGE_TRACE'],'1')
+        self.assertIn('PALACE_STAGE_TRACE=1',plan['argv'])
+        ordinary=runner.make_environment('preprocess',1,False,self.baseline)
+        self.assertEqual({k:v for k,v in plan['environment'].items() if k!='PALACE_STAGE_TRACE'},ordinary)
+        self.assertEqual(plan['staged_config_sha256'],plan['identity']['config_sha256'])
+        self.assertEqual(plan['identity']['baseline_environment'],self.baseline)
+        self.assertEqual(plan['identity']['baseline_environment_sha256'],runner.environment_hash(self.baseline))
+
+    def test_changed_stage_trace_fingerprint_is_rejected_before_execution(self):
+        plan=self.prepare()
+        plan['stage_trace']=True
+        runner.dev.write(self.root/'out/plan.json',plan)
+        with self.assertRaisesRegex(ValueError,'command/environment changed'):
+            runner.execute(self.root/'out/plan.json')
+        self.assertEqual(len(self.capture.call_args_list),1)
+
+    def test_trace_cannot_be_inherited_from_baseline_or_passed_as_a_string(self):
+        command=runner.dev.read(self.run/'command.json')
+        command['environment']['PALACE_STAGE_TRACE']='1'
+        runner.dev.write(self.run/'command.json',command)
+        with self.assertRaisesRegex(ValueError,'reviewed whitelist'):
+            self.prepare(stage_trace=True)
+        with self.assertRaisesRegex(ValueError,'explicit boolean'):
+            runner.make_environment('preprocess',1,False,self.baseline,'1')
 
     def test_gpu_rejects_inherited_history_or_profiling_flags(self):
         command=runner.dev.read(self.run/'command.json')

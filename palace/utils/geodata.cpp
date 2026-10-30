@@ -27,6 +27,7 @@
 #include "utils/omp.hpp"
 #include "utils/outputdir.hpp"
 #include "utils/prettyprint.hpp"
+#include "utils/stageprofile.hpp"
 #include "utils/timer.hpp"
 #include "utils/units.hpp"
 
@@ -123,6 +124,7 @@ bool UseAmr(const config::RefinementData &refinement)
 std::unique_ptr<mfem::Mesh> Load(IoData &iodata, MPI_Comm comm)
 {
   BlockTimer bt0(Timer::MESH_PREPROCESS);
+  StageProfile load_profile("preprocess.load");
 
   const auto &refinement = iodata.model.refinement;
   const bool use_amr = UseAmr(refinement);
@@ -191,6 +193,7 @@ std::unique_ptr<mfem::Mesh> Load(IoData &iodata, MPI_Comm comm)
   // Clean up unused domain elements from the mesh.
   if (iodata.model.clean_unused_elements)
   {
+    StageProfile clean_profile("preprocess.load.clean");
     std::vector<int> attr_list;
     std::merge(iodata.domains.attributes.begin(), iodata.domains.attributes.end(),
                iodata.domains.postpro.attributes.begin(),
@@ -231,6 +234,7 @@ std::unique_ptr<mfem::Mesh> Load(IoData &iodata, MPI_Comm comm)
   // needs tet refinement flags set, which Finalize(refine=true) provides. Initial
   // orientation was already fixed at load.
   {
+    StageProfile finalize_profile("preprocess.load.finalize");
     constexpr bool refine = true, fix_orientation = false;
     smesh->Finalize(refine, fix_orientation);
   }
@@ -245,6 +249,7 @@ std::unique_ptr<mfem::Mesh> Load(IoData &iodata, MPI_Comm comm)
   // insertion. Only meaningful on an initial conformal mesh.
   if (smesh->Conforming())
   {
+    StageProfile interfaces_profile("preprocess.load.check_interfaces");
     auto face_to_be = CheckMesh(*smesh, iodata.boundaries);
     if (iodata.model.crack_bdr_elements || iodata.model.add_bdr_elements)
     {
@@ -268,6 +273,7 @@ std::unique_ptr<mfem::ParMesh> Partition(IoData &iodata, std::unique_ptr<mfem::M
                                          MPI_Comm comm)
 {
   BlockTimer bt0(Timer::MESH_PREPROCESS);
+  StageProfile partition_profile("preprocess.partition");
   const auto &refinement = iodata.model.refinement;
   const bool use_amr = UseAmr(refinement);
 
@@ -426,6 +432,7 @@ double ComputeReferenceLength(const std::unique_ptr<mfem::Mesh> &mesh, MPI_Comm 
 
 void RefineMesh(const IoData &iodata, std::vector<std::unique_ptr<mfem::ParMesh>> &mesh)
 {
+  StageProfile refine_profile("preprocess.refine");
   // Parallel uniform refinement only. Box / sphere region refinement happens in Load.
   MFEM_VERIFY(mesh.size() == 1,
               "Input mesh vector before refinement has more than a single mesh!");
@@ -2174,6 +2181,7 @@ namespace
 std::unique_ptr<mfem::Mesh> LoadMesh(const std::string &mesh_file, bool remove_curvature,
                                      const config::BoundaryData &boundaries)
 {
+  StageProfile load_mesh_profile("preprocess.load_mesh");
   // Read the (serial) mesh from the given mesh file. Handle preparation for refinement and
   // orientations here to avoid possible reorientations and reordering later on. MFEM
   // supports a native mesh format (.mesh), VTK/VTU, Gmsh, as well as some others. We use
@@ -2190,27 +2198,37 @@ std::unique_ptr<mfem::Mesh> LoadMesh(const std::string &mesh_file, bool remove_c
     // fi << std::fixed;
     fi << std::scientific;
     fi.precision(MSH_FLT_PRECISION);
-    if (mesh_path.extension() == ".mphtxt" || mesh_path.extension() == ".mphbin")
     {
-      mesh::ConvertMeshComsol(mesh_file, fi, remove_curvature);
-      // mesh::ConvertMeshComsol(mesh_file, fo, remove_curvature);
+      StageProfile convert_profile("preprocess.load_mesh.convert");
+      if (mesh_path.extension() == ".mphtxt" || mesh_path.extension() == ".mphbin")
+      {
+        mesh::ConvertMeshComsol(mesh_file, fi, remove_curvature);
+        // mesh::ConvertMeshComsol(mesh_file, fo, remove_curvature);
+      }
+      else
+      {
+        mesh::ConvertMeshNastran(mesh_file, fi, remove_curvature);
+        // mesh::ConvertMeshNastran(mesh_file, fo, remove_curvature);
+      }
     }
-    else
     {
-      mesh::ConvertMeshNastran(mesh_file, fi, remove_curvature);
-      // mesh::ConvertMeshNastran(mesh_file, fo, remove_curvature);
+      StageProfile parse_profile("preprocess.load_mesh.mfem_parse");
+      mesh = std::make_unique<mfem::Mesh>(fi, generate_edges, refine, fix_orientation);
     }
-    mesh = std::make_unique<mfem::Mesh>(fi, generate_edges, refine, fix_orientation);
   }
   else
   {
+    StageProfile read_profile("preprocess.load_mesh.native_read");
     // Otherwise, just rely on MFEM load the mesh.
     std::ifstream fi(mesh_file);
     if (!fi.good())
     {
       MFEM_ABORT("Unable to open mesh file \"" << mesh_file << "\"!");
     }
-    mesh = std::make_unique<mfem::Mesh>(fi, generate_edges, refine, fix_orientation);
+    {
+      StageProfile parse_profile("preprocess.load_mesh.mfem_parse");
+      mesh = std::make_unique<mfem::Mesh>(fi, generate_edges, refine, fix_orientation);
+    }
   }
   if (remove_curvature)
   {

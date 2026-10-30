@@ -2,7 +2,7 @@
 
 ## Stan i dowody początkowe
 
-2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M1; M0 zamknięty 2026-10-30.
+2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M2; M0/M1 zamknięte zakresowo 2026-10-30.
 Wykonawcy: GPT-6.1 Sol high. Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić usługę.
 Panel systemowy goal wciąż ma stary paused goal; create_goal odrzucone
 z powodu unfinished goal. Nie zamykać starego celu bez osiągnięcia jego kryteriów.

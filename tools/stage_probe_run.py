@@ -149,7 +149,9 @@ def identity(source, build, run, driver_record):
                 driver_record_sha256=dev.sha(driver_record), cdi=cdi_identity(driver_path)), config
 
 
-def make_environment(stage, threads, cpu, baseline=None):
+def make_environment(stage, threads, cpu, baseline=None, stage_trace=False):
+    if type(stage_trace) is not bool:
+        raise ValueError('Stage trace must be an explicit boolean')
     if cpu:
         # CPU tiny is an explicit controlled diagnostic, not the archived GPU profile.
         environment = {'PALACE_LINE_BUFFERED_LOG': '1', 'MFEM_MEMORY': 'host',
@@ -165,6 +167,8 @@ def make_environment(stage, threads, cpu, baseline=None):
     environment.update(PALACE_STAGE_STOP=stage, OMP_NUM_THREADS=str(threads),
                        OPENBLAS_NUM_THREADS='1',
                        LD_LIBRARY_PATH='/opt/palace-cudss/lib:/opt/view/lib:/opt/view/lib64:/opt/cudss/lib')
+    if stage_trace:
+        environment['PALACE_STAGE_TRACE'] = '1'
     return environment
 
 
@@ -180,7 +184,7 @@ def create_argv(plan):
             '-w', '/work']
     for name_, destination in dev.NATIVE_PATHS.items():
         argv += ['-v', f'{native / name_}:{destination}:ro']
-    environment = make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'])
+    environment = make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False))
     for key, value in environment.items():
         if key != 'LD_PRELOAD':
             argv += ['-e', key+'='+value]
@@ -192,7 +196,7 @@ def create_argv(plan):
 
 
 def prepare(source, build, run, output, driver_record, stage, seconds=120,
-            memory_gib=8, threads=1, cpu=False):
+            memory_gib=8, threads=1, cpu=False, stage_trace=False):
     source, build, run, output, driver_record = (Path(p).resolve() for p in
                                                (source, build, run, output, driver_record))
     validate_policy(stage, seconds, memory_gib, threads, cpu, dev.available_memory())
@@ -214,8 +218,8 @@ def prepare(source, build, run, output, driver_record, stage, seconds=120,
                 source=str(source), build=str(build), input_run=str(run), output=str(output),
                 driver_record=str(driver_record), identity=observed, name=name,
                 image_id=IMAGE, seconds=seconds, memory_gib=memory_gib, threads=threads,
-                cpu=cpu, scope='Controlled diagnostic only; CPU override/thread and quota policy are explicit, not an E2E speedup benchmark',
-                configuration_changes=changes, environment=make_environment(stage,threads,cpu,observed['baseline_environment']),
+                cpu=cpu, stage_trace=stage_trace, scope='Controlled diagnostic only; CPU override/thread and quota policy are explicit, not an E2E speedup benchmark',
+                configuration_changes=changes, environment=make_environment(stage,threads,cpu,observed['baseline_environment'],stage_trace),
                 image_config_sha256=hashlib.sha256(json.dumps(image['Config'],sort_keys=True).encode()).hexdigest(),
                 runner_sha256=dev.sha(Path(__file__)), helper_sha256=helper_hashes(), prepared_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
     plan['argv'] = create_argv(plan)
@@ -232,7 +236,7 @@ def execute(plan_path):
     output = plan_path.parent
     if Path(plan['output']) != output or (output/'diagnostic-result.json').exists():
         raise ValueError('Wrong plan location or existing execution result; no automatic retry')
-    if plan['argv'] != create_argv(plan) or plan['environment'] != make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment']):
+    if plan['argv'] != create_argv(plan) or plan['environment'] != make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False)):
         raise ValueError('Prepared command/environment changed')
     if dev.sha(Path(__file__)) != plan['runner_sha256'] or helper_hashes() != plan['helper_sha256']:
         raise ValueError('Runner or helper changed since preparation')
@@ -266,6 +270,7 @@ def gpu_sample():
 
 def _execute(plan, output):
     result = dict(diagnostic_only=True, rf_result=False, complete=False,
+                  stage_trace=plan.get('stage_trace',False),
                   started_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
     created = False; process = None; cgroup = None
     started = time.monotonic()
@@ -360,9 +365,10 @@ def main():
     p.add_argument('--memory-gib',type=int,default=8)
     p.add_argument('--threads',type=int,default=1)
     p.add_argument('--cpu',action='store_true')
+    p.add_argument('--stage-trace',action='store_true',help='Opt-in inclusive host phase trace; does not change numerical config')
     sub.add_parser('execute').add_argument('plan',type=Path)
     args=parser.parse_args()
-    result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu)
+    result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu,args.stage_trace)
     print(json.dumps(result,indent=2))
 
 if __name__=='__main__': main()

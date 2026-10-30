@@ -6,6 +6,7 @@
 #include "fem/coefficient.hpp"
 #include "fem/fespace.hpp"
 #include "fem/libceed/integrator.hpp"
+#include "utils/stageprofile.hpp"
 
 namespace palace
 {
@@ -352,6 +353,7 @@ void Mesh::ResetCeedObjects()
 
 void Mesh::Update()
 {
+  StageProfile update_profile("mesh.update");
   // Attribute mappings, etc. are always constructed for the parent mesh (use boundary
   // attribute maps for the domain attributes of a boundary submesh, for example).
   ceed_from_self = false;

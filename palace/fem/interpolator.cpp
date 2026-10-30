@@ -9,6 +9,7 @@
 #include "utils/communication.hpp"
 #include "utils/iodata.hpp"
 #include "utils/units.hpp"
+#include "utils/stageprofile.hpp"
 
 namespace palace
 {
@@ -50,8 +51,14 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
     }
     op_idx[i++] = idx;
   }
-  op.Setup(mesh, GSLIB_BB_TOL, GSLIB_NEWTON_TOL, npts);
-  op.FindPoints(xyz, mfem::Ordering::byNODES);
+  {
+    StageProfile profile("operators.probes.gslib_setup");
+    op.Setup(mesh, GSLIB_BB_TOL, GSLIB_NEWTON_TOL, npts);
+  }
+  {
+    StageProfile profile("operators.probes.find_points");
+    op.FindPoints(xyz, mfem::Ordering::byNODES);
+  }
   op.SetDefaultInterpolationValue(0.0);
   i = 0;
   for (const auto &[idx, data] : probe)

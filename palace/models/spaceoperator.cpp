@@ -21,11 +21,24 @@
 #include "utils/geodata.hpp"
 #include "utils/iodata.hpp"
 #include "utils/prettyprint.hpp"
+#include "utils/stageprofile.hpp"
 
 namespace palace
 {
 
 using namespace std::complex_literals;
+
+namespace
+{
+// C++17 return-value elision preserves direct member construction, including members
+// without a copy/move constructor. Each builder is invoked exactly once.
+template <typename Make>
+auto ProfiledConstruction(const char *label, Make &&make)
+{
+  StageProfile profile(label);
+  return make();
+}
+}  // namespace
 
 SpaceOperator::SpaceOperator(const config::SolverData &solver,
                              const config::DomainData &domains,
@@ -35,23 +48,45 @@ SpaceOperator::SpaceOperator(const config::SolverData &solver,
   : pc_mat_real(solver.linear.pc_mat_real), pc_mat_shifted(solver.linear.pc_mat_shifted),
     print_hdr(true), print_prec_hdr(true),
     dbc_attr(SetUpBoundaryProperties(boundaries.pec, *mesh.back())),
-    nd_fecs(fem::ConstructFECollections<mfem::ND_FECollection>(
-        solver.order, mesh.back()->Dimension(), solver.linear.mg_max_levels,
-        solver.linear.mg_coarsening, false)),
-    h1_fecs(fem::ConstructFECollections<mfem::H1_FECollection>(
-        solver.order, mesh.back()->Dimension(), solver.linear.mg_max_levels,
-        solver.linear.mg_coarsening, false)),
-    rt_fecs(fem::ConstructFECollections<mfem::RT_FECollection>(
-        solver.order - 1, mesh.back()->Dimension(),
-        solver.linear.estimator_mg ? solver.linear.mg_max_levels : 1,
-        solver.linear.mg_coarsening, false)),
-    nd_fespaces(fem::ConstructFiniteElementSpaceHierarchy<mfem::ND_FECollection>(
-        solver.linear.mg_max_levels, mesh, nd_fecs, &dbc_attr, &nd_dbc_tdof_lists)),
-    h1_fespaces(fem::ConstructFiniteElementSpaceHierarchy<mfem::H1_FECollection>(
-        solver.linear.mg_max_levels, mesh, h1_fecs, &dbc_attr, &h1_dbc_tdof_lists)),
-    rt_fespaces(fem::ConstructFiniteElementSpaceHierarchy<mfem::RT_FECollection>(
-        solver.linear.estimator_mg ? solver.linear.mg_max_levels : 1, mesh, rt_fecs)),
-    mat_op(domains.materials, boundaries.periodic, problem_type, *mesh.back()),
+    nd_fecs(ProfiledConstruction("operators.fec.nd", [&]
+    {
+      return fem::ConstructFECollections<mfem::ND_FECollection>(
+          solver.order, mesh.back()->Dimension(), solver.linear.mg_max_levels,
+          solver.linear.mg_coarsening, false);
+    })),
+    h1_fecs(ProfiledConstruction("operators.fec.h1", [&]
+    {
+      return fem::ConstructFECollections<mfem::H1_FECollection>(
+          solver.order, mesh.back()->Dimension(), solver.linear.mg_max_levels,
+          solver.linear.mg_coarsening, false);
+    })),
+    rt_fecs(ProfiledConstruction("operators.fec.rt", [&]
+    {
+      return fem::ConstructFECollections<mfem::RT_FECollection>(
+          solver.order - 1, mesh.back()->Dimension(),
+          solver.linear.estimator_mg ? solver.linear.mg_max_levels : 1,
+          solver.linear.mg_coarsening, false);
+    })),
+    nd_fespaces(ProfiledConstruction("operators.hierarchy.nd", [&]
+    {
+      return fem::ConstructFiniteElementSpaceHierarchy<mfem::ND_FECollection>(
+          solver.linear.mg_max_levels, mesh, nd_fecs, &dbc_attr, &nd_dbc_tdof_lists);
+    })),
+    h1_fespaces(ProfiledConstruction("operators.hierarchy.h1", [&]
+    {
+      return fem::ConstructFiniteElementSpaceHierarchy<mfem::H1_FECollection>(
+          solver.linear.mg_max_levels, mesh, h1_fecs, &dbc_attr, &h1_dbc_tdof_lists);
+    })),
+    rt_fespaces(ProfiledConstruction("operators.hierarchy.rt", [&]
+    {
+      return fem::ConstructFiniteElementSpaceHierarchy<mfem::RT_FECollection>(
+          solver.linear.estimator_mg ? solver.linear.mg_max_levels : 1, mesh, rt_fecs);
+    })),
+    mat_op(ProfiledConstruction("operators.materials", [&]
+    {
+      return MaterialOperator(domains.materials, boundaries.periodic, problem_type,
+                              *mesh.back());
+    })),
     current_dipole_op(domains.current_dipole, units, *mesh.back()),
     farfield_op(boundaries.farfield, problem_type, mat_op, *mesh.back()),
     surf_sigma_op(boundaries.conductivity, problem_type, units, mat_op, *mesh.back()),
@@ -59,15 +94,22 @@ SpaceOperator::SpaceOperator(const config::SolverData &solver,
               *mesh.back()),
     surf_rz_op(boundaries.rational_impedance, boundaries.cracked_attributes, problem_type,
                units, mat_op, *mesh.back()),
-    lumped_port_op(boundaries.lumpedport, units, mat_op, *mesh.back()),
-    wave_port_op(boundaries, domains, solver, problem_type, units, mat_op, GetNDSpace(),
-                 GetH1Space()),
+    lumped_port_op(ProfiledConstruction("operators.lumped_ports", [&]
+    {
+      return LumpedPortOperator(boundaries.lumpedport, units, mat_op, *mesh.back());
+    })),
+    wave_port_op(ProfiledConstruction("operators.wave_ports", [&]
+    {
+      return WavePortOperator(boundaries, domains, solver, problem_type, units, mat_op,
+                              GetNDSpace(), GetH1Space());
+    })),
     floquet_port_op(boundaries.floquetport, boundaries.periodic, problem_type, units,
                     mat_op, GetNDSpace().Get()),
     surf_j_op(boundaries.current, *mesh.back()),
     port_excitation_helper(lumped_port_op, wave_port_op, floquet_port_op, surf_j_op,
                            current_dipole_op)
 {
+  StageProfile profile("operators.constructor_body");
   // In 2D, curl maps H(curl) → L2 (scalar), so we need an L2 FE space for B = curl E.
   // Must use INTEGRAL map type so the discrete interpolator recognizes this as the curl
   // target space.
@@ -125,6 +167,7 @@ void SpaceOperator::CheckExcitations(ProblemType problem_type) const
 mfem::Array<int> SpaceOperator::SetUpBoundaryProperties(const config::PecBoundaryData &pec,
                                                         const mfem::ParMesh &mesh)
 {
+  StageProfile profile("operators.boundary_attributes");
   // Check that boundary attributes have been specified correctly.
   int bdr_attr_max = mesh.bdr_attributes.Size() ? mesh.bdr_attributes.Max() : 0;
   mfem::Array<int> bdr_attr_marker;
@@ -446,6 +489,7 @@ template <typename OperType>
 std::unique_ptr<OperType>
 SpaceOperator::GetStiffnessMatrix(Operator::DiagonalPolicy diag_policy)
 {
+  StageProfile profile("operators.K");
   PrintHeader(GetH1Space(), GetNDSpace(), GetRTSpace(), print_hdr);
   MaterialPropertyCoefficient df(mat_op.MaxCeedAttribute()), f(mat_op.MaxCeedAttribute()),
       fb(mat_op.MaxCeedBdrAttribute()), fc(mat_op.MaxCeedAttribute());
@@ -493,6 +537,7 @@ template <typename OperType>
 std::unique_ptr<OperType>
 SpaceOperator::GetDampingMatrix(Operator::DiagonalPolicy diag_policy)
 {
+  StageProfile profile("operators.C");
   PrintHeader(GetH1Space(), GetNDSpace(), GetRTSpace(), print_hdr);
   MaterialPropertyCoefficient f(mat_op.MaxCeedAttribute()),
       fb(mat_op.MaxCeedBdrAttribute());
@@ -528,6 +573,7 @@ SpaceOperator::GetDampingMatrix(Operator::DiagonalPolicy diag_policy)
 template <typename OperType>
 std::unique_ptr<OperType> SpaceOperator::GetMassMatrix(Operator::DiagonalPolicy diag_policy)
 {
+  StageProfile profile("operators.M");
   PrintHeader(GetH1Space(), GetNDSpace(), GetRTSpace(), print_hdr);
   MaterialPropertyCoefficient fr(mat_op.MaxCeedAttribute()), fi(mat_op.MaxCeedAttribute()),
       fbr(mat_op.MaxCeedBdrAttribute()), fbi(mat_op.MaxCeedBdrAttribute());

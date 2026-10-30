@@ -8,12 +8,14 @@
 #include "fem/libceed/ceed.hpp"
 #include "fem/mesh.hpp"
 #include "utils/omp.hpp"
+#include "utils/stageprofile.hpp"
 
 namespace palace
 {
 
 void BilinearForm::AssembleQuadratureData()
 {
+  StageProfile profile("operators.quadrature_data");
   for (auto &integ : domain_integs)
   {
     integ->AssembleQuadratureData();
@@ -48,60 +50,66 @@ BilinearForm::PartialAssemble(const FiniteElementSpace &trial_fespace,
   // Assemble the libCEED operator in parallel, each thread builds a composite operator.
   // This should work fine if some threads create an empty operator (no elements or boundary
   // elements).
-  PalacePragmaOmp(parallel if (ceed::internal::NumCeeds() > 1))
   {
-    Ceed ceed = ceed::internal::GetCeedObjects()[utils::GetThreadNum()];
-    for (const auto &[geom, data] : mesh.GetCeedGeomFactorData(ceed))
+    StageProfile profile("operators.restrictions_suboperators");
+    PalacePragmaOmp(parallel if (ceed::internal::NumCeeds() > 1))
     {
-      const auto trial_map_type =
-          trial_fespace.GetFEColl().GetMapType(mfem::Geometry::Dimension[geom]);
-      const auto test_map_type =
-          test_fespace.GetFEColl().GetMapType(mfem::Geometry::Dimension[geom]);
-
-      if (mfem::Geometry::Dimension[geom] == mesh.Dimension() && !domain_integs.empty())
+      Ceed ceed = ceed::internal::GetCeedObjects()[utils::GetThreadNum()];
+      for (const auto &[geom, data] : mesh.GetCeedGeomFactorData(ceed))
       {
-        // Assemble domain integrators on this element geometry type.
-        CeedElemRestriction trial_restr =
-            trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-        CeedElemRestriction test_restr =
-            test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-        CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
-        CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
+        const auto trial_map_type =
+            trial_fespace.GetFEColl().GetMapType(mfem::Geometry::Dimension[geom]);
+        const auto test_map_type =
+            test_fespace.GetFEColl().GetMapType(mfem::Geometry::Dimension[geom]);
 
-        for (const auto &integ : domain_integs)
+        if (mfem::Geometry::Dimension[geom] == mesh.Dimension() && !domain_integs.empty())
         {
-          CeedOperator sub_op;
-          integ->SetMapTypes(trial_map_type, test_map_type);
-          integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
-                          data.geom_data, data.geom_data_restr, &sub_op);
-          op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+          // Assemble domain integrators on this element geometry type.
+          CeedElemRestriction trial_restr =
+              trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          CeedElemRestriction test_restr =
+              test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
+          CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
+
+          for (const auto &integ : domain_integs)
+          {
+            CeedOperator sub_op;
+            integ->SetMapTypes(trial_map_type, test_map_type);
+            integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
+                            data.geom_data, data.geom_data_restr, &sub_op);
+            op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+          }
         }
-      }
-      else if (mfem::Geometry::Dimension[geom] == mesh.Dimension() - 1 &&
-               !boundary_integs.empty())
-      {
-        // Assemble boundary integrators on this element geometry type.
-        CeedElemRestriction trial_restr =
-            trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-        CeedElemRestriction test_restr =
-            test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-        CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
-        CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
-
-        for (const auto &integ : boundary_integs)
+        else if (mfem::Geometry::Dimension[geom] == mesh.Dimension() - 1 &&
+                 !boundary_integs.empty())
         {
-          CeedOperator sub_op;
-          integ->SetMapTypes(trial_map_type, test_map_type);
-          integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
-                          data.geom_data, data.geom_data_restr, &sub_op);
-          op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+          // Assemble boundary integrators on this element geometry type.
+          CeedElemRestriction trial_restr =
+              trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          CeedElemRestriction test_restr =
+              test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
+          CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
+
+          for (const auto &integ : boundary_integs)
+          {
+            CeedOperator sub_op;
+            integ->SetMapTypes(trial_map_type, test_map_type);
+            integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
+                            data.geom_data, data.geom_data_restr, &sub_op);
+            op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+          }
         }
       }
     }
   }
 
   // Finalize the operator (call CeedOperatorCheckReady).
-  op->Finalize();
+  {
+    StageProfile profile("operators.ceed_finalize");
+    op->Finalize();
+  }
 
   return op;
 }
@@ -109,6 +117,7 @@ BilinearForm::PartialAssemble(const FiniteElementSpace &trial_fespace,
 std::unique_ptr<hypre::HypreCSRMatrix> BilinearForm::FullAssemble(const ceed::Operator &op,
                                                                   bool skip_zeros, bool set)
 {
+  StageProfile profile("operators.full_assembly");
   return ceed::CeedOperatorFullAssemble(op, skip_zeros, set);
 }
 
@@ -154,6 +163,7 @@ std::vector<std::unique_ptr<Operator>>
 BilinearForm::Assemble(const FiniteElementSpaceHierarchy &fespaces, bool skip_zeros,
                        std::size_t l0) const
 {
+  StageProfile profile("operators.bilinear_hierarchy");
   // Only available for square operators (same test and trial spaces).
   MFEM_VERIFY(&trial_fespace == &test_fespace &&
                   &fespaces.GetFinestFESpace() == &trial_fespace,
@@ -213,70 +223,76 @@ std::unique_ptr<ceed::Operator> DiscreteLinearOperator::PartialAssemble() const
   // Assemble the libCEED operator in parallel, each thread builds a composite operator.
   // This should work fine if some threads create an empty operator (no elements or boundary
   // elements).
-  PalacePragmaOmp(parallel if (ceed::internal::NumCeeds() > 1))
   {
-    Ceed ceed = ceed::internal::GetCeedObjects()[utils::GetThreadNum()];
-    for (const auto &[geom, data] : mesh.GetCeedGeomFactorData(ceed))
+    StageProfile profile("operators.interpolator_setup");
+    PalacePragmaOmp(parallel if (ceed::internal::NumCeeds() > 1))
     {
-      if (mfem::Geometry::Dimension[geom] == mesh.Dimension() && !domain_interps.empty())
+      Ceed ceed = ceed::internal::GetCeedObjects()[utils::GetThreadNum()];
+      for (const auto &[geom, data] : mesh.GetCeedGeomFactorData(ceed))
       {
-        // Assemble domain interpolators on this element geometry type.
-        CeedElemRestriction trial_restr =
-            trial_fespace.GetInterpCeedElemRestriction(ceed, geom, data.indices);
-        CeedElemRestriction test_restr =
-            test_fespace.GetInterpRangeCeedElemRestriction(ceed, geom, data.indices);
-
-        // Construct the interpolator basis.
-        CeedBasis interp_basis;
-        const mfem::FiniteElement &trial_fe =
-            *trial_fespace.GetFEColl().FiniteElementForGeometry(geom);
-        const mfem::FiniteElement &test_fe =
-            *test_fespace.GetFEColl().FiniteElementForGeometry(geom);
-        const int trial_vdim = trial_fespace.GetVDim();
-        const int test_vdim = test_fespace.GetVDim();
-        ceed::InitInterpolatorBasis(trial_fe, test_fe, trial_vdim, test_vdim, ceed,
-                                    &interp_basis);
-
-        for (const auto &interp : domain_interps)
+        if (mfem::Geometry::Dimension[geom] == mesh.Dimension() && !domain_interps.empty())
         {
-          CeedOperator sub_op, sub_op_t;
-          interp->Assemble(ceed, trial_restr, test_restr, interp_basis, &sub_op, &sub_op_t);
-          op->AddSubOperator(sub_op, sub_op_t);  // Sub-operator owned by ceed::Operator
-        }
+          // Assemble domain interpolators on this element geometry type.
+          CeedElemRestriction trial_restr =
+              trial_fespace.GetInterpCeedElemRestriction(ceed, geom, data.indices);
+          CeedElemRestriction test_restr =
+              test_fespace.GetInterpRangeCeedElemRestriction(ceed, geom, data.indices);
 
-        // Basis is owned by the operator.
-        PalaceCeedCall(ceed, CeedBasisDestroy(&interp_basis));
+          // Construct the interpolator basis.
+          CeedBasis interp_basis;
+          const mfem::FiniteElement &trial_fe =
+              *trial_fespace.GetFEColl().FiniteElementForGeometry(geom);
+          const mfem::FiniteElement &test_fe =
+              *test_fespace.GetFEColl().FiniteElementForGeometry(geom);
+          const int trial_vdim = trial_fespace.GetVDim();
+          const int test_vdim = test_fespace.GetVDim();
+          ceed::InitInterpolatorBasis(trial_fe, test_fe, trial_vdim, test_vdim, ceed,
+                                      &interp_basis);
+
+          for (const auto &interp : domain_interps)
+          {
+            CeedOperator sub_op, sub_op_t;
+            interp->Assemble(ceed, trial_restr, test_restr, interp_basis, &sub_op, &sub_op_t);
+            op->AddSubOperator(sub_op, sub_op_t);  // Sub-operator owned by ceed::Operator
+          }
+
+          // Basis is owned by the operator.
+          PalaceCeedCall(ceed, CeedBasisDestroy(&interp_basis));
+        }
       }
     }
   }
 
   // Finalize the operator (call CeedOperatorCheckReady).
-  op->Finalize();
-
-  // Construct dof multiplicity vector for scaling to account for dofs shared between
-  // elements (on host, then copy to device).
-  Vector test_multiplicity(test_fespace.GetVSize());
-  test_multiplicity = 0.0;
-  auto *h_mult = test_multiplicity.HostReadWrite();
-  PalacePragmaOmp(parallel)
   {
-    mfem::Array<int> dofs;
-    mfem::DofTransformation dof_trans;
-    PalacePragmaOmp(for schedule(static))
-    for (int i = 0; i < test_fespace.GetMesh().GetNE(); i++)
+    StageProfile profile("operators.interpolator_finalize_multiplicity");
+    op->Finalize();
+
+    // Construct dof multiplicity vector for scaling to account for dofs shared between
+    // elements (on host, then copy to device).
+    Vector test_multiplicity(test_fespace.GetVSize());
+    test_multiplicity = 0.0;
+    auto *h_mult = test_multiplicity.HostReadWrite();
+    PalacePragmaOmp(parallel)
     {
-      test_fespace.Get().GetElementVDofs(i, dofs, dof_trans);
-      for (int j = 0; j < dofs.Size(); j++)
+      mfem::Array<int> dofs;
+      mfem::DofTransformation dof_trans;
+      PalacePragmaOmp(for schedule(static))
+      for (int i = 0; i < test_fespace.GetMesh().GetNE(); i++)
       {
-        const int k = dofs[j];
-        PalacePragmaOmp(atomic update)
-        h_mult[(k >= 0) ? k : -1 - k] += 1.0;
+        test_fespace.Get().GetElementVDofs(i, dofs, dof_trans);
+        for (int j = 0; j < dofs.Size(); j++)
+        {
+          const int k = dofs[j];
+          PalacePragmaOmp(atomic update)
+          h_mult[(k >= 0) ? k : -1 - k] += 1.0;
+        }
       }
     }
+    test_multiplicity.UseDevice(true);
+    test_multiplicity.Reciprocal();
+    op->SetDofMultiplicity(std::move(test_multiplicity));
   }
-  test_multiplicity.UseDevice(true);
-  test_multiplicity.Reciprocal();
-  op->SetDofMultiplicity(std::move(test_multiplicity));
 
   return op;
 }

@@ -3,6 +3,7 @@
 
 #include "tablecsv.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/stageprofile.hpp"
 
 #include <algorithm>
 #include <fstream>
@@ -168,6 +169,7 @@ void Table::append_row(T &buf, std::size_t row_j) const
 
 [[nodiscard]] std::string Table::format_table() const
 {
+  StageProfile profile("io.csv.format_table");
   fmt::memory_buffer buf{};
   append_header(buf);
   for (std::size_t j = 0; j < n_rows(); j++)
@@ -220,6 +222,7 @@ Table::Table(std::string_view table_str,
              std::optional<std::string_view> print_col_separator_,
              std::optional<std::string_view> print_row_separator_)
 {
+  StageProfile profile("io.csv.parse_table");
   using namespace std::literals;
   if (table_str.empty())
   {
@@ -282,6 +285,7 @@ TableWithCSVFile::TableWithCSVFile(std::string csv_file_fullpath, bool load_exis
   {
     return;
   }
+  StageProfile profile("io.csv.reload");
   if (!fs::exists(csv_file_fullpath_))
   {
     return;
@@ -293,13 +297,17 @@ TableWithCSVFile::TableWithCSVFile(std::string csv_file_fullpath, bool load_exis
     return;
   }
   std::stringstream file_buffer_str;
-  file_buffer_str << file_buffer.rdbuf();
-  file_buffer.close();
+  {
+    StageProfile read_profile("io.csv.read_buffer");
+    file_buffer_str << file_buffer.rdbuf();
+    file_buffer.close();
+  }
   table = Table(file_buffer_str.str());
 }
 
 void TableWithCSVFile::WriteFullTableTrunc()
 {
+  StageProfile profile("io.csv.rewrite");
   // Remove previous file/symlink before writing.
   fs::remove(csv_file_fullpath_);
   auto file_buffer = fmt::output_file(

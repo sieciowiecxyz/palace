@@ -1,6 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+#include <chrono>
+#include <cstdio>
+#include <cstdint>
 #include <fstream>
 #include <iterator>
 #include <utility>
@@ -350,5 +353,69 @@ TEST_CASE_METHOD(palace::test::PerRankTempDir,
       CHECK(reloaded.table[col].n_rows() == output.table[col].n_rows());
       CHECK(reloaded.table[col].data == output.table[col].data);
     }
+  }
+}
+
+// Explicit opt-in replay: native formatting, bounded ordinary CSV writes and reload.
+// The synthetic table checks I/O costs only; it is not an antenna or solver benchmark.
+TEST_CASE_METHOD(palace::test::PerRankTempDir, "TableCSV bounded native I/O replay",
+                 "[.stage_io_replay][Serial]")
+{
+  if (!Mpi::Root(Mpi::World()))
+  {
+    return;
+  }
+  using Clock = std::chrono::steady_clock;
+  for (int points : {16, 32})
+  {
+    const auto path = temp_dir / ("replay-" + std::to_string(points) + ".csv");
+    TableWithCSVFile output(path.string());
+    output.table.insert("frequency", "f (GHz)", 0);
+    for (int source = 1; source <= 2; source++)
+    {
+      for (int col = 0; col < 4; col++)
+      {
+        output.table.insert("source" + std::to_string(source) + "col" +
+                                std::to_string(col),
+                            "source " + std::to_string(source) + " col " +
+                                std::to_string(col), source);
+      }
+    }
+    std::uintmax_t logical_bytes_written = 0;
+    double write_seconds = 0.0;
+    double reload_seconds = 0.0;
+    for (int row = 0; row < points; row++)
+    {
+      output.table[0] << double(row + 1);
+      for (int source = 1; source <= 2; source++)
+      {
+        for (int col = 0; col < 4; col++)
+        {
+          output.table[1 + (source - 1) * 4 + col]
+              << 10.0 * source + col + row / 4.0;
+        }
+        const auto begin_write = Clock::now();
+        output.WriteFullTableTrunc();
+        write_seconds += std::chrono::duration<double>(Clock::now() - begin_write).count();
+        logical_bytes_written += fs::file_size(path);
+        REQUIRE(logical_bytes_written < 2 * 1024 * 1024);
+        const auto begin_read = Clock::now();
+        TableWithCSVFile reloaded(path.string(), true);
+        reload_seconds += std::chrono::duration<double>(Clock::now() - begin_read).count();
+        REQUIRE(reloaded.table.n_cols() == output.table.n_cols());
+        for (std::size_t col = 0; col < output.table.n_cols(); col++)
+        {
+          CHECK(reloaded.table[col].data == output.table[col].data);
+          CHECK(reloaded.table[col].header_text == output.table[col].header_text);
+        }
+      }
+    }
+    std::fprintf(stderr,
+                 "PALACE_IO_REPLAY {\"points\":%d,\"sources\":2,\"snapshots\":%d,"
+                 "\"logical_bytes_written\":%llu,\"final_file_bytes\":%llu,"
+                 "\"write_wall_s\":%.9f,\"reload_wall_s\":%.9f}\n",
+                 points, points * 2, static_cast<unsigned long long>(logical_bytes_written),
+                 static_cast<unsigned long long>(fs::file_size(path)), write_seconds,
+                 reload_seconds);
   }
 }

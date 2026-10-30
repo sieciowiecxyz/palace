@@ -18,9 +18,9 @@ Przejście między etapami zatwierdza koordynator. Brak zysku jest poprawnym wyn
 
 ## M2 - Niezależne prototypy na trzech branchach
 
-- M2.1: Preprocessing: PRE-02/PRE-04/PRE-05 tylko według profilu; zachować topologię, atrybuty, orientację, BC, przypisanie portów i równoważność DOF po permutacji. Reordering on/off liczyć w E2E, nie tylko setup.
+- M2.1: Preprocessing: PRE-02/PRE-03/PRE-04/PRE-05 tylko według profilu (PRE-03 wznowione po pomiarze 19,4 s także dla rank1); zachować topologię, atrybuty, orientację, BC, przypisanie portów i równoważność DOF po permutacji. Reordering on/off liczyć w E2E, nie tylko setup.
 - M2.2: Operatory: usunąć potwierdzone powtórne przygotowanie/kopie lub serial bottleneck. Najpierw istniejące API; cache tylko z pełnym kluczem i testem invalidation. Zachować curl/div structure, coarse sparsity, constraints, operator action oraz aktualne precyzje. Nie wprowadzać TF32/nowego solvera w ramach tej kampanii.
-- M2.3: I/O: najpierw sprawdzić pełny rewrite CSV przy sweepie. Append/buforowanie musi obsługiwać częściowe wiersze obu portów, restart/adaptive sweep, header, kolejność, precyzję i błąd zapisu. Samo wyłączenie pól/logów lub przeniesienie zapisu poza timer nie jest optymalizacją.
+- M2.3: I/O: po profilu priorytet IO-06 — binarny/native odczyt lub cache wejścia; udowodnić równoważność krzywizny order2, współrzędnych, topologii, orientacji, atrybutów/BC i portów. Cache invalidation po zmianie mesh, wersji/formatu, transformacji i konfiguracji; mierzyć osobno cold conversion + run oraz warm run. Rewrite CSV sprawdzony w M1 i odłożony jako koszt milisekundowy; jeśli kiedyś wróci, Append/buforowanie musi obsługiwać częściowe wiersze obu portów, restart/adaptive sweep, header, kolejność, precyzję i błąd zapisu. Samo wyłączenie pól/logów lub przeniesienie zapisu poza timer nie jest optymalizacją.
 - M2.4: Osobne małe commity i build-dir na ścieżkę, wspólny bezpieczny compiler cache. Nie modyfikować współdzielonych dependency build trees ani zamrożonych artefaktów. Jedna przyczyna zmiany na eksperyment, bez równoczesnego tuningu anteny.
 
 ## M3 - Kwalifikacja oddzielnych patchy

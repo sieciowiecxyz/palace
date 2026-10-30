@@ -31,6 +31,7 @@
 #include "utils/outputdir.hpp"
 #include "utils/tablecsv.hpp"
 #include "utils/timer.hpp"
+#include "utils/stageprofile.hpp"
 
 #include <mfem/config/config.hpp>
 
@@ -105,6 +106,7 @@ PostOperator<solver_t>::PostOperator(const config::ProblemData &problem,
     dom_post_op(std::move(
         [&domains, &fem_op_]()
         {
+          StageProfile profile("operators.post.domain");
           if constexpr (solver_t == ProblemType::ELECTROSTATIC)
           {
             return DomainPostOperator(domains.postpro, fem_op_.GetMaterialOp(),
@@ -127,10 +129,19 @@ PostOperator<solver_t>::PostOperator(const config::ProblemData &problem,
                                       fem_op_.GetNDSpace(), fem_op_.GetCurlSpace());
           }
         }())),
-    surf_post_op(boundaries.postpro, solver_t, fem_op->GetMaterialOp(),
-                 fem_op->GetH1Space(), fem_op->GetNDSpace()),
-    interp_op(domains.postpro.probe, units_, fem_op->GetNDSpace())
+    surf_post_op([&]
+    {
+      StageProfile profile("operators.post.surface");
+      return SurfacePostOperator(boundaries.postpro, solver_t, fem_op->GetMaterialOp(),
+                                 fem_op->GetH1Space(), fem_op->GetNDSpace());
+    }()),
+    interp_op([&]
+    {
+      StageProfile profile("operators.post.interpolator");
+      return InterpolationOperator(domains.postpro.probe, units_, fem_op->GetNDSpace());
+    }())
 {
+  StageProfile profile("operators.post.body");
   // Define primary grid-functions.
   if constexpr (HasVGridFunction<solver_t>())
   {

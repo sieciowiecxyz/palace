@@ -40,6 +40,7 @@
 #include "utils/timer.hpp"
 #include "utils/sweepprojection.hpp"
 #include "utils/stageprobe.hpp"
+#include "utils/stageprofile.hpp"
 
 extern "C" void PalacePCBasisRelease() __attribute__((weak));
 
@@ -105,7 +106,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   // Initialize postprocessing for measurement and printers.
   // Initialize write directory with default path; will be changed for multi-excitations.
-  PostOperator<ProblemType::DRIVEN> post_op(iodata, space_op);
+  PostOperator<ProblemType::DRIVEN> post_op = [&]
+  {
+    StageProfile profile("operators.post.constructor");
+    return PostOperator<ProblemType::DRIVEN>(iodata, space_op);
+  }();
 
   // Construct the system matrices defining the linear operator. PEC boundaries are handled
   // simply by setting diagonal entries of the system matrix for the corresponding dofs.
@@ -115,7 +120,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   auto K = space_op.GetStiffnessMatrix<ComplexOperator>(Operator::DIAG_ONE);
   auto C = space_op.GetDampingMatrix<ComplexOperator>(Operator::DIAG_ZERO);
   auto M = space_op.GetMassMatrix<ComplexOperator>(Operator::DIAG_ZERO);
-  const auto &Curl = space_op.GetCurlMatrix();
+  const auto &Curl = [&space_op]() -> const Operator &
+  {
+    StageProfile profile("operators.Curl");
+    return space_op.GetCurlMatrix();
+  }();
 
   if (RequestedStageProbe() == StageProbe::Operators)
   {
