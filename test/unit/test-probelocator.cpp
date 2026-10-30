@@ -51,6 +51,34 @@ public:
   void Set(const char *value) { setenv("PALACE_PROBE_LOCATOR", value, 1); }
 };
 
+class ProbeThreadsEnvironment
+{
+  bool present;
+  std::string previous;
+
+public:
+  explicit ProbeThreadsEnvironment(int threads)
+    : present(std::getenv("PALACE_PROBE_THREADS") != nullptr)
+  {
+    if (present)
+    {
+      previous = std::getenv("PALACE_PROBE_THREADS");
+    }
+    setenv("PALACE_PROBE_THREADS", std::to_string(threads).c_str(), 1);
+  }
+  ~ProbeThreadsEnvironment()
+  {
+    if (present)
+    {
+      setenv("PALACE_PROBE_THREADS", previous.c_str(), 1);
+    }
+    else
+    {
+      unsetenv("PALACE_PROBE_THREADS");
+    }
+  }
+};
+
 mfem::Mesh CurvedMesh(mfem::Element::Type element)
 {
   auto mesh = mfem::Mesh::MakeCartesian3D(2, 2, 2, element);
@@ -411,6 +439,12 @@ TEST_CASE("Bounded probe rescue preserves GSLIB complex fields in the rescued ce
           "[stage-probes][Serial]")
 {
   const auto family = GENERATE(0, 1, 2, 3);  // ND, RT, H1 scalar, H1 vector
+#if defined(_OPENMP)
+  const auto threads = GENERATE(1, 2, 4, 8);
+#else
+  const int threads = 1;
+#endif
+  ProbeThreadsEnvironment thread_environment(threads);
   LocatorEnvironment environment;
   auto serial = DistractorMesh(1);
   Mesh mesh(Mpi::World(), serial);
@@ -435,7 +469,7 @@ TEST_CASE("Bounded probe rescue preserves GSLIB complex fields in the rescued ce
   Randomize(field, 271828);
   mfem::IntegrationPoint reference;
   reference.Set3(0.01, 0.1, 0.1);
-  const std::map<int, Sample> samples{{7, {target, reference}}};
+  const std::map<int, Sample> samples{{7, {target, reference}}, {9, {target, reference}}};
   const auto probes = MakeProbes(mesh.Get(), samples);
   environment.Set("gslib");
   InterpolationOperator oracle(probes, Units(1.0, 1.0), nd_space);

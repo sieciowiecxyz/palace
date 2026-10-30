@@ -8,6 +8,11 @@ Najprostszy czytelny kod, małe zmiany i jawne granice odpowiedzialności. Reuż
 
 ## Mapa
 
+- Opcjonalne lokalne OpenMP: `palace/fem/probesearch.hpp` wybiera kandydatów z
+  read-only snapshotu i prywatnych, wcześniej zaalokowanych kopców. MFEM/inverse
+  mapping pozostają sekwencyjne; `PALACE_PROBE_THREADS` nie zmienia globalOMP.
+  Pomiary, domyślne1 i osobny zakres walidacji: `docs/probe-openmp.md`.
+
 - Kwalifikowana optymalizacja faz (2026-10-30): `palace/fem/probelocator.hpp` i opt-in
   `PALACE_PROBE_LOCATOR=mfem` omijają ciężki GSLIBSetup wyłącznie dla bezpiecznych wnętrz;
   stare GSLIB pozostaje default/fallback. `PALACE_SINGLE_RANK_DIRECT_MESH=1` pomija rank1

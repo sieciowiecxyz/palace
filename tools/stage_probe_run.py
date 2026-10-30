@@ -156,7 +156,8 @@ def identity(source, build, run, driver_record):
 
 
 FEATURE_VALUES = {'PALACE_PROBE_LOCATOR': frozenset(('gslib', 'mfem')),
-                  'PALACE_SINGLE_RANK_DIRECT_MESH': frozenset(('0', '1'))}
+                  'PALACE_SINGLE_RANK_DIRECT_MESH': frozenset(('0', '1')),
+                  'PALACE_PROBE_THREADS': frozenset(str(n) for n in range(1,65))}
 
 
 def checked_features(features):
@@ -166,6 +167,8 @@ def checked_features(features):
             not isinstance(value, str) or value not in FEATURE_VALUES[key]
             for key, value in features.items())):
         raise ValueError('Only reviewed prototype feature names/values are allowed')
+    if 'PALACE_PROBE_THREADS' in features and features.get('PALACE_PROBE_LOCATOR') != 'mfem':
+        raise ValueError('Probe threads require the explicit MFEM locator')
     return dict(features)
 
 
@@ -234,6 +237,9 @@ def prepare(source, build, run, output, driver_record, stage, seconds=120,
                                                (source, build, run, output, driver_record))
     validate_policy(stage, seconds, memory_gib, threads, cpu, dev.available_memory(), stage_trace)
     features = checked_features(features)
+    if 'PALACE_PROBE_THREADS' in features and (stage == 'preprocess' or
+            not (source/'palace/fem/probesearch.hpp').is_file()):
+        raise ValueError('Probe threads require operator/full stage and a matching threaded source build')
     observed, config = identity(source, build, run, driver_record)
     image = json.loads(capture(['podman', 'image', 'inspect', IMAGE]))[0]
     if image['Id'].removeprefix('sha256:') != IMAGE:
@@ -605,6 +611,7 @@ def main():
     p.add_argument('--stage-trace',action='store_true',help='Opt-in inclusive host phase trace; does not change numerical config')
     p.add_argument('--probe-locator',choices=('gslib','mfem'),help='Explicit experimental locator; default leaves production choice unchanged')
     p.add_argument('--direct-mesh',choices=('0','1'),help='Explicit experimental rank-one mesh distribution')
+    p.add_argument('--probe-threads',type=int,metavar='N',help='Local OpenMP candidate search team,1..64; requires --probe-locator mfem, leaves global OMP unchanged')
     sub.add_parser('execute').add_argument('plan',type=Path)
     recovery = sub.add_parser('recover-completion', help='Offline approved cgroup end-race proof; default read-only preview')
     recovery.add_argument('--run', type=Path, required=True)
@@ -619,6 +626,8 @@ def main():
             features['PALACE_PROBE_LOCATOR'] = args.probe_locator
         if args.direct_mesh is not None:
             features['PALACE_SINGLE_RANK_DIRECT_MESH'] = args.direct_mesh
+        if args.probe_threads is not None:
+            features['PALACE_PROBE_THREADS'] = str(args.probe_threads)
     result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu,args.stage_trace,features)
     print(json.dumps(result,indent=2))
 

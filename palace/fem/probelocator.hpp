@@ -14,12 +14,10 @@
 #include <utility>
 #include <vector>
 #include <mfem.hpp>
+#include "fem/probesearch.hpp"
 
 namespace palace::fem::probe
 {
-inline constexpr int CandidateCap = 128;
-using Candidate = std::pair<double, int>;  // Euclidean distance, then element ID.
-
 struct Quality
 {
   bool finite = true, strict = false, forward = false;
@@ -65,6 +63,8 @@ struct Statistics
 {
   int initial_found = 0, rescued = 0, tried = 0, remaining = 0;
   int center_evaluations = 0;
+  int selection_threads = 1;
+  std::size_t snapshot_bytes = 0;
   double selection_wall_s = 0.0, selection_cpu_s = 0.0;
   double inverse_wall_s = 0.0, inverse_cpu_s = 0.0;
 };
@@ -72,7 +72,7 @@ struct Statistics
 inline Statistics Rescue(mfem::Mesh &mesh, const mfem::DenseMatrix &points,
                          mfem::Array<int> &elements,
                          mfem::Array<mfem::IntegrationPoint> &references,
-                         std::vector<Trace> *trace = nullptr)
+                         std::vector<Trace> *trace = nullptr, int threads = 1)
 {
   MFEM_VERIFY(points.Height() == mesh.SpaceDimension() &&
                   elements.Size() == points.Width() && references.Size() == points.Width(),
@@ -99,38 +99,68 @@ inline Statistics Rescue(mfem::Mesh &mesh, const mfem::DenseMatrix &points,
   using Clock = std::chrono::steady_clock;
   auto wall = Clock::now();
   auto cpu = std::clock();
-  std::vector<std::priority_queue<Candidate>> nearest(missing.size());
-  mfem::Vector center(points.Height());
-  for (int element = 0; element < mesh.GetNE(); element++)
+  std::vector<CandidateHeap> nearest(missing.size());
+  if (threads > 1)
   {
-    mesh.GetElementCenter(element, center);
-    bool finite = true;
-    for (int d = 0; d < center.Size(); d++)
+    MFEM_VERIFY(points.Height() > 0 && points.Height() <= 3,
+                "Parallel probe search requires at most three coordinates");
+    // Extract geometry serially: MFEM transformations and memory pools are shared.
+    std::vector<Coordinates> centers(mesh.GetNE()), queries(missing.size());
+    mfem::Vector center(points.Height());
+    for (int e = 0; e < mesh.GetNE(); e++)
     {
-      finite = finite && std::isfinite(center(d));
-    }
-    if (!finite)
-    {
-      continue;  // Never accept an invalid map; unresolved probes retain fallback.
+      mesh.GetElementCenter(e, center);
+      for (int d = 0; d < center.Size(); d++)
+      {
+        centers[e][d] = center(d);
+      }
     }
     for (std::size_t m = 0; m < missing.size(); m++)
     {
-      double distance = 0.0;
+      for (int d = 0; d < points.Height(); d++)
+      {
+        queries[m][d] = points(d, missing[m]);
+      }
+    }
+    auto selected = FindNearestCenters(centers, queries, threads);
+    nearest = std::move(selected.candidates);
+    statistics.selection_threads = selected.threads_used;
+    statistics.snapshot_bytes = (centers.size() + queries.size()) * sizeof(Coordinates);
+  }
+  else
+  {
+    mfem::Vector center(points.Height());
+    for (int element = 0; element < mesh.GetNE(); element++)
+    {
+      mesh.GetElementCenter(element, center);
+      bool finite = true;
       for (int d = 0; d < center.Size(); d++)
       {
-        const double delta = center(d) - points(d, missing[m]);
-        distance += delta * delta;
+        finite = finite && std::isfinite(center(d));
       }
-      const Candidate candidate{std::sqrt(distance), element};
-      auto &heap = nearest[m];
-      if (heap.size() < CandidateCap)
+      if (!finite)
       {
-        heap.push(candidate);
+        continue;  // Never accept an invalid map; unresolved probes retain fallback.
       }
-      else if (candidate < heap.top())
+      for (std::size_t m = 0; m < missing.size(); m++)
       {
-        heap.pop();
-        heap.push(candidate);
+        double distance = 0.0;
+        for (int d = 0; d < center.Size(); d++)
+        {
+          const double delta = center(d) - points(d, missing[m]);
+          distance += delta * delta;
+        }
+        const Candidate candidate{std::sqrt(distance), element};
+        auto &heap = nearest[m];
+        if (heap.size() < CandidateCap)
+        {
+          heap.push(candidate);
+        }
+        else if (candidate < heap.top())
+        {
+          heap.pop();
+          heap.push(candidate);
+        }
       }
     }
   }
