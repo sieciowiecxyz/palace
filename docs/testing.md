@@ -156,7 +156,7 @@ obejmują wymaganie direct/CUDA, dodatnie markery per solve i profiler jako
 niekwalifikujący RF, capture markers, brak utraty zdarzeń i naturalny cleanup.
 ActualAPI CPU/CUDA relink currentnative PASS; prefetch jakościowo sprawdzony
 w tiny,3mediumcoaxshards/bothports i aktualnym W.3. [Wyniki/argv](basis-prefetch.md),
-[M4](milestones/optimization-M4.md) oceniony w EXP94; aktywny [M5](milestones/M5.md). Upstreamfullsuite i W.4/W.5 nadal NOT RUN.
+[M4](milestones/optimization-M4.md) oceniony w EXP94; późniejsza ocena [M5](milestones/optimization-M5.md) jest archiwalna. Upstreamfullsuite i W.4/W.5 nadal NOT RUN.
 
 ## M4 — reuse i kolejność pomiarów, EXP91–94
 

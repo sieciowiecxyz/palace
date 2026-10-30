@@ -1,7 +1,7 @@
 # Plan: preprocessing, operatory i I/O
 
 Mode: goal
-Active: M4
+Active: M5
 
 ## Cel i zakres
 
@@ -10,7 +10,7 @@ bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obi
 zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
 Wykonanie uruchomione na polecenie użytkownika 2026-10-29. Trzej wykonawcy:
 GPT-6.1 Sol high, każdy na swoim branchu; koordynator zbiera i weryfikuje wyniki.
-M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; M3 zamknięte zakresowo; aktywny M4: integracja zakwalifikowanych zmian. Użytkownik zgodził się na zatrzymanie
+M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; M3 zamknięte zakresowo; M4 zamknięte zakresowo; aktywny M5: reprezentatywna walidacja. Użytkownik zgodził się na zatrzymanie
 Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez cloud i publikacji.
 
 ## Milestones
@@ -19,7 +19,7 @@ Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez clo
 - [x] M1 — Zintegrować minimalne profilowanie trzech faz, zmierzyć narzut i wybrać rzeczywiste hotspoty.
 - [x] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
 - [x] M3 — Oddzielnie zakwalifikować każdy patch: poprawność, pamięć, czas; odrzucić nieudane hipotezy.
-- [ ] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
+- [x] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
 - [ ] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
 - [ ] M6 — Zamknąć rejestry, wskazać build rekomendowany, rollback i ograniczenia.
 
@@ -43,7 +43,7 @@ Nie należy rezygnować z niezależnego, taniego audytu I/O z powodu niższego p
 [Poprzedni plan PR i jego M0](docs/optimization-stages/previous-pr-plan.md) zachowany.
 Poprzedni checkpoint PR M4 zachowano w
 [archiwum](docs/optimization-stages/previous-pr-checkpoint-M4.md), a pliki optimization-M*
-dotyczą wcześniejszych kampanii; obecne docs/milestones/M2–M4 opisują tę kampanię.
+dotyczą wcześniejszych kampanii; obecne docs/milestones/M2–M5 opisują tę kampanię.
 poprzednie checkpointy M1 i M2 zachowano w archiwum. Te dokumenty
 nie zaliczają bramek obecnego planu. Nowe M0–M6 mają dowody w ledgerach tej kampanii
 oraz PROGRESS.md. Obecne zamrożone runtime/bundle pozostają nietknięte.

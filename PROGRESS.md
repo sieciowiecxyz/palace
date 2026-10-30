@@ -1,3 +1,16 @@
+## M4 PASS zakresowo / M5 ACTIVE (2026-10-30)
+
+Combined95822/lib048f zkwalifikowaneOP+PRE: cachedbuild8,43s,749+55986tinyPASS.
+PełneM4A/B/C iRFgatesPASS: base737,913s→combined631,171s; OPonly637,483s,
+cgroup66,056/57,054/57,041GiB. Nie przedstawiaćjednejpróbkijakomediany.
+CPU/MPI2fallbackiPASS (OP38+38/PRE11657+11653), parser-onlybłędyzachowane,
+bezpowtórzeńnative. TerazM5prepared12plans:4runydokończeniatrzechpar1,92GHz
++8runów(pary1,71/2,69/3,80GHz+osobnageometria). Input/schemaaudytprzedexecute.
+Nowageometria oldM7+2mm zachowujeFR4director, nowesondyzknownP2interiors/FF;
+walidacjaalgorytmu, nie zmiana produkcyjnejanteny/reprezentatywnybenchmarksond.
+Root nadal referencja0341;integrationcode osobnyworktree, wszystkiepłatneźródłanietknięte.
+StrataOFFexplicituser; po pomiarachprzywrócić. M6jeszczenieauditowane.
+
 ## M3 CLOSED zakresowo / M4 ACTIVE (2026-10-30)
 
 OP3pary:738,559→637,773s,65,713→57,030GiB, RF PASS. PRE3nativepary:

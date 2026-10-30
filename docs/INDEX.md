@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M4; M3 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M5; M4 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -51,7 +51,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [M4: reuse setup](milestones/optimization-M4.md)
   - Czytaj gdy: sprawdzasz zamknięcie audytu setup i pamięci między portami
   - Opis: EXP94 pełna para obu portów PASS; jedna faktoryzacja, pomiary po zwolnieniu solvera, zysk czasu i pamięci z jawnym zakresem.
-- [M5: preconditioner](milestones/M5.md)
+- [M5: preconditioner](milestones/optimization-M5.md)
   - Czytaj gdy: sprawdzasz dowody zamknięcia oceny PC i mixed precision
   - Opis: M5.1–M5.6 assessment; mixed W.2/W.3 PASS jako opt-in, hybrid/AMS/directgprMax REJECT, bez globalnej promocji.
 - [M6: kernele CUDA i sweepy](milestones/M6.md)
@@ -333,3 +333,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Poprzedni checkpoint PR M4](optimization-stages/previous-pr-checkpoint-M4.md)
   - Czytaj gdy: odtwarzasz historyczny pakiet pilota PR.
   - Opis: Archiwum poprzedniej kampanii; nie kwalifikuje obecnej integracji.
+
+- [M5: kwalifikacja integracji](milestones/M5.md)
+  - Czytaj gdy: oceniasz powtórzenia combined, sweep i inną geometrię.
+  - Opis: Trzy pary1,92GHz,1,71/2,69/3,80GHz, osobna geometria i CPU/MPI2; brak globalnej promocji.

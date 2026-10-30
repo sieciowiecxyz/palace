@@ -1,7 +1,7 @@
 # M4 — reuse setup i czas życia pomiarów
 
 Status: **COMPLETE — ocena EXP91–94**, 2026-10-20. Bez globalnej zmiany defaultów.
-Poprzedni etap: [prefetch](../basis-prefetch.md). Następny: [M5](M5.md).
+Poprzedni etap: [prefetch](../basis-prefetch.md). Następny: [M5](optimization-M5.md).
 
 ## Dowody zamknięcia
 
