@@ -1,8 +1,8 @@
 # Audyt i plan: preprocessing siatki
 
-## Stan bieżący po badaniach M2 — 2026-10-30
+## Stan bieżący po kwalifikacji M3 — 2026-10-30
 
-Bieżący wynik PRE-03: **kandydat opt-in**, domyślnie wyłączony.
+Bieżący wynik PRE-03: **kandydat opt-in zakwalifikowany w M3 dla jednego punktu 1,92 GHz**, domyślnie wyłączony.
 `PALACE_SINGLE_RANK_DIRECT_MESH=1` dla jednej rangi, siatki conforming bez NURBS
 oraz bez AMR pomija zbędny graf partycjonowania i round trip ASCII. Nadal wykonuje
 `ParMesh` oraz `Finalize(true, false)` i zachowuje zakrzywione węzły. Pozostałe
@@ -12,8 +12,13 @@ konfiguracje korzystają z oryginalnej ścieżki z komunikatem fallback.
   atrybuty, węzły, orientacje, flagi, Jacobiany i działanie operatora ND.
 - Jedna para medium preprocess-only: **53,361 → 46,025 s (−13,75%)**,
   cgroup peak **2 307 706 880 → 1 834 889 216 B (−20,49%)**.
-- **Pełne RF, pola, complex S i residual dla PRE-03: NOT RUN.** To nie jest wynik
-  całej symulacji ani statystyka trzech median. Przed promocją potrzebny plan M3.
+- M3: trzy pełne pary, oba porty 1,92 GHz, **RF PASS**. Mediana czasu Palace
+  **739,008 → 731,570 s (−1,006%)**; etap Mesh **28,121 → 21,375 s (−23,99%)**.
+  Pełny peak cgroup prawie bez zmiany (**−0,066%**); nie przenosić zysku RAM
+  preprocess-only na cały solve. Wszystkie 164 próbki E/B i 5012 kierunków FF
+  na port przeszły bramki; normy pełnych pól objętościowych nie były mierzone.
+  Jedna kontrola wymagała jawnego recovery monitora; są 3 pary natywnego czasu
+  Palace, lecz tylko 2 czyste pary wall. To nie jest promocja globalnego defaultu.
 - Pierwszy test miał jedną błędną asercję o flagach po uniform refinement.
   Oryginalne FAIL i logi zachowano w E02; zatwierdzona korekta kontraktu testu
   w E03 nie zmieniła kodu produktu ani progów numerycznych.
@@ -22,7 +27,7 @@ konfiguracje korzystają z oryginalnej ścieżki z komunikatem fallback.
 |---|---|
 | PRE-01 | PASS — profil M1/E08–E09, bez twierdzenia o zysku RF |
 | PRE-02 | TODO_TO_CHECK — reorder nadal niebadany |
-| PRE-03 | PASS tiny + pojedyncza para preprocess-only; opt-in, pełne RF NOT RUN |
+| PRE-03 | PASS tiny + preprocess-only + 3 pełne pary M3 przy 1,92 GHz; opt-in |
 | PRE-04 | DEFERRED — bez dowodu bezpiecznej redukcji dalszych skanów |
 | PRE-05 | DEFERRED do ścieżki IO-06; brak zmiany parsera w PRE |
 
@@ -30,7 +35,7 @@ Owner: agent preprocessing, branch `opt/preprocessing-20261029`.
 Aktualny kod produktu: `palace/utils/geodata.cpp`; test:
 `tools/stage_preprocess_partition_test.cpp`. Koordynator posiada wspólny plan,
 checkpoint i integrację. Poniższe wcześniejsze plany i wyniki są historią prób;
-aktualny stan określa ta sekcja i końcowe wyniki E03/E04.
+aktualny stan określa ta sekcja, końcowe wyniki E03/E04 i wynik M3 poniżej.
 
 ## Granica fazy i dane bazowe
 
@@ -701,3 +706,166 @@ wynik preprocessingu, pełne RF nadal NOT RUN. Nie uruchamiano ponownie zakończ
 testów ani compute. Source hash nadal `02ddf3af26ca44b8949ad2c4cd737cbd9fbc7b4a2ae9a66a4401a70011b3cbab`,
 lib `493df76aeec5ddb4c76329999e95a6ba9f85567823b2a885d43f8f4c565a2739`.
 Docs check i `git diff --check` PASS; dalszy krok to dokładny plan M3 od root.
+
+### M3 PRE / M5.2–M5.3 — przygotowanie tylko do odczytu (2026-10-30)
+
+Podczas wyłącznego slotu OP nie uruchomiono MPI, buildu, Gmsh ani symulacji.
+Raport: ROOT/artifacts/optimization-stages/M5-generalization-PRE-readonly-20261030/report.json.
+Znaleziono medium M7.5: `artifacts/m7-director-gap-plus2-geometry-20261022/mesh/pcb.msh`,
+336 693 277 B; SHA c66c6f55c8e28b3efe87bdc4eac373e65d69b71cb016454a2c92c7d4dbfaf8fb
+zweryfikowany dla geometrii i własnej referencji. Sprawdzono SHA archiwum, configów
+oraz metadane. Nie tworzono nowego mesh/fixture.
+
+Własna stara referencja: `artifacts/m7-director-gap-plus2-reference-20261022`,
+3,5 GHz / oba porty / K64 / order2 / tol1e-6; actual config SHA
+628ae137148c5bb41ef349578ee3dc646a445e5e532e21561f48c331ff58669c.
+Nominalny config fixture ma tylko P2/K240 — nie mylić go z actual reference.
+Stara referencja fields identity 0fa6583e133556f370831769932813e2f4c493a01058a5f8a846fdc23d1184ff;
+1 601 320 elementów / 11 218 724 ND DOF, zapisane pełne E/B obu portów.
+Duże payloady pól sprawdzono rozmiarem i zachowanymi hashami manifestu, bez ich
+ponownego pełnego hashowania. Historyczne FP64 764,008 s / 61,139 GB cgroup;
+fixed3 755,874 s / 46,601 GB to inna polityka precyzji, nie wyniki PRE/OP.
+
+**Brak probes i FF w starym actual config i wynikach.** Są S/I/V, energia,
+power oraz E/B snapshots. Niezmieniony przypadek sprawdzi PRE, ale nie OP06/FF.
+Root wybierze nowy derived config identyczny dla A/B, własną świeżą referencję,
+znane punkty wewnętrzne po dokładnym mapowaniu P2 i jawny jednakowy FF/output audit.
+Nie kopiować ślepo 164 punktów innej anteny i nie dobierać punktów dla speedupu.
+Stary M7 stanowi provenance geometrii; nie jest oracle nowych outputów. Nowa
+referencja unieważnia stare seedy/faktory. Limity wymagają nowego root planu;
+historyczne koszty nie gwarantują czasu/RAM po dodaniu probes/FF.
+
+MPI2: gotowa tania propozycja OP wykorzystuje aktualny cached rescue
+`build/optimization-stages-m2-operators-rescue-20261030/test/probe-unit-tests`,
+case `MFEM probe locator keeps GSLIB ownership at boundaries and outside`.
+Ten case nie wymaga rank1; przy MPI2 gałąź mfem ma wrócić do całego GSLIB i
+porównać wartości zespolone z oracle. Pełne argv / pinned image / matching native /
+manifest i propozycja 120 s / CPU OMP1 / 8 GiB no-swap w raporcie i
+`op-mpi2-command-proposed-NOTRUN.txt`. Launcher w obrazie potwierdzony jako OpenMPI5.0.10.
+CDI wyłącznie dla ładowania zależności CUDA; payload `--device cpu --backend /cpu/self`.
+**Polecenia nie wykonano.**
+
+PRE MPI2 nie ma jeszcze gotowego zgodnego cached testu: bieżący case wymaga
+size1, a StageStop jawnie zabrania MPI2. Najmniejsza poprawna bramka to nowy mały
+case `[stage_preprocess][Parallel]` w istniejącym tiny harness: publiczne Partition,
+root-only curved tet, opcja0/1, jawny fallbackoriginal, równe lokalne nodes/attrs/
+topologia/ND action. Jeden test TU + link z cache, bez rebuild MFEM/produktu;
+przygotowanie i wykonanie dopiero po slocie/root review. Nie uruchamiać OP testu
+z biblioteką PRE493d — layout InterpolationOperator jest inny; potrzebny matching
+native lub świeży combined test. PRE/OP full paired M3 i MPI2 nadal NOT RUN tutaj;
+worker czeka na dokładny plan po zakończeniu slotu OP.
+
+### PRE-03-M3-E01 — pełny medium, trzy sparowane runy (PASS w opisanym zakresie)
+
+Rootpreregister ROOT/artifacts/optimization-stages/M3-PRE03-full-20261030/preregister.json;
+soleGPUslot granted po OP. Exactplany:1A-off→1B-direct,2B-direct→2A-off,3A-off→3B-direct.
+Po każdejparze root stage_rf_compare.py(A,B), FAIL/guard/OOM/deadline STOPbezretry.
+Każdyfullrun1800s/68GiB/noSwap/core0/OMP1/8CPUquota/CDI/image43ac; source02dd/lib493d,
+config9f/mesh2af/all18baselineflags,GSLIBdefaulti traceOFF. Różnicatylkodirect0/1.
+Polecenia /usr/bin/python3 tools/stage_probe_run.py execute plan.json zROOT; nieedytować
+aktywnychhelpers/sources. Bramka:raw<=1e-6,ΔcomplexS<=1e-5,ΔVSWR<=.001,
+fieldsrelL2<=1e-5,power/FFflux<=.02. Rodzajmierzonegopola wgexactcheckeroutputmanifest,
+nieudawaćbitwisezgodności. Raportkażdejpary+pełne3pairedmedian/minmaxWall/Palace/fazy/RAM;
+brakzyskupełnegonieukrywać. ŻadnychinnychGPU/build/MPI/cloud/geometry/Strataakcji.
+
+#### PRE-03-M3-E01 — pair1 PASS; pair2 monitoring end-race, STOP
+
+Pair1 A→B zakończona, rootchecker pair1-rf.json PASS. Palace738.249863→731.226210s,
+Mesh28.121020→21.375176s; wszystkie8CSV/probes164/FF10024rows, oba porty85iteracji.
+MaxΔS3.4231e-8,ΔVSWR4.6609e-8; probepointL2max1.14384e-6,FFL2max2.542e-8,
+powerresidualmax.00021545W,FFfluxmax1.2588%. Jedna para nie zastępuje trzech median.
+
+Pair2-B-direct completePASS; pair2-A-off PythonrunnerFAIL po zniknięciu cgroup:
+FileNotFoundError memory.swap.max, elapsed740.161669s. Oryginalny full-result.json
+complete=false zachowany, SHA f543e23205ea0a64346d78c69483bd1dc9af9b3e473d570962d33bb88d3c0cd0.
+Native ma końcowe timery739.008s/2solves85its i wszystkie8CSV. Na zlecenie root
+zebrano ograniczone czasowo podman events dla dokładnego CID04180b54...:
+**died ContainerExitCode=0**, timeNano1793355193146280025; remove także0.
+Raw monitor-race-podman-events.jsonl SHA7c500a3b86ad60990d5717ad0e4fb054b0563e74cb3627bbf0057f8ed4505b03;
+monitor-race-events-proof.json zapisany przy pair2-A-off. Terminalsession29566 exit1
+należy do monitora Python, nie Palace. Brak retry/checkerpair2/edycjiresult/helpers;
+cleanup potwierdzony, pair3 obaNOTRUN. Root naprawia race i decyduje o jawnej
+niezależnej kwalifikacji istniejących wyników. Worker STOP/czeka; nie zaliczono
+po cichu nieukończonego harness receipt jako PASS.
+
+#### PRE-03-M3-E01 — jawny recovery root; para3r2 autoryzowana
+
+Root niezależnie sprawdził supplemental completion-recovery.json dla pair2-A-off,
+wiążący event nativeexit0/oryginalnyFAIL/plan/identity/pełneoutputy. Pair2-rf.json PASS;
+oryginalny controller receipt nadalFAIL i wall tej próbki wyłączony z czystych statystyk.
+Nie ponawiano compute. Użytkownik jawnie ponownie zezwolił StrataOFF/continue;
+rootservice0. Monitorrootcommit1520a583e po niezależnymOPreview/91testach poprawia
+race; planów starych pair3 NIEwykonujemy. Nowy preregister-pair3r2.json i dokładne
+pair3r2-A-off→pair3r2-B-direct otrzymały soleGPUslot. Same PREsource02dd/lib493d,
+physics/config9f/mesh2af/all18flags,68GiB/noSwap1800s/OMP1; różni się tylko wersja
+monitora między parami (wewnątrz każdej pary taka sama). Po RFgate ostatniejpary
+3nativepairedmedians dozwolone, lecz tylko2czyste wallpairs; brak udawania3wallmedian.
+PierwszyFAILSTOP/no retry; bez edycji aktywnych helpers lub kodu produktu.
+
+#### PRE-03-M3-E01 — wynik końcowy: 3 pary native + RF PASS
+
+Zakończono dokładnie sześć autoryzowanych solve: pair1 A→B, pair2 B→A oraz
+nowe pair3r2 A→B. Stare plany pair3-A/B pozostały NOT RUN. Każda para przeszła
+root `stage_rf_compare.py`; bramki pozostały niezmienione. Pair2-A ma jawny
+supplemental completion-recovery i native exit0 z eventów Podman; oryginalny
+controller FAIL zachowany. Nie wykonywano ponownie tej symulacji.
+
+| Miara | A off: mediana [min, max] | B direct: mediana [min, max] |
+|---|---:|---:|
+| Palace Total [s] |739,007857 [738,249863;744,922888]|731,570240 [731,226210;734,089966]|
+| MeshPreprocessing [s] |28,121020 [27,873131;28,331267]|21,375176 [21,336886;21,735001]|
+| OperatorConstruction [s] |120,513707 [120,058165;121,265227]|119,760551 [119,707518;119,783647]|
+| Setup [s] |91,804289 [91,760155;92,576705]|91,768951 [91,721659;91,870776]|
+| Peak cgroup [GB decimal] |70,608499 [70,566187;71,267557]|70,561608 [70,554399;70,928703]|
+
+Native Total: różnica median **−7,437617 s / −1,00643%**. Sparowane B/A:
+0,990486076 / 0,989935672 / 0,985457660 (mediana0,989935672).
+Różnice czasu par:−7,023653 /−7,437617 /−10,832922s. Mesh zyskuje około6,5–6,7s
+w każdej parze; mediana sparowanej różnicy−6,596267s. Zysk fazy jest wyraźny,
+ale pełna symulacja poprawia się tylko około1%; brak dużego zysku full RAM:
+różnica median−46,891MB/−0,06641%. Nie przypisywać całej zmienności innych faz
+tej optymalizacji; aktualny default pozostaje off, połączenie z OP to osobna bramka.
+
+Czysty wall ma **tylko 2 pary (pair1/pair3r2)**: A743,580718s [739,818623;747,342813],
+B734,192078s [732,936400;735,447755], mediana różnicy−9,388641s/−1,26263%.
+Pair2-A oryginalny wall740,161669s jest zachowany jako raw controller-failure sample,
+ale nie wchodzi do czystych wall-statystyk ani twierdzenia o3 udanych wall parach.
+Monitor/hash par1/2:303ea41b...; pair3r2:65c111d7..., jednak wewnątrz każdej pary
+wersja taka sama. RF checker dla pair1 f2b2e275..., dla pair2/3 5c63ed2b...;
+zmiana dodaje tylko jawne obsłużenie proof-recovery, a progi/normalizacja są równe.
+
+RF maksima ze wszystkich3 par: ΔcomplexS3,423073e-8; ΔVSWR4,660876e-8;
+L2 próbek E/B1,304300e-6; L2 complexFF2,541981e-8. Maksymalny raw residual
+8,339296e-7<=1e-6. Power residual<=.000215467W; względny FF/flux<=.012587722
+(1,2588%)<2%. Każdy solve miał2porty/85iteracji,164punkty E/B na port,
+5012kierunków FF na port,10024wiersze FF i wszystkie8CSV. Nie są to wyniki
+bitwise; pointwise faza słabych składowych ma osobne diagnostyki, a pełna norma
+objętościowa pól nie była częścią tego runu.
+
+Wszystkie6próbek mają identyczne: source02ddf3af.../lib493df76a.../adapter3f25...,
+config9f.../mesh2af..., GPU CUDA/MAGMA/1MPI/OMP1/all18baselineflags; różni się
+jedynie explicit direct0/1. TraceOFF, GSLIB original w obu wariantach,68GiB
+Memory==MemorySwap/no dodatkowego swap/core0/8CPUquota/image43ac. Wszystkie
+markery direct obecne tylkoB, fallback brak. Min hostavailable13,06GiB lubwięcej;
+globalNVMLpeak15858–15868MiB obejmuje pulpit, nie traktować jako process UVM.
+Source/native ponownie sprawdzono po zakończeniu. Wszystkie własne kontenery
+usunięte; tylko unrelated rapidmakerpostgres działa. Slot GPU zwolniony; bez
+innych native/build/MPI/cloud/Strata działań.
+
+Raport odtwarzalny: ROOT/artifacts/optimization-stages/M3-PRE03-full-20261030/
+`three-pair-summary.json`, `raw-six-samples.csv`, `summarize-pre03.py`, per-phase
+med/min/max i sparowane ratios oraz wszystkie identity/policy/telemetry hashes.
+Zachowano pair1-rf.json, pair2-rf.json, pair3r2-rf.json, raw logs i recovery/events.
+M3 PRE zakończony w tym zakresie; generalizacja drugiej geometrii/MPI oraz
+połączenie PRE+OP wymagają kolejnych jawnych planów root. Brak globalnej promocji.
+
+#### M3 — docs-garden i lokalny handoff
+
+Sprawdzono własny doc-only diff, ARCHITECTURE/INDEX i raport trzech par.
+Aktualny skrót oddziela ~24% zysku Mesh od ~1% całego solve oraz płaskiego
+full peak RAM. Zachowano controller FAIL, dowód native exit0, jawny recovery,
+dwie wersje monitora i tylko dwie czyste wall pary. Nie zmieniono wymagań ani
+historycznych artefaktów. Shared PLAN/INDEX/checkpoint pozostają własnością root.
+Ponownie potwierdzono source02dd/lib493d; bez uruchamiania nowego compute.
+Docs-garden check i diff-check PASS. Dalsze M4/M5 wykonuje wyłącznie koordynator
+według nowego planu; ten worker zatrzymuje się po commicie dokumentacji.

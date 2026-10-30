@@ -58,9 +58,60 @@ class RFComparisonTests(unittest.TestCase):
         self.b['plan']['features']['PALACE_PROBE_LOCATOR']='mfem'
         self.b['plan']['environment']['PALACE_PROBE_LOCATOR']='mfem'
 
-    def compare(self,legacy=False):
+    def compare(self,legacy=False,integration=False):
         with mock.patch.object(rf,'load_run',side_effect=[self.a,self.b]):
-            return rf.compare_runs('a','b',legacy_reference=legacy)
+            return rf.compare_runs('a','b',legacy_reference=legacy,integration=integration)
+
+    def combined_pair(self):
+        for run,value in ((self.a,'0'),(self.b,'1')):
+            run['plan']['features']['PALACE_SINGLE_RANK_DIRECT_MESH']=value
+            run['plan']['environment']['PALACE_SINGLE_RANK_DIRECT_MESH']=value
+
+    def test_default_rejects_combined_feature_changes(self):
+        self.combined_pair()
+        with self.assertRaisesRegex(ValueError,'one prototype flag'):self.compare()
+
+    def test_explicit_integration_accepts_exact_forward_pair(self):
+        self.combined_pair()
+        result=self.compare(integration=True)
+        self.assertTrue(result['passed']);self.assertTrue(result['integration'])
+        self.assertEqual(len(result['intentional_feature_changes']),2)
+        self.assertIn('combined integration',result['scope'])
+        self.assertIn('not repeated medians',result['scope'])
+        self.assertFalse(result['production_promoted'])
+
+    def test_integration_rejects_reverse_single_and_implicit_baselines(self):
+        with self.assertRaisesRegex(ValueError,'exactly'):self.compare(integration=True)
+        self.combined_pair();self.a,self.b=self.b,self.a
+        with self.assertRaisesRegex(ValueError,'exactly'):self.compare(integration=True)
+        self.a,self.b=self.b,self.a
+        self.a['plan']['features'].pop('PALACE_SINGLE_RANK_DIRECT_MESH')
+        self.a['plan']['environment'].pop('PALACE_SINGLE_RANK_DIRECT_MESH')
+        with self.assertRaisesRegex(ValueError,'exactly'):self.compare(integration=True)
+
+    def test_integration_rejects_legacy_before_loading(self):
+        with mock.patch.object(rf,'load_run') as load:
+            with self.assertRaisesRegex(ValueError,'not a legacy'):
+                rf.compare_runs('a','b',legacy_reference=True,integration=True)
+            load.assert_not_called()
+
+    def test_integration_retains_environment_provenance_and_rf_gates(self):
+        self.combined_pair();self.b['plan']['environment']['uncontrolled']='1'
+        with self.assertRaisesRegex(ValueError,'environment'):self.compare(integration=True)
+        self.b['plan']['environment'].pop('uncontrolled')
+        self.b['plan']['source']='different'
+        with self.assertRaisesRegex(ValueError,'source'):self.compare(integration=True)
+        self.b['plan']['source']=self.a['plan']['source']
+        self.b['tables']['surface-F.csv'][1][0][1]+=.03
+        self.assertFalse(self.compare(integration=True)['passed'])
+
+    def test_single_flag_op_to_combined_remains_default(self):
+        self.combined_pair()
+        self.a['plan']['features']['PALACE_PROBE_LOCATOR']='mfem'
+        self.a['plan']['environment']['PALACE_PROBE_LOCATOR']='mfem'
+        result=self.compare()
+        self.assertTrue(result['passed']);self.assertFalse(result['integration'])
+        self.assertEqual(set(result['intentional_feature_changes']),{'PALACE_SINGLE_RANK_DIRECT_MESH'})
 
     def test_matched_pair_passes_closed_power_and_native_farfield_gates(self):
         result=self.compare();self.assertTrue(result['passed'])

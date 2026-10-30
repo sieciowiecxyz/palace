@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M3; M2 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M4; M3 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -18,11 +18,11 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Optymalizacja faz: M2](milestones/M2.md)
   - Czytaj gdy: realizujesz prototypy wybrane po aktualnym profilu
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
-- [Przygotowanie PR: M3](milestones/M3.md)
-  - Czytaj gdy: sprawdzasz historyczny etap M3 planu lokalnych PR-ów
+- [Optymalizacja faz: M3](milestones/M3.md)
+  - Czytaj gdy: sprawdzasz osobną kwalifikację OP i PRE przed integracją
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
-- [Przygotowanie PR: M4](milestones/M4.md)
-  - Czytaj gdy: sprawdzasz historyczny etap M4 planu lokalnych PR-ów
+- [Optymalizacja faz: M4](milestones/M4.md)
+  - Czytaj gdy: łączysz zakwalifikowane patche i sprawdzasz ich interakcje
   - Opis: Dowody i zakres ukończenia etapu, oddzielone od zakończonych badań.
 - [Archiwum: kontrakt optymalizacji](milestones/optimization-contract.md)
   - Czytaj gdy: sprawdzasz kryteria i tolerancje zakończonych badań M0–M7
@@ -329,3 +329,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Operatory: trzy pełne pary M3](optimization-stages/operators-m3.md)
   - Czytaj gdy: sprawdzasz kwalifikację OP-06 przed integracją.
   - Opis: Trzy nieprofilowane pary, wszystkie bramki RF PASS; zakres 1,92 GHz, oba porty, 5070 Ti.
+
+- [Poprzedni checkpoint PR M4](optimization-stages/previous-pr-checkpoint-M4.md)
+  - Czytaj gdy: odtwarzasz historyczny pakiet pilota PR.
+  - Opis: Archiwum poprzedniej kampanii; nie kwalifikuje obecnej integracji.

@@ -306,7 +306,9 @@ def farfields(run):
     return result
 
 
-def compare_runs(reference,candidate,legacy_reference=False,frozen=FROZEN):
+def compare_runs(reference,candidate,legacy_reference=False,frozen=FROZEN,integration=False):
+    if integration and legacy_reference:
+        raise ValueError('Combined integration requires a matched full pair, not a legacy reference')
     a=load_run(reference,legacy_reference,frozen);b=load_run(candidate,False,frozen)
     if a['config']!=b['config'] or a['fingerprint']['config_sha256']!=b['fingerprint']['config_sha256'] or a['fingerprint']['mesh_sha256']!=b['fingerprint']['mesh_sha256']:
         raise ValueError('RF A/B requires exactly unchanged config and mesh')
@@ -322,7 +324,12 @@ def compare_runs(reference,candidate,legacy_reference=False,frozen=FROZEN):
                 raise ValueError('Feature/stage environment differs from recorded policy')
         fa,fb=a['plan'].get('features',{}),b['plan'].get('features',{})
         feature_changes={k:dict(reference=fa.get(k),candidate=fb.get(k)) for k in set(fa)|set(fb) if fa.get(k)!=fb.get(k)}
-        if len(feature_changes)>1:
+        if integration:
+            expected={'PALACE_PROBE_LOCATOR':dict(reference='gslib',candidate='mfem'),
+                      'PALACE_SINGLE_RANK_DIRECT_MESH':dict(reference='0',candidate='1')}
+            if feature_changes!=expected:
+                raise ValueError('Combined integration requires exactly gslib/direct0 -> mfem/direct1')
+        elif len(feature_changes)>1:
             raise ValueError('M3 compares one prototype flag at a time')
         if {k:v for k,v in a['plan']['environment'].items() if k not in FEATURE_VALUES}!={k:v for k,v in b['plan']['environment'].items() if k not in FEATURE_VALUES}:
             raise ValueError('Uncontrolled execution environment difference')
@@ -405,9 +412,9 @@ def compare_runs(reference,candidate,legacy_reference=False,frozen=FROZEN):
                                 passed=abs(ratio-1)<=.02,**q))
     powers={'reference':power_gates(a,sa),'candidate':power_gates(b,sb)}
     passed=all(row['passed'] for row in srows+probes+ffrows+ffpower+auxiliary) and all(x['passed'] for x in powers.values())
-    return dict(scope='Diagnostic legacy comparison, not same-build timing evidence' if legacy_reference else 'One matched full RF A/B pair; not repeated medians or hardware generalization',
+    return dict(scope='Diagnostic legacy comparison, not same-build timing evidence' if legacy_reference else 'One matched combined integration RF A/B pair; not repeated medians or hardware generalization' if integration else 'One matched full RF A/B pair; not repeated medians or hardware generalization',
                 passed=passed,one_pair_rf_gates_passed=passed,production_promoted=False,
-                legacy_reference=legacy_reference,intentional_feature_changes=feature_changes,
+                legacy_reference=legacy_reference,integration=integration,intentional_feature_changes=feature_changes,
                 recovered_controller_failure={'reference':a['fingerprint'].get('recovered_controller_failure',False),
                                               'candidate':b['fingerprint'].get('recovered_controller_failure',False)},
                 timing_scope='Native Palace elapsed remains available; any controller-recovered wall is explicitly tagged, never a clean successful wall sample',
@@ -427,9 +434,11 @@ def main():
     p.add_argument('reference',type=Path);p.add_argument('candidate',type=Path)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--legacy-reference',action='store_true')
+    p.add_argument('--integration',action='store_true',
+                   help='Require the exact combined gslib/direct0 -> mfem/direct1 pair; not repeated medians')
     args=p.parse_args()
     try:
-        report=compare_runs(args.reference,args.candidate,args.legacy_reference)
+        report=compare_runs(args.reference,args.candidate,args.legacy_reference,integration=args.integration)
     except (OSError, ValueError, KeyError, TypeError, StopIteration) as error:
         report=dict(passed=False,one_pair_rf_gates_passed=False,production_promoted=False,
                     scope='Input/provenance/completeness rejection; no RF qualification',

@@ -1,3 +1,14 @@
+## M3 CLOSED zakresowo / M4 ACTIVE (2026-10-30)
+
+OP3pary:738,559→637,773s,65,713→57,030GiB, RF PASS. PRE3nativepary:
+739,008→731,570s, Mesh−24%, fullpeakRAM flat, RF PASS. PREjednaodzyskananative
+completion z zachowanymcontrollerFAIL/events/proof; 2cleanwallpary, nie3.
+IODEFER. Source/nativeaktoryniezmienione, ścieżkistatystyk w M3 i ledgerach.
+Strata ponownie OFF na jawnepolecenieużytkownika; GPUnativerunszakończone.
+NextM4 osobnyintegrationworktree/codecommitsOP+PRE/cachedbuild/regresje;
+combined vs base i OP, potem M5 sweep/drugageometria i M6 rekomendacja.
+FizyczneUVMtransfery/residency niezmierzone: nie twierdzićoVRAMsavingzsamegocgroup.
+
 ## GPU ponownie zwolnione; M3 PRE ostatnia para przygotowana (2026-10-30)
 
 Użytkownik jawnie polecił wyłączyć Stratę i kontynuować; service inactive/dead0,
