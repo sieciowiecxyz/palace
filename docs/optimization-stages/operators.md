@@ -12,7 +12,7 @@ PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
 | OP-03 | DEFERRED — JIT nie wyjaśnia GSLIB104,52s |
 | OP-04 | DEFERRED — K/C/M mały koszt względem geometrySetup |
 | OP-05 | TODO_TO_CHECK — Umpire/OMP2 baseline crash; oddzielnie od nowego locatora |
-| OP-06 | PASS (M2 scope) — structural/tiny749 + actual CUDA ND/RT synthetic fields; one constructor pair benefit. Full RF/repeated pairs NOT RUN |
+| OP-06 | PASS (M2 + scoped M3) — structural/tiny749/CUDA synthetic + all3 matched full medium pairs/RF gates; production promotion root-owned |
 
 **Worker:** operator-construction track
 **Branch:** `opt/operators-20261029`
@@ -22,9 +22,12 @@ probe interpolation and actual CUDA/UVM synthetic complex ND/RT fields. One
 same-build operators-only pair measured113.196→12.166s and12.742→3.633GiB cgroup
 RAM; this is not repeated medians or full-solver memory/time. Default remains GSLIB;
 `PALACE_PROBE_LOCATOR=mfem` is explicit and conservative whole-batch fallback stays.
-**Full RF / residual / S / efficiency / far-field and repeated performance pairs:
-NOT RUN, reserved for root-reviewed M3.** Current compiler sourceb834/nativebc7
-remain frozen; source review must not change the qualified product bytes.
+**M3 update:** [three full pair ledger](operators-m3.md): all6 full-medium runs at
+1.92GHz/both ports completed and all3 independent RF comparisons PASS. Median Palace
+time738.559→637.773s/cgroup65.713→57.030GiB; production promotion is root-owned.
+This qualifies the unchanged case, not other geometries/frequencies/MPI.
+Current compiler sourceb834/nativebc7 remain frozen; source review must not change
+the qualified product bytes.
 
 
 ## Why this track exists
