@@ -36,7 +36,7 @@ class FullCompletionTests(unittest.TestCase):
         self.write_csv('domain-E.csv',['f (GHz)','E_elec[1] (J)','E_elec[2] (J)'],[[1.92,.1,.2]])
         self.write_csv('farfield-rE.csv',['f (GHz)','exc','theta (deg.)','phi (deg.)','r*Re{E_x} (V)'],
                        [[1.92,1,0,0,.2],[1.92,2,0,0,.3]])
-        self.log=''
+        self.log='Device configuration: cuda,omp,cpu\nlibCEED backend: /gpu/cuda/magma\n'
         for source in (1,2):
             self.log+=(f'PALACE_PORT_SETUP: action=build excitation={source} frequency_index=0\n'
                        'It 1/1: ω/2π = 1.920e+00 GHz (total elapsed time = 1 s)\n'
@@ -145,6 +145,14 @@ class FullCompletionTests(unittest.TestCase):
         self.config['Solver']['Driven']['Samples'][0]['Type']='Point'
         p=self.out/'port-S.csv';p.write_text(p.read_text().replace('|S[2][2]| (dB)','wrong'))
         with self.assertRaisesRegex(ValueError,'port/source'):expectations(self.config,self.out)
+
+    def test_cpu_or_missing_cuda_backend_is_rejected(self):
+        for value in (self.log.replace('Device configuration: cuda,omp,cpu','Device configuration: cpu'),
+                      self.log.replace('/gpu/cuda/magma','/cpu/self'),
+                      self.log.replace('libCEED backend: /gpu/cuda/magma\n','')):
+            self.stdout.write_text(value)
+            with self.assertRaisesRegex(ValueError,'CUDA device/backend'):
+                self.check()
 
 
 if __name__=='__main__':unittest.main()

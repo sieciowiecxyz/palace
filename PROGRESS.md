@@ -12,9 +12,9 @@ IO actual production parser19,040→17,000 s; cold34,049/warm0,441 s;
 ≥22 identycznych loads do zwrotu: DEFER auto cache. Strict representation PASS.
 
 Nowy bounded full stage istniejącego runnera: 61 testów Python PASS + archived
-REF completion PASS (2 solves/85its/maxrawrelative8,334129e-7). Rootreview pending;
+REF completion PASS (2 solves/85its/maxrawrelative8,334129e-7). Rootreview PASS;
 checker nie zastępuje A/B RF. Następny krok nieprofilowany OP 1,92 GHz/oba porty,
-exact same build i output, później PRE, powtarzane pary i M4. Actual fullRF NOT RUN.
+exact same build i output, później PRE, powtarzane pary i M4. Actual fullRF NOT RUN. Dwa dokładne plany pair1 B→A przygotowane w M3-OP06-full-20261030.
 Strata inactive/dead0, brak cloud. System goal zachowuje rzeczywisty stan panelu;
 repo Mode goal/Active M3. Nie sumować niezależnych oszczędności przed combined test.
 

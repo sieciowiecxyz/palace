@@ -291,6 +291,17 @@ class StageProbeRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'command/environment changed'):
             runner.execute(self.root/'out/plan.json')
 
+    def test_full_preserves_implicit_cuda_default(self):
+        config=runner.dev.read(self.run/'config.json')
+        config['Solver'].pop('Backend')
+        runner.dev.write(self.run/'config.json',config)
+        command=runner.dev.read(self.run/'command.json')
+        command['actual_config_sha256']=runner.dev.sha(self.run/'config.json')
+        runner.dev.write(self.run/'command.json',command)
+        plan=self.full_prepare()
+        self.assertNotIn('Backend',runner.dev.read(self.root/'out/config.json')['Solver'])
+        self.assertEqual(plan['configuration_changes'],{})
+
     def test_full_cpu_trace_threads_and_resource_bounds_are_rejected(self):
         for seconds,memory,threads,cpu,trace in [(1801,8,1,False,False),(0,8,1,False,False),
                 (1800,71,1,False,False),(1800,8,2,False,False),

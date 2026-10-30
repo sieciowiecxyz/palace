@@ -257,7 +257,9 @@ def prepare(source, build, run, output, driver_record, stage, seconds=120,
                 image_config_sha256=hashlib.sha256(json.dumps(image['Config'],sort_keys=True).encode()).hexdigest(),
                 runner_sha256=dev.sha(Path(__file__)), helper_sha256=helper_hashes(), prepared_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
     if stage == 'full':
-        if config.get('Solver', {}).get('Device') != 'GPU' or not config['Solver'].get('Backend', '').startswith('/gpu/cuda/'):
+        backend = config.get('Solver', {}).get('Backend', '')
+        # CUDA's default is /gpu/cuda/magma (main.cpp ConfigureCeedBackend).
+        if config.get('Solver', {}).get('Device') != 'GPU' or (backend and not backend.startswith('/gpu/cuda/')):
             raise ValueError('Full run requires unchanged GPU/CUDA config')
         plan['full_expectations'] = full_expectations(config, run/observed['postpro'])
         plan['scope'] = 'Full completion/residual checks only; RF equivalence requires a separate matched comparison'

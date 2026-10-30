@@ -94,6 +94,9 @@ def check_full(postpro, stdout, stderr, expected):
             any(marker in combined for marker in
                 ('PALACE_STAGE_DIAGNOSTIC', 'PALACE_STAGE_STOP', 'PALACE_STAGE_PROFILE'))):
         raise ValueError('Full run contains diagnostic/stop/trace markers')
+    if not re.search(r'^Device configuration: cuda(?:,|$)', text, re.MULTILINE) or not re.search(
+            r'^libCEED backend: /gpu/cuda/\S+', text, re.MULTILINE):
+        raise ValueError('Actual CUDA device/backend proof missing')
     metadata = json.loads((postpro/'palace.json').read_text())
     frequencies, excitations = expected['frequencies_ghz'], expected['excitations']
     solves = len(frequencies) * len(excitations)
