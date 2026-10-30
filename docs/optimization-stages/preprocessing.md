@@ -1,43 +1,58 @@
 # Audyt i plan: preprocessing siatki
 
-## Stan bieżący po zamknięciu M1 — 2026-10-30
+## Stan bieżący po badaniach M2 — 2026-10-30
 
-Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.
-PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
+Bieżący wynik PRE-03: **kandydat opt-in**, domyślnie wyłączony.
+`PALACE_SINGLE_RANK_DIRECT_MESH=1` dla jednej rangi, siatki conforming bez NURBS
+oraz bez AMR pomija zbędny graf partycjonowania i round trip ASCII. Nadal wykonuje
+`ParMesh` oraz `Finalize(true, false)` i zachowuje zakrzywione węzły. Pozostałe
+konfiguracje korzystają z oryginalnej ścieżki z komunikatem fallback.
+
+- Tiny CPU/OMP1: **55 986 asercji PASS**, zakrzywione tet/hex rzędu 2, topologia,
+  atrybuty, węzły, orientacje, flagi, Jacobiany i działanie operatora ND.
+- Jedna para medium preprocess-only: **53,361 → 46,025 s (−13,75%)**,
+  cgroup peak **2 307 706 880 → 1 834 889 216 B (−20,49%)**.
+- **Pełne RF, pola, complex S i residual dla PRE-03: NOT RUN.** To nie jest wynik
+  całej symulacji ani statystyka trzech median. Przed promocją potrzebny plan M3.
+- Pierwszy test miał jedną błędną asercję o flagach po uniform refinement.
+  Oryginalne FAIL i logi zachowano w E02; zatwierdzona korekta kontraktu testu
+  w E03 nie zmieniła kodu produktu ani progów numerycznych.
 
 | ID | Stan i zakres |
 |---|---|
-| PRE-01 | PASS — profil M1/E08–E09, bez speedup/RF claim |
+| PRE-01 | PASS — profil M1/E08–E09, bez twierdzenia o zysku RF |
 | PRE-02 | TODO_TO_CHECK — reorder nadal niebadany |
-| PRE-03 | TODO_TO_CHECK — wznowione dla rank1 po koszcie19,5s, M2 |
-| PRE-04 | TODO_TO_CHECK — duplikaty topologii, tylko po sourceaudit |
-| PRE-05 | TODO_TO_CHECK — koordynacja z IO-06, parser18,75s |
+| PRE-03 | PASS tiny + pojedyncza para preprocess-only; opt-in, pełne RF NOT RUN |
+| PRE-04 | DEFERRED — bez dowodu bezpiecznej redukcji dalszych skanów |
+| PRE-05 | DEFERRED do ścieżki IO-06; brak zmiany parsera w PRE |
 
-Status: M0 zamknięte przez root; aktywny M1. Instrumentacja i testy runnera gotowe, nowy native build/profil oraz narzut NOT RUN.
 Owner: agent preprocessing, branch `opt/preprocessing-20261029`.
-Koordynator scala plan i wspólny checkpoint. Proponowany zakres kodu: `palace/utils/geodata.cpp`, ewentualnie `palace/utils/meshio.cpp`; nie dotykać solverów, wspólnych plików planu ani I/O outputu. M1 rozszerzenie przydziału root: `palace/fem/mesh.cpp` (Update), `tools/stage_probe_run.py` i jego testy; współdzielony stageprofile.hpp oraz driver.cpp pozostają root-owned.
+Aktualny kod produktu: `palace/utils/geodata.cpp`; test:
+`tools/stage_preprocess_partition_test.cpp`. Koordynator posiada wspólny plan,
+checkpoint i integrację. Poniższe wcześniejsze plany i wyniki są historią prób;
+aktualny stan określa ta sekcja i końcowe wyniki E03/E04.
 
 ## Granica fazy i dane bazowe
 
 W logu Palace „Mesh Preprocessing” jest timerem wewnątrz „Initialization”, nie obejmuje generowania geometrii ani meshera zewnętrznego. `palace/driver.cpp:59-79` obejmuje w nadrzędnym `INIT` odczyt i przygotowanie siatki, `solver->Preprocess`, partycjonowanie, równomierne refinement oraz utworzenie obiektu `Mesh`. Sam timer `MESH_PREPROCESS` jest zakładany osobno w `geodata.cpp:130` (`Load`) i `:270` (`Partition`). Część dalszego przygotowania MFEM/FE może zostać przypisana do Initialization lub solverowego Setup; nie należy przypisywać całego INIT do tego milestone’u.
 
-Ostatni porównywalny medium run użył już wygenerowanej, stałej siatki; nie mierzył CAD ani generowania siatki. Wyniki: preprocessing 29,224 s (3,54% całości 825,783 s), operator construction 121,501 s lokalnie; na CMP operator construction 401,9 s. I/O Palace 19,612 s to osobna kategoria. Scope może być zagnieżdżony, ale BlockTimer przerywa naliczanie rodzica: końcowa tabela jest exclusive i jej kategorie można sumować w tym single-rank runie. Nie sumować natomiast inclusive wpisów phase trace. Initialization 6,768 s + Mesh Preprocessing 29,224 s daje 35,992 s przygotowania. Nie ma na dziś profilu, który mówi, ile z 29,224 s przypada na odczyt, walidację, transformacje, partycjonowanie i refinement.
+Historyczny pełny medium run sprzed M1 użył już wygenerowanej, stałej siatki; nie mierzył CAD ani generowania siatki. Wyniki: preprocessing 29,224 s (3,54% całości 825,783 s), operator construction 121,501 s lokalnie; na CMP operator construction 401,9 s. I/O Palace 19,612 s to osobna kategoria. Scope może być zagnieżdżony, ale BlockTimer przerywa naliczanie rodzica: końcowa tabela jest exclusive i jej kategorie można sumować w tym single-rank runie. Nie sumować natomiast inclusive wpisów phase trace. Initialization 6,768 s + Mesh Preprocessing 29,224 s daje 35,992 s przygotowania. Wówczas brakowało podziału wewnętrznego; aktualny profil M1 znajduje się w PRE-01-E08/E09, a pomiar kandydata w PRE-03-E04.
 
 ## Miejsca w kodzie do sprawdzenia
 
 | Miejsce | Rola / fakt z kodu | Możliwy kierunek | Status |
 |---|---|---|---|
-| `palace/utils/geodata.cpp:130-264`, `Load` | Ładuje mesh; sprawdza typy i warunki AMR/periodic; opcjonalnie czyści nieużywane elementy, konwertuje typy, reorderyzuje elementy, finalizuje siatkę, robi region refinement i sprawdza granice/interfejsy. Część ścieżek jest warunkowa. | Najpierw rozbić czas na fazy i ranki, potem optymalizować tylko kosztowną ścieżkę faktycznie używaną przez antenę. | `PRE-01` TODO |
-| `palace/utils/geodata.cpp:267-369`, `Partition`; zwłaszcza `:314-367` | Wylicza partycjonowanie i rozdziela siatkę; ścieżka zależy m.in. od conformality, AMR i liczby rang. Przy niekonformalnym AMR są dodatkowe konwersje i broadcast porcjowany. | Odrębnie profilować 1 rank i MPI. Rozważyć zmianę tylko wtedy, gdy koszt partycjonowania/broadcastu istotny dla docelowej konfiguracji. | `PRE-03` DEFERRED dla obecnego single-GPU case |
+| `palace/utils/geodata.cpp:130-264`, `Load` | Ładuje mesh; sprawdza typy i warunki AMR/periodic; opcjonalnie czyści nieużywane elementy, konwertuje typy, reorderyzuje elementy, finalizuje siatkę, robi region refinement i sprawdza granice/interfejsy. Część ścieżek jest warunkowa. | Najpierw rozbić czas na fazy i ranki, potem optymalizować tylko kosztowną ścieżkę faktycznie używaną przez antenę. | `PRE-01` PASS M1 |
+| `palace/utils/geodata.cpp:267-369`, `Partition`; zwłaszcza `:314-367` | Wylicza partycjonowanie i rozdziela siatkę; ścieżka zależy m.in. od conformality, AMR i liczby rang. Przy niekonformalnym AMR są dodatkowe konwersje i broadcast porcjowany. | Odrębnie profilować 1 rank i MPI. Rozważyć zmianę tylko wtedy, gdy koszt partycjonowania/broadcastu istotny dla docelowej konfiguracji. | `PRE-03` PASS w zakresie tiny + jednej pary medium preprocess |
 | `palace/utils/geodata.cpp:208-212`, `ReorderMeshElements`; implementacja `:2743+` | Istnieje opt-in `reorder_elements`, który zmienia kolejność elementów/węzłów dla lokalności cache. | Sparowany benchmark on/off może sprawdzić, czy preprocess kosztuje się późniejszym assembly, pamięcią i solverem. Wliczać koszt reordering do całego runu. | `PRE-02` TODO |
-| `palace/utils/geodata.cpp:191-205, 2279+, 2375+` | `CleanMesh`, rozcinanie typów elementów i testy typu mesh występują w opcjonalnych ścieżkach; `CheckElements` bywa wywołane ponownie przez konwersję. | Szukać redundantnych przebiegów siatki dopiero po profilerze; bezpieczny mikrotest atrybutów/topologii może wskazać, czy jeden przebieg można współdzielić. | `PRE-04` TODO |
-| `palace/utils/geodata.cpp:2174-2215`; konwersje `meshio.cpp` | `LoadMesh` używa wbudowanego czytnika MFEM dla obsługiwanych formatów; COMSOL/Nastran przechodzą przez konwerter do strumienia Gmsh. | Badać parser/format tylko jeśli profil pokaże dominację odczytu lub konwersji. Nie wprowadzać mmap/cache formatu jako założonego rozwiązania. | `PRE-05` TODO |
+| `palace/utils/geodata.cpp:191-205, 2279+, 2375+` | `CleanMesh`, rozcinanie typów elementów i testy typu mesh występują w opcjonalnych ścieżkach; `CheckElements` bywa wywołane ponownie przez konwersję. | Szukać redundantnych przebiegów siatki dopiero po profilerze; bezpieczny mikrotest atrybutów/topologii może wskazać, czy jeden przebieg można współdzielić. | `PRE-04` DEFERRED |
+| `palace/utils/geodata.cpp:2174-2215`; konwersje `meshio.cpp` | `LoadMesh` używa wbudowanego czytnika MFEM dla obsługiwanych formatów; COMSOL/Nastran przechodzą przez konwerter do strumienia Gmsh. | Badać parser/format tylko jeśli profil pokaże dominację odczytu lub konwersji. Nie wprowadzać mmap/cache formatu jako założonego rozwiązania. | `PRE-05` DEFERRED do IO-06 |
 
 ## Rejestr hipotez i prób
 
 Każdy agent najpierw sprawdza poniższe ID. Dopisuje datę, commit/build/input hash, dokładne polecenie, wyniki, testy poprawności i decyzję. `TODO_TO_CHECK` oznacza hipotezę bez pomiaru; nie jest wynikiem. Po `PASS`/`REJECTED` nowy agent nie powtarza próby bez zmiany mesh, wersji MFEM, hardware, konfiguracji lub ujawnionego błędu.
 
-### PRE-01 — profil faz wewnątrz przygotowania siatki (`TODO_TO_CHECK`)
+### PRE-01 — historyczny plan profilowania (aktualnie PASS M1)
 
 Hipoteza: 29,2 s ukrywa jedną lub dwie dominujące funkcje, więc ogólna optymalizacja całej fazy grozi pracą nad małym kosztem. Dodać tymczasowe/niskonarzutowe timery wokół istniejących bloków `Load` i `Partition`, a nie logować każdy element. Rozdzielić CPU time/wall time, rank oraz bajty wejścia; osobno oznaczyć koszt I/O. Najpierw krótki profil bez zmiany kodu, jeśli istniejący profiler i dokładne binary pozwalają rozdzielić te fazy.
 
@@ -49,17 +64,17 @@ Hipoteza: cache locality może obniżyć późniejsze operatory/solver, ale moż
 
 Zaliczenie: topologia, materiały/atrybuty, boundary IDs, DOF dimensions i liczby elementów zachowane; rozwiązanie porównane przez normę pola / residuum / S-parametry w zatwierdzonych tolerancjach. Wariant promować tylko przy powtarzalnym E2E zysku ponad szum bez nieakceptowalnego wzrostu pamięci.
 
-### PRE-03 — koszt `Partition` przy docelowym modelu równoległym (`DEFERRED`)
+### PRE-03 — historyczne odroczenie przed profilem M1
 
 Single-GPU nie oznacza automatycznie single MPI rank, ale brak osobnego pomiaru nie pozwala wnioskować o zysku z nowego partitionera. Najpierw zapisać `MPI size`, `OMP threads`, czas `GetMeshPartitioning`, dystrybucji i rozmiary per-rank. Wrócić do testu tylko dla faktycznej konfiguracji multi-rank albo gdy etap przekroczy 10% E2E. Zachować obecne ścieżki nonconforming AMR i chunked broadcast; nie upraszczać na podstawie konfigu anteny.
 
-### PRE-04 — ograniczenie powtórnych skanów siatki (`TODO_TO_CHECK`)
+### PRE-04 — ograniczenie powtórnych skanów siatki (`DEFERRED`)
 
 Hipoteza: opcjonalne clean/split/validation ścieżki mogą wykonywać wielokrotne globalne skany. Profil wywołań i konfiguracji ma wykazać, że dana para skanów wykonuje się w tym samym runie i koszt jest mierzalny. Dopiero potem prototypować współdzielenie już policzonych cech. Nie cache'ować bez jawnej reguły unieważnienia po modyfikacji/refinement; nie zmieniać walidacji dla przyspieszenia.
 
 Zaliczenie: testy tetra/hex/prism/pyramid, curved/linear, conforming/nonconforming oraz region refine odpowiednie do zmienionej ścieżki; identyczne atrybuty i connectivity; brak regresji na MPI jeśli dotknięto partycjonowania.
 
-### PRE-05 — parser/konwersja wejścia (`TODO_TO_CHECK`)
+### PRE-05 — parser/konwersja wejścia (`DEFERRED` do IO-06)
 
 Hipoteza: koszt może zależeć od formatu; COMSOL/Nastran mają koszt konwersji do Gmsh, lecz obecny antenowy fixture może już być Gmsh. Zmierzyć format na fixture reprezentatywnym i porównać tylko równoważne mesh, nie różne eksporty. Nie zmieniać formatu plików projektu ani nie dodawać stałego cache, dopóki oszczędność odczytu nie uzasadni miejsca, walidacji hashy i kosztu zapisu.
 
@@ -591,3 +606,98 @@ IndividualphaseMeshdifference>1%, whileOpsnegative, illustratessequentialrunnois
 OFF328telemetrysamples,cgrouppeak13,676,187,648B,hostavailablemin71,128,174,592B,globalGPUpeak6276MiB/utilmean.088415%/median0/max9;powermean40.0935W;SMclockmean1263.55/median225/max2595MHz. PriorONmeanSM1249.48/median225/max2587,desktop/global notprocessresidency. GuardStratainactive/deadPID0/noSwap/core0/networknone64GiB8CPUquotaOMP1. Owncontainerremoved; podmanpsonlyunrelatedrapidmakerpostgres. NoactivePalace;slotreturned.
 
 Evidence ROOT/artifacts/optimization-stages/M1-profile-coverage-r2-20261030/r2-medium-on-off-comparison.json plusnewmedium-operators-gpu-off-control/{plan,diagnostic-result,resource-policy,container-state}.json +rawlogs/telemetry/postpro; priorONuntouched. NoRFsolve/M2/sourcechange/retries.
+
+### PRE-03-E01 — M2 one-rank mesh distribution audit/prototype (przygotowano; E03/E04 PASS)
+
+Reopened afterM1 source+measurement: Partition19.506679wall/19.463181CPU evenrank1. ExistingpathGetMeshPartitioning callsMFEMGeneratePartitioning(1): noMETISsolver, but ElementToElementTable executesbeforeonepartbranch. ThenDistributeMesh always MeshPartitioner→ExtractPart→MeshPart.Print ASCII→string→ParMeshistream evenrank1. MeshPartitioner also buildsedge/vertex/boundarytables. This data roundtrip is actual redundantrepresentationwork; timeinside19.5s notyetisolated, possiblegain boundedabove by19.5s (2.3%ofhistorical825sfullrun, ~11.5%of169sdiagnostic). No measuredspeedupyet.
+
+Pinnedbuilder7d609652... highestviewlibmfem.so.4.9 resolvesnucrpyipn2tktie6vyzz2hakdcgklpd6, notlowerx5variant. Read-only source underoverlayc00cc97882f279a802968318daea16166e2e5fcd378e550860e624216b002042/diff/tmp/root/spack-stage/spack-stage-mfem-4.9.0-nucrpyipn2tktie6vyzz2hakdcgklpd6/spack-src. MFEMpmesh.cpp107-315 directParMesh(comm,Mesh&,partitioning)duplicateslocalvertices/elements/boundaries, attributes/names andcurvedNodes asParGridFunction, retainsgeometryspace/order. HoweverdirectctorhasnoFinalize; streamconstructor936-985 callsFinalize(refine=true,fix_orientation=false) +EnsureParNodes. Anydirectprototype MUST retainFinalize(true,false), notremovegeometryorder2/refinement/orientationwork. MeshPart.GetMesh aloneREJECTED: explicitNodesnotsetforcurvedmesh.
+
+Plan narrow opt-in PALACE_SINGLE_RANK_DIRECT_MESH=1 onlyrank1/conforming/nonNURBS/allpartitionIDs0; othercasesfailvisiblyifrequested, defaultuntouched. No longlivedstate/cache; constructfromimmutablepostLoadmesh eachtime. Inputmesh/connectivity/coords/nodes/order/attributes/units/refinement/MPI/topologychanges alwaysreconstruct; no stale-cache reuse. PreserveFinalize(true,false), EnsureParNodes andsmeshresetlifetimeafterconstruction. Root-onlycompilerinputsuntouched, patchinchildtreeonly; noheavybuild/runtimepermissionyet.
+
+Meaningfulnativeunitproposed: tinycurvedorder2tetandhex withdifferentdomain/boundaryattrs, comparelegacy/direct counts/connectivity/attrs/nodeFEC/order/values/quadratureJacobians/refinementflags+NDspaces; testagainafteruniformrefinement. MPI>1,NC,AMR,NURBS/prism/pyramid/periodic NOTRUN/notpromoted. Tiny<120s8GiBCPUOMP1; noEMsolve. Rootbuildrequest onlyPalacegeodata TU+smalltest, noMFEMrebuild, thenrunexistingCatchoperatorinitmain withnewstage_preprocess test linked. No mediumuntiltinycorrectnessPASS, parentreview andresource slot.
+
+#### PRE-03-E01 — source audit and bounded prototype ready (native NOT RUN)
+
+Parentapprovedonenarrowhypothesis: skiponepartdualgraphpreparationANDASCIIroundtrip usingexistingMFEMAPI. Patchchildonly palace/utils/geodata.cpp: envPALACE_SINGLE_RANK_DIRECT_MESH exact0/1,defaultoff. Eligible1rankconformingnonNURBS/noAMR; otherwiseoriginalpathplusfallbackreport (supersedesinitialdraftfailunsupportedproposalabove). Emptycustompartitionpathaloneallowsvalue-initializedall0vectorbeforeGeneratePartitioning; explicitpartitionfilealwaysgoesexistingreaderandallIDs0validatedbeforeanydirectconstruction. No bypassfilevalidation. OriginalMPI/nonconformal/NURBS/AMR flowunchanged.
+
+ExistingdirectParMesh→Finalize(true,false) retained; DoNodeReorder keepssameNodesobject/FESpace, updatesvaluesunderMFEMownership. EnsureParNodes isprotected(pmesh.hpp324), soDONOTcallitfromPalace: directconstructoralreadycreatesParGridFunction+ParFiniteElementSpace; prototypeverifiesbothafterFinalize. This matchesEnsureParNodes'no-opcondition (pmesh.cpp2030ff), no manuallyrewirednodes. Serialmeshresetafterpmeshconstruction+finalization, sameeffectiveownershiplifetimeasstreamreturn. No cachestate, nosignaturesreused.
+
+PinnedsourceSHA256 mesh.cpp c939f52988ec9243854ef5eed52de132fba27f738196e83be964f3591f89a262; pmesh.cpp5d4f041b7e952a1df803dc436e97d34e6537fa467751b1ede20e7beafba04a26; pmesh.hpp0e6ce0b6aa97d6f4685bed3f662be912678076bd331243e2297a654ee6966f3f. GeneratePartitioning(1)METISskipconfirmed butadjacencybeforebranch. MeshPart.GetMeshrejectedforNodes. NoMFEMsource/binarychanged.
+
+Newtools/stage_preprocess_partition_test.cpp usesexistingCatchmain+dependencies, no newframework. Curvedquadratic2x2x2tetANDhex, variablematerial1/2 andboundary21/22attrs, exactdefaultExtract/Print/reparse vsdirectthroughpublicPartition. Assertions:counts/connectivity,attributevectors, allnodalcoords/FEC/order2/ordering,ParGridFunction,orientationchecks,tetrefinementflags, quadraturephysicalcoords/Jacobianweights, NDtrueDOFdims ANDindependentlyassembledcurlcurl+massoperatoractionrelative1e-12. Repeatedafteroneuniformrefinement. LazyElementToElementTablequeriedandcomparedafterbothpaths, checkingnoimplicitdependencyonthedroppedGeneratePartitioningcache. CPUOMP1/noEMsolve; nativecompile/testNOTRUN pendingrootslot. DiffcheckPASS/sourceAPIreviewonly.
+
+Proposedexactboundedruntimeonceparentbuildstestexe: env OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MFEM_MEMORY=host timeout -k 3 120 /stage/test/preprocess-partition-tests '[stage_preprocess][Serial]' --device cpu --backend /cpu/self. Useexistingstage_operator_unit_main.cpp withnewtestsource, cachedM0Catch2/lib and exactcachedCXX/linkflagsfromM0build-script.py117-127; compileonlynewtest+geodata TU, freshmanifest/nativepaths. 8GiBcgroup/noSwap/core0/hostguard/soleCPUslot. Buildtimeoutnewtest<=180s(link<=60), notrequesteddependencyrebuild. Rootprepare runnerintegrationfornewenv onlyafterreview; currentstrictstage_probe_runwhitelist intentionallyuntouched. MediumdiagnosticonlyifthisstructuraltestPASS+review+slot. FullRF/power/complexScomparisonlaterbeforeanypromotion. MPI>1/NC/AMR/NURBS/prism/pyramid/periodic unsupportedcoverageNOTRUN; defaultunchangedandunsupportedopt-infallbackoriginal.
+
+PRE-04Finalize/PrintMeshInfo/repeatedtopologyscans remainDEFERRED: current4.78sRefine includesboundingbox/PrintMeshInfoevenuniform0, butnoinnerprofileisolatescostandgeometry/topologychangesinvalidatecasualreuse. DoNOTskipFinalize/refinementmarks/geometrychecksforpaperdesignortradeRFqualityforseconds. ParenttoauthorizeM2nativequalification; nocloud/services/build/nativeexecutiondonebythisaudit.
+
+#### PRE-03-E02 — M2 cached build + native tiny gate (FAIL asercji; historia zachowana)
+
+Rootgrantedchildbranchbuild/testslotonly. ArtifactROOT/build/optimization-stages-m2-preprocessing-20261030, baseM1r2source0341/lib0546cache; verifyactorcompilercontentdiffexactlygeodata.cpp, alignunchangedmtimesusingrootstage_align_mtimes.py(recordallmetadataadjustments). Preservechangedgeodatafreshanddonotfakeheaders. Sharedhostlock /run/user/UID/optimization-stages-host.lock pluslegacylock; sourceactorRO/rootccacheRW, noROOTcompilerinputedits. Limitsbuild32GiBnoSwap/core0/jobs2/600s/<=6PalaceTUs/noexternaldeps,total900s; actualnativeCPUtest8GiB/noSwap/core0/OMP1/cpuself120s. FreshCatchmain+newstage_preprocess_partition_test twoTUs, exactcachedCXX/linkflags/CatchCDIhostdriverSHA, unchangedadapter. NativefailSTOP/no loosening; no medium/EM/paidcompute. Source+diff+flags/nativebeforeafter+cleanup evidence required.
+
+#### PRE-03-E02 — result FAIL, stopped (no retry)
+
+Cachedbuild succeeded:only3TUs geodata.cpp + generatedjsonschema.cpp/main.cpp (worktreeGittag/schema stamp), noexternaldependencyrebuild. Alignedmetadataforunchangedinputs; reportchangedcontentexactlygeodata.cpp. Source02ddf3af26ca44b8949ad2c4cd737cbd9fbc7b4a2ae9a66a4401a70011b3cbab,lib493df76aeec5ddb4c76329999e95a6ba9f85567823b2a885d43f8f4c565a2739,bin225e3cfb5ea90323110ca260b02baf5725b4c38dd493de50c6cc5c0fe7cbfb8e,adapter3f25unchanged. Fresh2TUtestcompile/linksuccessful; nooldtestbinaryreuse.
+
+ActualCPUOMP1native0.614424s exit42:29826assertions,29825PASS/1FAIL. Failureatnewtestline57:unconditionalCheckRefinementFlags(actual)==true. **All per-tet actual-vs-baseline refinement flag equalities passed**, all nodal/attrs/connectivity/orientation/physicalquadrature/Jacobian/NDoperatoractionchecks also passed, includingafteruniformrefinement. Thereforethisfailuredoesnotshowdirect/baselinegeometrydivergence; likelytestinvariantincorrectafteruniformrefinement. NeverthelessgateFAILretainedandstopped, no changingassertion/threshold/rerunwithoutrootreview.
+
+Source-onlydiagnosis:MFEMUniformRefinement3D_basemesh.cpp10125ff constructsnewTetrahedra with default0refinementflags (tetrahedron.hpp45-56/defaultInitref_flag0); PalaceRefineMeshcomments explicitlyrequireFinalizeafteruniformrefinementonlyforlocalAMR. Sinceallper-tetflagsequalandactualCheckfalse, baselineCheckmustalsofalseforsamestate. Proposedreview:requirebothfullymarkedbeforeuniformrefinement, assertflagconditionequalityafterit, optionallyexplicitFinalizeboththentestagain. Thiswouldcorrecttestcontract, notloosenprecision; notappliedyet. ParentreceivednecessaryFAILdecisionreportandartifactpaths.
+
+Totalbuild/testorchestration19.197086s; ownbuilder/runtimebothstoppedinfinally, onlyunrelatedrapidmakerpostgresactive, globalslotreleased. No medium/EM/native-retry. Artifactfailure-analysis.json recordsactualcounts/sourcefacts; originalpreprocess-unit-results.jsonpassed=false,logs/rawfailureunchanged. LimitsnoSwap/core0/networknone,build32GiB2CPU/testing8GiB2CPUOMP1,driver/CDI/inferenceguardvalid; allsource/nativeprovenanceanddirtydiffpreserved. Awaitrootdecision.
+
+#### PRE-03-E03 — approved test-contract correction + one fresh unit run (PASS)
+
+Rootreviewexplicitlyapproves correctingreferenceassumption afterUniformRefinement: helpercompares actual/base CheckRefinementFlags withCAPTURE+recordstage; initialbothrequirevalid; preserveallper-tetexactflags,geometry/node/NDactionassertionsandthresholds. Addthirdstate:explicitFinalize(true,false)BOTH,requirebothvalidandcompareentiregeometry/actionagain. Productgeodata/librarysource02dd/native493dunchanged; test-onlycompileoneTU+link<=60s,CPUOMP1sameCDI/8GiB/noSwap/core0/120s. OriginalE02FAILhistoryretained, newartifactattempt-r2; oneauthorizedexecution,no medium.
+
+#### PRE-03-E03 — result PASS (tiny CPU/OMP1 structural gate only)
+
+Approvedtest-onlycorrectionexecutedonce; productsource02ddf3af.../library493df76a.../adapter/binUNCHANGED,noPalacerebuild. Freshone-test-TUcompile+link withsamecachedflags/main/Catch. Newtestsourcebc299ce9b3e94a7f5029b98c945199355a01f5e3c0de5f39874b4aed3f4541d5,exe43a5f1077a0eaaa8fd13ebb64ccc7478ccc906fe6d19560495ec04c2aaa3d420. CPUOMP1exit0,55,986assertionsPASS/oneCatchcasewithtet+hexgenerator; nativecommand .714680s,totalorchestration8.747032s. Alloldper-tetflags/nodes/connectivity/attributes/orientation/Jacobian/NDactionchecksretained; numericthresholdsunchanged. AdditionalfullcomparisonafterexplicitFinalizeboth strengthenscoverage.
+
+Flagrecords(tet): partitioned baseline1/direct1; uniform_refined baseline0/direct0; refinalized baseline1/direct1. Hexallthreestates1/1. ConfirmsoriginalE02failurewasincorrecttestexpectationafterMFEMuniformtetrefinement, notobservedproductdivergence. E02originalFAIL/log/binarykeptunchanged; E03PASSspecifictotestcontractfixandtinystructuralchecks,noRF/medium/speedupclaim.
+
+Runtimeinspectproves8GiBMemory==MemorySwap(noextraswap),coreulimit0; sameCPUOMP1/cpuself/CDI/driver/inferenceguard; freshunitlddloads/stage/native/libpalace.so. Ownbuilder/runtimebothstopped, onlyunrelatedrapidmakerpostgresactive; sharedslotreturned. Root/build/.../attempt-r2/{inputs,inputs-after,compile-flag-proof,results,cdi-proof,inference-guard}.json +testsource/rawcompiler/runtime/testlogsandflagrecords. No furthernative/mediumauthorized untilparentreview.
+
+#### PRE-03-E04 — authorized medium preprocess-only OFF/ON (PASS jednej pary)
+
+Rootpreparedexactplans ROOT/artifacts/optimization-stages/M2-PRE03-20261030/{baseline-medium,direct-medium}/plan.json andgrantedsoleexecution slot. Childsource02dd/lib493d notmerged; rootrunneronly(feature+globalhostlock current),180s64GiB/noSwap/core0/OMP1/CDIeach,original355MBmesh/config/all18flags,traceOFF. Sequentialbaseline0thendirect1onlyiffirstPASS; nooperators/GSLIB/GMRES/RF. Guards/source/native/helperfrozen,no codechanges. Comparetruefastpathmarker/no fallback,metadata/counts/attrs/order andtimers/resources. Warmcacheonepair,nothreemedianorfullRFpromotion; nativefailSTOP/no retry. TinyE03structural55,986PASSscope alreadyreviewed.
+
+#### PRE-03-E04 — result PASS medium diagnostic, candidate not globally promoted
+
+Exactrootpreparedtwoattemptsexecutedonceeach, baselinefeature0thendirect1,source02ddf3af/lib493df76a/bin225e3/adapter3f25unchangedbybefore/afterhashguard. Bothstagepreprocess exit0/noRF/solvefalse/noCSV, Init2/Mesh2/IO5/Ops0/allGMRES/PC/FF0, owncontainersremoved; onlyunrelatedrapidmakerpostgresactive. Sameoriginalmesh/config/all18baselineflags/backend/OMP1, exceptdirect0vs1; bothtraceOFF. Explicitactualdirectmarker1 ranks1/ascii_round_trip0, nofallback; baselinefastpathmarker0.
+
+| Timer | Baseline0 s | Direct1 s | Delta s | Delta % |
+|---|---:|---:|---:|---:|
+| PalaceTotal |53.360878837|46.025047751|-7.335831086|-13.747583|
+| MeshPreprocessing |27.769618768|21.104537609|-6.665081159|-24.001342|
+| DiskIO |18.739782245|18.471197705|-.268584540|-1.433232|
+| Init |6.795602429|6.393504432|-.402097997|-5.917032|
+| Runner incl checks/cleanup |54.589635164|47.619604503|-6.970030661|diagnostic only|
+
+Cgrouppeak2,307,706,880→1,834,889,216B (-472,817,664B,~20.49%); samples105/91,hostavailableminimum81,000,873,984/80,891,928,576B,globalGPUpeak2248MiBboth. GlobalGPUincludesdesktop/notprocessUVMresidency.64GiB/noextraswap/core0/8CPUquota/OMP1/CDI/driver/inactiveStrata guard same. LowVRAMherebecausepreprocessonly,notsolve.
+
+Metadata sidecarcounts/attrs equal:1,700,660elements,510,048boundary,402,647vertices; materials1..8/boundaryIDs10,20,21,22,30,35,41,48,55,56,65,72,75,83,150. Printedcurvatureorder2both. **Mediumfullconnectivity/nodalarraysnotdumped**: equalmetadataisnotprooffullmeshbitidentity; tinyE03fullstructuralchecks55,986PASScovertet/hexquadraticgeometry+orientation/refinement+NDaction. FullRF/complexS/fieldsresidual,power/energyNOTRUN. ThisonewarmcachebaselineOFF→directONpairismeasuredpreprocessgain, notthree-mediansorfullsimulation/E2E13.7%speedup. MostobserveddeltaMesh(-6.665s)matcheseliminatingrepresentationroundtrip; innerPartitionnotisolatedbecausetraceOFF, do notattributeall19.5sorsavingsinIOtothisfeature.
+
+Evidence ROOT/artifacts/optimization-stages/M2-PRE03-20261030/pair-result.json withallplans/identities/native/configenvchecks,rawlogs/telemetry/resourcepolicy/containerstates/noRFsidecars. Parentreceivednecessarypairreport. Nofurthernative/build/sourcechanges; slotreturned, awaitM3/M4review. Productcandidatecontinuesopt-inonly/defaultunchanged.
+
+### Cross-track OP06 independent source review (read-only, 2026-10-30)
+
+RootrequestedinspectiononlyduringactiveOPcontrol, nocompute/sourcechanges. Reviewedactorprobelocator.hpp/interpolator.cpp/.hpp/test-probelocator.cpp againstff97f08bc; snapshotSHA+notes ROOT/artifacts/optimization-stages/M2-OP06-independent-PRE-review-20261030/review.json. No blockingcandidatebugfound forrank1validtet/hex supportedH1/ND/RTscope. Strictinterior+forwardfinitecheck, boundedK128/deterministicties/wholebatchfallback,point-majorcomplexlayout,mesh+nodesequence/foreignfieldinvalidations anddefaultGSLIBpath reviewed. No164probe/outputsubset removal seen.
+
+NOTRUNbyreviewer:runtime/build,actualCUDAdevice-residentProbeFieldvalues/HostReadmigration,MPI/AMR/NC/periodic/prism/pyramid/noGSLIB. CPUknown-reference/complex/layouttestsstrong; operators-onlytimingdoesnotexecuteProbeFieldsolvedGPUfields, soM3mustretainall164complexfield+S/residualcomparison (orboundedCUDAknownreference/replayfirst). MFEMdocumentsrawGetNodeswritesrequireNodesUpdated; sequencecachehonorsthatcontract, not silentrawmutations. Forwardresidualsanitythreshold isnotuniversalfield-errorbound onthinelements; no thresholdlooseningproposed. RootdecidesM3/fixesafterOPslot.
+
+### PRE-03 — M2 handoff: docs-garden i przegląd przed commitem
+
+Wykonano `.agents/skills/docs-garden/SKILL.md` w zakresie własnego diffu:
+`geodata.cpp`, test i ten ledger; sprawdzono ARCHITECTURE/INDEX oraz powiązane
+wyniki E02/E03/E04. Poprawiono nieaktualny nagłówek „aktywny M1 / native NOT RUN”,
+statusy kolejki i jawnie oddzielono historyczne plany od wyników. Nie usunięto
+pierwszego FAIL ani zatwierdzonej korekty kontraktu testu. Wspólne pliki planu,
+indeksu i checkpointu należą do koordynatora i nie są zmieniane w tym commicie.
+
+Review kodu: brak zmiany geometrii/precyzji; domyślny flow pozostaje oryginalny,
+custom partition file nie jest pomijany, AMR/NC/MPI/NURBS mają fallback. Tiny
+kontroluje dokładne flagi/węzły/topologię i działanie ND; jedna para medium daje
+wynik preprocessingu, pełne RF nadal NOT RUN. Nie uruchamiano ponownie zakończonych
+testów ani compute. Source hash nadal `02ddf3af26ca44b8949ad2c4cd737cbd9fbc7b4a2ae9a66a4401a70011b3cbab`,
+lib `493df76aeec5ddb4c76329999e95a6ba9f85567823b2a885d43f8f4c565a2739`.
+Docs check i `git diff --check` PASS; dalszy krok to dokładny plan M3 od root.

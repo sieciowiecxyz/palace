@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -317,15 +319,54 @@ std::unique_ptr<mfem::ParMesh> Partition(IoData &iodata, std::unique_ptr<mfem::M
     }
   }
 
+  const char *direct_option = std::getenv("PALACE_SINGLE_RANK_DIRECT_MESH");
+  MFEM_VERIFY(!direct_option || std::strcmp(direct_option, "0") == 0 ||
+                  std::strcmp(direct_option, "1") == 0,
+              "PALACE_SINGLE_RANK_DIRECT_MESH must be 0 or 1!");
+  const bool direct_requested = direct_option && std::strcmp(direct_option, "1") == 0;
+  const bool direct = direct_requested && Mpi::Size(comm) == 1 && !use_amr &&
+                      smesh && smesh->Conforming() && !smesh->NURBSext;
+  if (direct_requested && !direct)
+  {
+    Mpi::Print(comm, "PALACE_SINGLE_RANK_DIRECT_MESH: fallback=original "
+                     "requires=single-rank,conforming,non-NURBS,no-AMR\n");
+  }
+
   // Generate partitioning from the serial mesh on loading ranks.
   std::unique_ptr<int[]> partitioning;
   if (smesh)
   {
-    partitioning = GetMeshPartitioning(*smesh, Mpi::Size(comm), iodata.model.partitioning);
+    if (direct && iodata.model.partitioning.empty())
+    {
+      // GeneratePartitioning(1) constructs the element adjacency graph before
+      // returning these same zero part IDs. No graph is needed for one rank.
+      partitioning = std::make_unique<int[]>(smesh->GetNE());
+    }
+    else
+    {
+      partitioning = GetMeshPartitioning(*smesh, Mpi::Size(comm), iodata.model.partitioning);
+    }
   }
 
   std::unique_ptr<mfem::ParMesh> pmesh;
-  if (use_mesh_partitioner)
+  if (direct)
+  {
+    MFEM_VERIFY(std::all_of(partitioning.get(), partitioning.get() + smesh->GetNE(),
+                            [](int part) { return part == 0; }),
+                "Direct one-rank mesh distribution requires all elements in partition 0!");
+    // Avoid the MeshPart ASCII round trip without dropping refinement marking,
+    // orientation checks, or curved Nodes (copied as a ParGridFunction).
+    pmesh = std::make_unique<mfem::ParMesh>(comm, *smesh, partitioning.get());
+    pmesh->Finalize(/*refine=*/true, /*fix_orientation=*/false);
+    MFEM_VERIFY(!pmesh->GetNodes() ||
+                    (dynamic_cast<mfem::ParGridFunction *>(pmesh->GetNodes()) &&
+                     dynamic_cast<mfem::ParFiniteElementSpace *>(
+                         pmesh->GetNodes()->FESpace())),
+                "Direct mesh distribution did not preserve parallel Nodes!");
+    smesh.reset();
+    Mpi::Print(comm, "PALACE_SINGLE_RANK_DIRECT_MESH: ranks=1 ascii_round_trip=0\n");
+  }
+  else if (use_mesh_partitioner)
   {
     pmesh = DistributeMesh(comm, smesh, partitioning.get(), iodata.problem.output);
   }
