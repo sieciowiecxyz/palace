@@ -1,6 +1,6 @@
 # Operator construction: source audit and experiment ledger
 
-## Stan bieżący po zamknięciu M1 — 2026-10-30
+## Stan bieżący po kwalifikacji prototypu M2 — 2026-10-30
 
 Ta tabela określa aktualną kolejkę; wcześniejsze wpisy zachowują historyczne etapy próby.
 PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
@@ -12,12 +12,20 @@ PASS jest zakresowy; nowa optymalizacja wymaga osobnych testów M2/M3.
 | OP-03 | DEFERRED — JIT nie wyjaśnia GSLIB104,52s |
 | OP-04 | DEFERRED — K/C/M mały koszt względem geometrySetup |
 | OP-05 | TODO_TO_CHECK — Umpire/OMP2 baseline crash; oddzielnie od nowego locatora |
-| OP-06 | TODO_TO_CHECK — M2 tańszy dokładny locator sond; GSLIB oracle/default |
+| OP-06 | PASS (M2 scope) — structural/tiny749 + actual CUDA ND/RT synthetic fields; one constructor pair benefit. Full RF/repeated pairs NOT RUN |
 
 **Worker:** operator-construction track
 **Branch:** `opt/operators-20261029`
-**Base:** `e288fe1639cef892b4cbfae0d98046a0afa62ae1`
-**Status:** M0 closed by coordinator; M1 instrumentation prepared. OP-01 `IN_PROGRESS`; optimization hypotheses OP-02–05 remain `TODO_TO_CHECK`. M0 and integrated M1 CPU/OMP1 tiny tests passed with profiling OFF. M1 timing attribution, profiling-ON and overhead remain NOT RUN; no speedup claim.
+**Base:** `ff97f08bc936495673017aa12471f4be5ce110a0`
+**Status:** M0/M1 closed; operator prototype M2 qualified for structure, curved
+probe interpolation and actual CUDA/UVM synthetic complex ND/RT fields. One
+same-build operators-only pair measured113.196→12.166s and12.742→3.633GiB cgroup
+RAM; this is not repeated medians or full-solver memory/time. Default remains GSLIB;
+`PALACE_PROBE_LOCATOR=mfem` is explicit and conservative whole-batch fallback stays.
+**Full RF / residual / S / efficiency / far-field and repeated performance pairs:
+NOT RUN, reserved for root-reviewed M3.** Current compiler sourceb834/nativebc7
+remain frozen; source review must not change the qualified product bytes.
+
 
 ## Why this track exists
 
@@ -597,3 +605,256 @@ tej samej konfiguracji. Nie przypisywać104s do GSLIB przed nowym timingiem.
 Wyliczenie183,7Mpunktów próbkowania bazuje na **potwierdzonym mesh curvature order2**
 z rzeczywistego stdout, nie na samym solver FEorder; nadal jest logiczne,
 warunkowe dlaallTet/FP64, a nie measuredpeak.
+
+
+## OP-06 — M2 bounded probe-location prototype
+
+Owner/branch as above. Evidence below preserves stable IDs and negative outcomes;
+preparation entries are superseded by their linked measured gates. All runs local,
+no cloud/services/push. No reduced mesh/probes, coefficient projection or precision
+change. One heavy slot at a time, cached builds with dependency/cache preservation.
+
+**Artifact abbreviations** (absolute root `/home/sieciowiec/dev/cpp/palace`):
+
+- `N0` = `build/optimization-stages-m2-operators-20261030` (source8854/libfb3d).
+- `N1` = `build/optimization-stages-m2-operators-rescue-20261030` (sourceb834/libbc7).
+- `A0` = `artifacts/optimization-stages/M2-OP06-20261030`.
+- `A1` = `artifacts/optimization-stages/M2-OP06-rescue-20261030`.
+- Source/full SHA, exact argv/env/cache/CUDA/adapter settings, raw logs, unit
+  sources and before/after identity checks are in each manifest/host script;
+  these ordinary artifacts stay ignored, never in Git.
+
+| Fingerprint | SHA256 |
+|---|---|
+| Frozen root reference source |0341e50051ac29e585c3b211d73fd44e89beb1fb583280541bae743589e3372b|
+| Initial OP06 source (`N0`) |8854d938e0314b18ae251bcd1a25913cd7c023bf7a3b038a4f38a9f8e689007a|
+| Initial OP06 library |fb3d0bd7bb6a074358f78a81b70e3bf08a2b7eb0742ee650749a6c59a9f1a549|
+| Qualified rescue source (`N1`) |b834bebb7a9c774cdb1028352bae62cefc8f4666d281570e26e4ccf7d3a8d46e|
+| Qualified rescue library |bc7a8f844f2c0e2374a0ae9dfc36438917a4382b604cde0ec11137c9fe1f26e5|
+| Unchanged adapter |3f25ec819e1a1d053c544afc63b4154103ffa23a7bdda48af547b211836dfd85|
+| Actual GPU replay tool source |1346d9c3f48735f12328057c1dea8a096525f9fee25e68c66ec1783f0d866c8e|
+
+**Shared protocol:** fixed runtime image43ac; actual config9f068/mesh2af and164
+probes, curvature2/1,700,660tets/402,647vertices/510,048boundary elements. Builds
+32GiB/noSwap/2CPU/core0/noGPU/networknone; tiny tests8GiB/OMP1/CPU/cpu-self/CDI
+for valid loader only,60s limit. Medium constructors64GiB/OMP1/cpus8/CUDA/CDI/
+core0/noSwap/networknone/300s with all18 baseline flags, canonical user-host lock,
+inference/reserve guards and cleanup. Geometry-only diagnostics32GiB/OMP1/cpus2,
+120s; actual GPU replay32GiB/cpus8/300s. Deviations/failures recorded per ID.
+All timers are scoped; global sampled GPU usage is not per-process/UVM telemetry.
+Kernel physical-I/O bytes were not collected; result sizes are not disk counters.
+
+### OP-06-E01 — existing MFEM locator feasibility (`PASS`, source only)
+
+Root M1 attribution: GSLIBSetup104.5197wall/104.3144CPU vs FindPoints0.001888s.
+Read-only copies of pinned MFEM4.9 source: operator-worktree
+`artifacts/optimization-stages/operators-m2/mfem-source-manifest.json`, not Git.
+Mesh::FindPoints (mesh.cpp13755–13871) scans curved centers×queries
+O(NE*Nprobe)=278,908,240distances, then inverse nearest and vertex-neighbor cells;
+explicitly not100% reliable. GridFunction::GetVectorValue preserves DOF/Piola maps
+and is itself used by serial GSLIB InterpolateGeneral(gslib.cpp1961–2001).
+Selected rank1 opt-in with strict interior/forward check and wholebatch oracle
+fallback; no custom Maxwell solver/BVH/geometry approximation.
+
+### OP-06-E02 — initial opt-in patch prepared (`PASS`, implementation gate E04)
+
+`PALACE_PROBE_LOCATOR=mfem`; absent/explicitgslib unchanged. Unknown env rejected.
+All164 coordinates/IDs/complex point-major ordering retained. Per-instance mesh
+pointer/GetSequence/GetNodesSequence invalidation; official NodesUpdated required
+for direct node edits. Unsupported rank/dimension/volume/field-map, missing or
+boundary ambiguity use wholebatch GSLIB. Initial class-layout change required fresh
+library/test executable. Fixed guards: strictinterior1e-7, forward residual<=1e-12
+scale. Default acquires no experiment clocks/logs. No numerical claim at preparation.
+
+### OP-06-E03 — first cache gate (`DEFERRED`, resolved E04)
+
+`N0` first dry-run requested110PalaceTUs, over25cap; compiler/tests never started.
+Preliminary regex also falsely matched Palace's own libceed/hypre wrapper names;
+manual plan showed no external dependency build. Stopped after3.67s, rawfailure
+and dry-run retained. Not a numerical failure; no blind110-TU rebuild.
+
+### OP-06-E04 — content-proven cache repair + initial tiny (`PASS`, narrow)
+
+Compared exact input bytes against frozen root: only interpolator.cpp/.hpp differ.
+Root approved copying **mtime only** for400 byte-identical actor inputs, preserving
+actor atime/changed-input times and all root metadata; compiler hash unchanged.
+No tree mirror/spill. Dry-run15PalaceTUs, native42.762s/setup43.618s. Fresh2TU
+unit from current headers/new library: **664 assertions/5cases PASS,1.065s**, both
+orderings and complex curved ND/RT/H1 plus fallback/invalidation. `N0/repair1`
+contains inventory/proof/logs; all containers stopped, source-before/after equal.
+No medium/RF/speedup qualification.
+
+### OP-06-E05 — real164 prelaunch lock failure (`DEFERRED`, resolved E06)
+
+Exact first runner attempt exited1 before container/native launch: per-worktree
+`build/optimization-stages-host.lock` parent absent. Did not mkdir a competing
+lock. Root fixed canonical `/run/user/<uid>/optimization-stages-host.lock` and
+cross-worktree regression. `A0/candidate-medium/prelaunch-lock-failure.json`
+preserves failure; no simulation result attributed to this attempt.
+
+### OP-06-E06 — simple native locator on real164 (`REJECTED` for benefit)
+
+`A0/candidate-medium-r2`: exit0 but selectedgslib/reasonnot_found. Native attempt
+0.995s, then full GSLIBSetup104.328wall/104.126CPU. Operators115.925s/total169.130s;
+peak12.737GiB cgroup, globalGPUmax7682MiB. No exact missed IDs logged yet.
+Safe fallback worked but no speedup; no promotion or default-control retry.
+Actual p2DOFs preserved; no solve/RF. Full typed summary/rawtiming/telemetry retained.
+
+### OP-06-E07 — standalone shared-load diagnostic prepared (`PASS`, measured E08)
+
+New tool uses exact public production chain Load→DrivenSolver.Preprocess(units)→
+Partition→Refine→allMeshwrappers/EnsureNodes, then finalmesh.back and normalized
+probe map. No PostOperator/GSLIB/FE solve. One load, three existing inverse guesses
+Center/ClosestPhysNode/ClosestRefNode, max16/ref1e-15/physical4e-15/element1e-8,
+OpenHalfUniform/relativeguessorder-1. Reports per-ID coordinates/reference/residual;
+missing reference null. Host verifies supplied identity JSON before/after.
+
+### OP-06-E08 — three-guess actual diagnostic (`PASS`, initial-guess fix rejected)
+
+`A0/locator-diagnostic`: first tool compile failed on temporary MPI_Comm passed to
+reference argument; saved `compile-failure1`. Mechanical local-comm fix only;
+no runtime before repair. Compile6.624s/link0.214s; one CPU process56.953s,
+load/units/partition/refine/wrap52.959s, peak2.088GiB. Each guess found141/164,
+missed SAME23 IDs **3,4,9–26,29–31**,0rescues/0boundary/0bad residual among found.
+Attempts0.9605/0.9665/0.9759s; maxresidual4.86e-17. Changing initial guesses alone
+rejected on unchanged inputs. This did not prove outside or distinguish candidate
+neighborhood vs all-candidate inverse failure. Raw rows/config normalization proof
+preserved; no GSLIB/solve/RF.
+
+### OP-06-E09 — bounded extra candidates prepared (`PASS`, measured E10)
+
+Pinned KDTree header has nearest1/radius APIs, **no k-nearest-N**. Chose K128 before
+run: one curved GetElementCenter pass, Euclidean/eID lexicographic maxheap for only
+missing points; no adaptive K/unbounded inverse scan/full center cloud. Same
+Center/max16/tolerances; only strict+valid forward maps accepted. Reconstructed
+original nearest/vertex-neighbor set for diagnostic attribution on conforming mesh.
+Tests proposed sliver/decoy/cap/ties/boundaries; production still unchanged.
+
+### OP-06-E10 — actual fixedK128 diagnostic (`PASS`, geometry only)
+
+`A0/locator-diagnostic-k128`: **all23rescued →164/164**. Selection0.58817s,
+inverse+neighborhood0.02537s, total0.61356s;72tried=45Outside+4Unknown+23Inside,
+accepted center ranks2–7, maxresidual2.776e-17,0boundary/bad acceptances. Exactly
+128candidates per missing point;2,944entry cap/39,115,180distances/1global center
+pass. **All23true cells outside entire original nearest-cell vertex neighborhood;
+mesh conforming**: same inverse proves omitted candidates caused these misses.
+Native57.474s including one load, compile7.024s/link0.264s, peak2.0873GiB. No
+library/GSLIB/solve/fields/RF. Report484,293B; no extra K/tolerance retries.
+
+### OP-06-E11 — shared helper integration prepared (`PASS`, gate E12)
+
+Internal probelocator.hpp used only by interpolator.cpp/test/diagnostic, not public
+class header; fixedK/search/quality cannot drift. Production derivedMISS rescue
+followed by allpoint quality guard; opt-in aggregate initial/rescued/cap/tried/
+remaining log only. Unresolved/boundary/unsupported retains wholebatch GSLIB.
+No new class-layout change versus8854. Diagnostic-only neighbor proof stays out
+of production; fresh adversarial tests required before medium.
+
+### OP-06-E12 — native/shared adversarial gate (`PASS`, CPU/OMP1)
+
+`N1`: **1CPP** rebuild4.619s/setup5.697s; fresh main0.314s/case3.519s/link0.264s.
+**749assertions/10cases PASS,1.165s** =original664+85new, fullslot16.180s.
+Known curved aspect10 targettet+closer disconnected decoy proves originalMISS/new
+rescue; complexrandom ND/RT/H1scalar/vector compare GSLIB+known reference with
+unchanged abs1e-11+rel1e-10. True cellrank129 behind128closer decoys remainsmissing,
+tried128 and production oraclefallback passes. Ties/NE<K/noMISSzero-work/boundary/
+outside plus old IDs/order/invalidenv/empty/mesh-invalidation pass. Runtime logs
+four fieldrescues(initial0/rescued1/tried2), capfailure(0/0/tried128/remain1).
+Native/unit/source identity equal before+after; fresh unit d703cd7…; allcleanup.
+Non-GSLIB build/MPI>1/unsupported-volume runtime remain NOT RUN.
+
+### OP-06-E13 — actual164 production constructor (`PASS`, not full RF)
+
+`A1/candidate-medium`: sourceb834/libbc7, **actualmfem selected,141+23rescued,
+cap128/tried72/remain0; zeroGSLIBSetup/FindPoints**. Location1.62299wall/1.61952CPU
+(includes rescue0.63345s), PostInterp1.62504s/allPost4.51094s.
+Operators12.165725s/diagnosticTotal65.568107s/runner67.073s; cgrouppeak3.63324GiB,
+globalGPUmax7952MiB. Same actual geometry/p2DOFs. Stage stop before solver,
+fields/residual/S/VSWR/FF NOT RUN here; tiny749 remains field evidence at this point.
+No extra run; parent prepared a matched default control next.
+
+### OP-06-E14 — one same-build control (`PASS`, constructor only)
+
+`A1/baseline-medium` and `A1/pair-comparison.json`: same sourceb834/libbc7/config/
+mesh/image/all18flags/trace/resources; **only mfem vs explicitgslib differs**.
+Default setup102.59144wall/102.38236CPU +FindPoints0.00188s, no experiment logs.
+Both complete/exit0/same counts/noRF.
+
+| Diagnostic metric | gslib baseline | mfem candidate | Change |
+|---|---:|---:|---:|
+| OperatorConstruction |113.195641s|12.165725s|−89.25%,9.30×|
+| Whole operators-only diagnostic |166.716360s|65.568107s|−60.67%,2.54×|
+| Cgroup peakRAM |12.74160GiB|3.63324GiB|−9.10836GiB/−71.49%|
+
+ONE sequential candidate→baseline pair, cache not flushed, profiled; not three
+medians/balanced ABBA/fullGMRES speedup or peakRAM. GlobalGPU sampledmax6290MiB
+baseline vs7952candidate; **not** per-process VRAM savings/regression/physicalUVM.
+No fullRF/solvedfields or repeated perf qualification. Raw pair identity/scopes kept.
+
+### OP-06-E15 — CUDA/UVM field replay prepared (`PASS`, measured E16)
+
+One public production load+SpaceOperator ND/RT, one mfem locator and one GSLIB
+oracle; no K/C/M/PostOperator/KSP/GMRES/coefficient projection. Fresh `.cu` compiled
+with actual cached CUDA12.9/C++17/compute120+sm120 rule, no native rebuild.
+Rule file is in **operator worktree** artifacts/optimization-stages/operators-m2/
+gpu-replay-prepare (the shorthand ROOT path does not exist); also independently
+captured exact Ninja command during execution. Toolsource1346 frozen.
+
+Declared before run: allfinite, complex global relL2<=1e-9 and maxabs<=1e-8*
+max(1,refMax), phase only when BOTH amplitudes>1e-6*max(1,refMax), explicit mask/
+null for excluded values. Zero reference norm handled without a fake denominator.
+FP64 DOFs exactly binary pattern `(((uint32(i)*1664525+seed+97*component)&1023)-512)*2^-10`,
+NDseed17/RT103. CUDA forall writer architecture witness must be nonzero; CPU
+fallback writes0/fails. Managed pointer attributes mandatory. First explicit
+HostRead+128strided exact samples, then GPU refill before EACH backend sampling.
+This does not relax final fullRF1e-5/residual/power gates or count physical UVM bytes.
+
+### OP-06-E16 — actual CUDA synthetic field replay (`PASS`, not full RF)
+
+`A1/gpu-field-replay`: one `.cu` compile14.537s/link0.264s, no error/fix/retry.
+Native executablef594e1153776b87db5ef3218e0c7a2d9f932570137c9a62f0ea462e7cb6aa7f3.
+Identity sourceb834/libbc7/adapter3f25/tool1346/config9f068/mesh2af before+after equal;
+all18 flags/readonly mounts and32GiB/8CPU/OMP1/300s/noSwap/core0/networknone.
+Canonical lock,31during-run inactive/dead/PID0 checks and memory guards PASS.
+Actual RTX5070TiCC12.0: **CUDA writer1200 and managed pointers type3 in ALL6fills**;
+128strided exact samples per real/imag part pass. No CPU fill/projected substitute.
+All164×3complex values perfield retain IDs/ordering/normalization. Meshrevision fixed.
+
+| Field | Global complex relL2 | Maxabs error | Scaled gate | Maxphase rad |
+|---|---:|---:|---:|---:|
+| E ND |4.9133e-14|1.8345e-10|1.8064e-5|1.2368e-12|
+| B RT |9.5320e-14|7.9382e-7|2.7616e-2|3.4310e-13|
+
+Both pass predeclared gates/allfinite. All492values perfield above phasefloor,
+0excluded; masks retained. RTreferenceMax2.7616e6/ND1806.398 explain scaled
+absolute limits; **not** claimed absolute error<=1e-8. FP64 DOF counts11,869,460ND /
+15,951,066RT per complex part; CUDA refilled before every backend call.
+
+Wall: preprocess53.338s/SpaceOperator7.230s/nativeCtor1.6407s/oracle103.4304s,
+exactlyONE GSLIBSetup103.4284wall/103.2216CPU. Native141+23/tried72/cap128/0fallback.
+FirstHostRead ND15.117ms/RT19.852ms; after fresh GPU fill sampling NDnative11.526ms/
+oracle11.770ms, RT14.855/14.820ms. These are API/copy/sample times, not physicalUVM
+migration counters or a fullsolver transfer benchmark.
+Runtime166.874s/tool165.787sCPU165.443s/slot185.228s; cgrouppeak12.3666GiB **includes
+oracle**, globalGPUmax6794MiB/util9% (short kernels proved by witness, not sampler).
+Report354,052B, ordinary metadata only, no solver SSDspill. Cleanup complete.
+Full report/values/masks/proof, exactargv/env, identity/ldd/policy/telemetry/rawlogs/
+stage-profile retained. **Actual synthetic GPU→HostRead ND/RT equality qualified;
+fullRF/residual/S/efficiency/pattern and repeated performance pairs NOT RUN.**
+
+### M2 local source/docs review and handoff — 2026-10-30
+
+Docs-garden skill read/applied; reviewed owning code/tests/artifact manifests,
+ARCHITECTURE/INDEX/workflow. Corrected stale current header/base/status and
+condensed repeated M2 protocol wording while preserving E01–E16, negative results,
+limits and exact evidence routes (verbose pre-garden copy ignored in artifacts).
+INDEX already links this ledger; shared root plan/index/checkpoint untouched.
+Source review found no blocker within qualified rank1/currentgeometry scope:
+shared fixedK/quality/fallback, existing DOF/Piola APIs, no new public layout vs8854,
+per-instance identity+both revisions. Raw node writes require NodesUpdated;
+non-GSLIB/MPI>1/unsupported types/othergeometry/fullRF remain NOT RUN.
+No product/test/tool bytes changed by this cleanup: preserve compilerb834/libbc7/
+CUDAtool1346. Clang-format dry checks, diff/docs check and staged-source/secret audit
+precede one local commit. Only eight owned source/test/tool/ledger files staged;
+no .env/credentials/private keys/rawartifacts/binaries. No GPU/build/cloud/services/
+push/PR during review. Stop after commit; root supplies exact M3 job plans later.
