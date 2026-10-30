@@ -20,6 +20,10 @@ class StageProbeRunnerTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(dir='/dev/shm')
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
+        # Unit tests must not acquire the live simulation's host lock.
+        local_lock = mock.patch.object(runner, 'host_lock_path', return_value=self.root/'host.lock')
+        local_lock.start()
+        self.addCleanup(local_lock.stop)
         for name in ('palace','cmake','tools/adapter','build/native','run'):
             (self.root/name).mkdir(parents=True,exist_ok=True)
         (self.root/'CMakeLists.txt').write_text('compiler fixture')

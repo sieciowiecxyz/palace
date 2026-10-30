@@ -325,3 +325,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Poprzedni checkpoint PR M3](optimization-stages/previous-pr-checkpoint-M3.md)
   - Czytaj gdy: odtwarzasz historyczną kampanię PR sprzed optymalizacji faz.
   - Opis: Archiwalny przegląd zasad upstream; nie kwalifikuje obecnego M3.
+
+- [Operatory: trzy pełne pary M3](optimization-stages/operators-m3.md)
+  - Czytaj gdy: sprawdzasz kwalifikację OP-06 przed integracją.
+  - Opis: Trzy nieprofilowane pary, wszystkie bramki RF PASS; zakres 1,92 GHz, oba porty, 5070 Ti.

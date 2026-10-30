@@ -1,3 +1,36 @@
+## M3 — RF checker i przegląd OP zamknięte (2026-10-30)
+
+81 Python testów PASS. Root+niezależny OP review RFcheckera i source-unitproof PASS;
+wszystkie3pary RF ponownie przeliczone read-only PASS. Doc-onlyOPcommit abef4eb09.
+Unit-test isolation correction: initialmockfulltest przy aktywnym PREtrafił na live
+hostlock (właściwa odmowa), test-onlyhostlock w /dev/shm; realexclusiveflockregression
+zostaje. Brak zmiany runner/helper/solver podczas aktywnych runów.
+PREpowtarzanepary w toku, M4/M5 pending. Patrz operators-m3.md dla tabel i ograniczeń.
+
+## M3 — OP trzy pełne pary PASS; PRE w trakcie (2026-10-30)
+
+OP mediana Palace738,559→637,773s, cgroup65,713→57,030GiB;
+trzy sparowane redukcje czasu12,04/13,65/13,64%, wszystkie RFgates PASS,
+6runów po85iteracji. Pełne próbki i rozrzut w M3-OP06-full-20261030/repeated-performance.json.
+To lokalny rank1CUDA/UVM medium1,92GHz, nie uniwersalnyGPU/MPIclaim.
+PRE pair1 PASS:738,250→731,226s (−7,024s), Mesh28,121→21,375s,
+fullpeakRAM praktycznie identyczny; RF PASS. Przerejestrowane dwie kolejne pary
+wykonuje PREagent. RootRFchecker/testy nowe, runner/helper niezmienione w czasie jobów.
+System get_goal potwierdził active prawidłowyobjective; stare paused wpisy historyczne.
+M4 integracja i M5 sweep/drugageometria wciąż NOT RUN, rootCPP nadal0341.
+
+## M3 — pierwsza pełna para OP PASS, powtarzalność jeszcze NOT RUN (2026-10-30)
+
+Matched b834/bc7 medium1,92GHz/oba porty, kolejność B→A, beztrace:
+Palace738,7508→649,8348s (−12,04%); cgroup65,709→57,027GiB.
+85iteracji w obu; rawrelative≤8,34e-7. RootRFchecker PASS:
+maxΔcomplexS1,736e-8, maxΔVSWR3,128e-8; pola/probes i FF PASS,
+bilansmocyresidual≤0,000216W i FF/fluxerror≤1,259%. Exactconfig/mesh/outputs.
+CoarseCSRpatternidentical, valueshashdifferent: brak deklaracji bitwiseequivalence.
+Dwa dalsze sparowane runy przygotowane AB/BA; żadnego promote po jednej parze.
+Artefakty M3-OP06-full-20261030/pair1-{rf,execution-summary}.json.
+Root source nadal0341, prototypyoddzielne; PREfull NOTRUN; M4/M5 pending.
+
 ## Bieżący checkpoint — M2 CLOSED / M3 ACTIVE (2026-10-30)
 
 OP `15045a30a`, PRE `2ab140620`, IO `2e1150c7e`: trzy lokalne commity,

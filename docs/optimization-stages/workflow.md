@@ -4,11 +4,14 @@
 
 2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M3; M0/M1/M2 zamknięte zakresowo 2026-10-30.
 Wykonawcy: GPT-6.1 Sol high. Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić usługę.
-Panel systemowy goal wciąż ma stary paused goal; create_goal odrzucone
-z powodu unfinished goal. Nie zamykać starego celu bez osiągnięcia jego kryteriów.
+Panel systemowy: get_goal 2026-10-30 potwierdził active objective
+„kontynułuj. Monitoringsub agentów i dokoń optymalizacje zgodnie z planem”.
+Wcześniejsza odmowa create_goal dotyczyła historycznego stanu panelu.
 Root checkout: `/home/sieciowiec/dev/cpp/palace`, branch `codex/local-cuda`,
-audytowane HEAD `e288fe1639cef892b4cbfae0d98046a0afa62ae1`.
-Sprawdzić zgodność tego źródła z runtime przed M0 PASS.
+początkowo audytowane HEAD `e288fe1639cef892b4cbfae0d98046a0afa62ae1` (stan przed M0).
+Zgodność źródeł/runtime zamknięto w M0; bieżący prototyp OP używa compiler-source
+`b834…`/native `bc7…`, a PRE ma osobne manifesty. Nie utożsamiać historycznego HEAD
+z aktualnym wykonywanym buildem; każdy plan sprawdza własną pełną tożsamość.
 Referencja: `/home/sieciowiec/dev/python/anteny/artifacts/tshaped/port-repair-20261028/rear-route-sma-only/run-local-stages-20261029/`.
 Czytaj `STAGES.md`, `stage-report.json`, config/manifest i log; runtime:
 `/home/sieciowiec/dev/cpp/palace/artifacts/m7-sm120-bundle-r3-20261022`,
@@ -106,7 +109,8 @@ nie dowód równoważnego przyspieszenia.
 
 Autor ścieżki przygotowuje patch i proponuje test, główny agent zatwierdza case,
 komendy i manifest. Jeden z trzech Sol high w tej kampanii wykonuje już przygotowany run,
-czeka i zbiera dowody (nowsze polecenie użytkownika zastępuje tu dawną Lunę). Nie oddawać jej projektowania solvera. Nie uruchamiać
+czeka i zbiera dowody (nowsze polecenie użytkownika zastępuje tu dawną Lunę).
+Wykonawca runu nie zmienia zatwierdzonego projektu solvera. Nie uruchamiać
 trzech benchmarków jednocześnie. Strata/inference musi być nieaktywna;
 wyłączenie wymaga bieżącej zgody. Zero swap/solver spill na SSD. Cache i zwykły
 zapis wyników dozwolone; zmierzyć bajty i unikać sztucznego wielkiego stress-write.
