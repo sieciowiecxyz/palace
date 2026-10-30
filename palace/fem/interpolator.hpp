@@ -37,6 +37,18 @@ class InterpolationOperator
 private:
 #if defined(MFEM_USE_GSLIB)
   mfem::FindPointsGSLIB op;
+
+  // Experimental rank-one locator. References belong to this mesh revision only.
+  mfem::ParMesh *probe_mesh = nullptr;
+  mfem::Vector probe_points;
+  mfem::Array<int> probe_elements;
+  mfem::Array<mfem::IntegrationPoint> probe_references;
+  long mesh_sequence = -1, nodes_sequence = -1;
+  bool mfem_requested = false, use_mfem = false;
+
+  const char *TryMFEMLocator();
+  void SetUpGSLIB();
+  void CheckProbeMesh(const mfem::ParGridFunction &field) const;
 #endif
   std::vector<int> op_idx;
 
@@ -51,6 +63,16 @@ public:
 
   auto GetVDim() const { return v_dim_fes; }
   const auto &GetProbes() const { return op_idx; }
+
+  // Diagnostic only: false also covers conservative fallback to the default locator.
+  bool UsesMFEMLocator() const
+  {
+#if defined(MFEM_USE_GSLIB)
+    return use_mfem;
+#else
+    return false;
+#endif
+  }
 
   std::vector<std::complex<double>> ProbeField(const GridFunction &U);
 };

@@ -4,12 +4,19 @@
 #include "interpolator.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
 #include "fem/fespace.hpp"
 #include "fem/gridfunction.hpp"
+#include "fem/probelocator.hpp"
 #include "utils/communication.hpp"
 #include "utils/iodata.hpp"
-#include "utils/units.hpp"
 #include "utils/stageprofile.hpp"
+#include "utils/units.hpp"
 
 namespace palace
 {
@@ -20,6 +27,33 @@ namespace
 constexpr auto GSLIB_BB_TOL = 0.01;  // MFEM defaults, slightly reduced bounding box
 constexpr auto GSLIB_NEWTON_TOL = 1.0e-12;
 
+#if defined(MFEM_USE_GSLIB)
+bool UseMFEMProbeLocator()
+{
+  const char *value = std::getenv("PALACE_PROBE_LOCATOR");
+  if (!value || std::strcmp(value, "gslib") == 0)
+  {
+    return false;
+  }
+  if (std::strcmp(value, "mfem") == 0)
+  {
+    return true;
+  }
+  throw std::invalid_argument("PALACE_PROBE_LOCATOR must be gslib or mfem");
+}
+
+// Called only for the explicit experiment; default runs acquire no extra clocks/logs.
+void ReportProbeLocator(const char *reason, int probes, int elements, double seconds)
+{
+  std::fprintf(stderr,
+               "PALACE_PROBE_LOCATOR {\"requested\":\"mfem\",\"selected\":\"%s\","
+               "\"reason\":\"%s\",\"probes\":%d,\"elements\":%d,\"wall_s\":%.9f}\n",
+               std::strcmp(reason, "interior") == 0 ? "mfem" : "gslib", reason, probes,
+               elements, seconds);
+}
+
+#endif
+
 }  // namespace
 
 InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeData> &probe,
@@ -29,6 +63,10 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
   : op(nd_space.GetParMesh().GetComm()), v_dim_fes(nd_space.Get().GetVectorDim())
 {
   auto &mesh = nd_space.GetParMesh();
+  probe_mesh = &mesh;
+  mesh_sequence = mesh.GetSequence();
+  nodes_sequence = mesh.GetNodesSequence();
+  mfem_requested = UseMFEMProbeLocator();
   // Set up probes interpolation. All processes search for all points.
   if (probe.empty())
   {
@@ -39,7 +77,8 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
       mesh.Dimension() == dim,
       "Probe postprocessing functionality requires mesh dimension == space dimension!");
   const int npts = static_cast<int>(probe.size());
-  mfem::Vector xyz(npts * dim);
+  probe_points.SetSize(npts * dim);
+  auto &xyz = probe_points;
   op_idx.resize(npts);
   int i = 0;
   for (const auto &[idx, data] : probe)
@@ -51,15 +90,19 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
     }
     op_idx[i++] = idx;
   }
+  if (mfem_requested)
   {
-    StageProfile profile("operators.probes.gslib_setup");
-    op.Setup(mesh, GSLIB_BB_TOL, GSLIB_NEWTON_TOL, npts);
+    const auto start = std::chrono::steady_clock::now();
+    const char *reason = TryMFEMLocator();
+    ReportProbeLocator(
+        reason, npts, mesh.GetNE(),
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+    if (use_mfem)
+    {
+      return;
+    }
   }
-  {
-    StageProfile profile("operators.probes.find_points");
-    op.FindPoints(xyz, mfem::Ordering::byNODES);
-  }
-  op.SetDefaultInterpolationValue(0.0);
+  SetUpGSLIB();
   i = 0;
   for (const auto &[idx, data] : probe)
   {
@@ -79,6 +122,107 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
 }
 #endif
 
+#if defined(MFEM_USE_GSLIB)
+const char *InterpolationOperator::TryMFEMLocator()
+{
+  auto &mesh = *probe_mesh;
+  if (Mpi::Size(mesh.GetComm()) != 1)
+  {
+    return "mpi";
+  }
+  if (mesh.Dimension() != 3 || mesh.SpaceDimension() != 3 || mesh.GetNE() == 0)
+  {
+    return "dimension_or_empty_mesh";
+  }
+  for (int e = 0; e < mesh.GetNE(); e++)
+  {
+    const auto geometry = mesh.GetElementBaseGeometry(e);
+    if (geometry != mfem::Geometry::TETRAHEDRON && geometry != mfem::Geometry::CUBE)
+    {
+      return "geometry";
+    }
+  }
+  StageProfile profile("operators.probes.mfem_locate");
+  const int npts = static_cast<int>(op_idx.size());
+  mfem::DenseMatrix points(3, npts);
+  for (int i = 0; i < npts; i++)
+  {
+    for (int d = 0; d < 3; d++)
+    {
+      points(d, i) = probe_points(d * npts + i);
+    }
+  }
+  mfem::InverseElementTransformation inverse;
+  // Use the serial API deliberately: all probes must be local in this experiment.
+  const int initial_found = mesh.mfem::Mesh::FindPoints(points, probe_elements,
+                                                        probe_references, false, &inverse);
+  if (initial_found != npts)
+  {
+    StageProfile rescue_profile("operators.probes.mfem_rescue");
+    const auto search = fem::probe::Rescue(mesh, points, probe_elements, probe_references);
+    std::fprintf(stderr,
+                 "PALACE_PROBE_SEARCH {\"initial_found\":%d,\"rescued\":%d,"
+                 "\"cap\":%d,\"tried\":%d,\"remaining\":%d}\n",
+                 search.initial_found, search.rescued, fem::probe::CandidateCap,
+                 search.tried, search.remaining);
+    if (search.remaining != 0)
+    {
+      return "not_found";
+    }
+  }
+  mfem::Vector point(3);
+  for (int i = 0; i < npts; i++)
+  {
+    for (int d = 0; d < 3; d++)
+    {
+      point(d) = points(d, i);
+    }
+    const auto quality =
+        fem::probe::CheckReference(mesh, probe_elements[i], probe_references[i], point);
+    // Shared-face traces retain the original whole-batch GSLIB owner.
+    if (!quality.strict)
+    {
+      return "boundary";
+    }
+    if (!quality.finite)
+    {
+      return "nonfinite";
+    }
+    if (!quality.forward)
+    {
+      return "forward_residual";
+    }
+  }
+  use_mfem = true;
+  return "interior";
+}
+
+void InterpolationOperator::SetUpGSLIB()
+{
+  {
+    StageProfile profile("operators.probes.gslib_setup");
+    op.Setup(*probe_mesh, GSLIB_BB_TOL, GSLIB_NEWTON_TOL, static_cast<int>(op_idx.size()));
+  }
+  {
+    StageProfile profile("operators.probes.find_points");
+    op.FindPoints(probe_points, mfem::Ordering::byNODES);
+  }
+  op.SetDefaultInterpolationValue(0.0);
+  use_mfem = false;
+}
+
+void InterpolationOperator::CheckProbeMesh(const mfem::ParGridFunction &field) const
+{
+  if (field.ParFESpace()->GetParMesh() != probe_mesh ||
+      mesh_sequence != probe_mesh->GetSequence() ||
+      nodes_sequence != probe_mesh->GetNodesSequence())
+  {
+    throw std::logic_error("Probe locator is stale or the field belongs to another mesh; "
+                           "recreate InterpolationOperator after mesh updates");
+  }
+}
+#endif
+
 InterpolationOperator::InterpolationOperator(const IoData &iodata,
                                              FiniteElementSpace &nd_space)
   : InterpolationOperator(iodata.domains.postpro.probe, iodata.units, nd_space)
@@ -88,6 +232,45 @@ InterpolationOperator::InterpolationOperator(const IoData &iodata,
 std::vector<double> InterpolationOperator::ProbeField(const mfem::ParGridFunction &U)
 {
 #if defined(MFEM_USE_GSLIB)
+  if (mfem_requested)
+  {
+    CheckProbeMesh(U);
+  }
+  if (op_idx.empty())
+  {
+    return {};
+  }
+  if (use_mfem)
+  {
+    const auto *collection = U.FESpace()->FEColl();
+    const bool supported = dynamic_cast<const mfem::H1_FECollection *>(collection) ||
+                           dynamic_cast<const mfem::ND_FECollection *>(collection) ||
+                           dynamic_cast<const mfem::RT_FECollection *>(collection);
+    if (!supported)
+    {
+      const auto start = std::chrono::steady_clock::now();
+      SetUpGSLIB();
+      ReportProbeLocator(
+          "field_map", static_cast<int>(op_idx.size()), probe_mesh->GetNE(),
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count());
+    }
+    else
+    {
+      const int npts = static_cast<int>(op_idx.size()), vdim = U.VectorDim();
+      std::vector<double> vals(npts * vdim);
+      mfem::Vector local(vdim);
+      U.HostRead();
+      for (int i = 0; i < npts; i++)
+      {
+        U.GetVectorValue(probe_elements[i], probe_references[i], local);
+        for (int d = 0; d < vdim; d++)
+        {
+          vals[i * vdim + d] = local(d);
+        }
+      }
+      return vals;
+    }
+  }
   // Interpolated vector values are returned from GSLIB interpolator with the same ordering
   // as the source grid function, which we transform to byVDIM for output.
   const int npts = op.GetCode().Size();
