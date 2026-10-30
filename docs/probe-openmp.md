@@ -72,3 +72,38 @@ Rollback opcji: `--probe-threads 1` albo pominięcie opcji. Poprzedni pełny pro
 M6 i jego wyniki dotyczą źródeł 95822/native 048f; ich źródła zachowano w worktree
 `/home/sieciowiec/dev/cpp/palace-opt-integration`. Nowy build jest odrębny i nie
 otrzymał przez kopiowanie kwalifikacji RF ani wyników wydajności poprzednika.
+
+## Kontrola starego GSLIB przy 12 rdzeniach
+
+Test 2026-10-30: ta sama siatka medium (1 700 660 elementów, geometria P2),
+164 sondy, nowy lokalizator GSLIB tworzony od zera w każdej próbie.
+Jedno wczytanie siatki poza pomiarem; kolejność 1/12/12/1, po dwie próbki.
+Globalne OpenMP zmieniano dopiero dla konstruktora i destruktora, przygotowanie
+siatki/FE pozostało przy OMP1 (odrębnie od znanego błędu alokatora OP-05).
+
+| Wątki | Czasy konstruktora [s] | Mediana [s] |
+|---:|---:|---:|
+| 1 | 102,2504 / 102,9429 | 102,5966 |
+| 12 | 102,0445 / 102,3202 | 102,1824 |
+
+Różnica 0,40% (1,004×) nie pokazuje użytecznego skalowania. CPU/wall około 1,
+choć próba zespołu potwierdza 12 wątków, affinity 12 osobnych rdzeni fizycznych
+oraz quota 12 CPU. To dowód braku skalowania tego konstruktora na obecnym buildzie,
+nie dowód, że cały GSLIB nigdy nie może pracować wielowątkowo.
+
+Profil rozdziela każdą próbkę: Setup zajmuje około 102 s, FindPoints około 2 ms.
+Zarchiwizowany kod przypiętego MFEM 4.9 (`fem_gslib.cpp`, hash bdb21dcd…)
+zawiera sekwencyjne pętle przygotowania split geometry i GetNodalValues
+(wiersze 1439–1468, 1495–1549). Samo OMP_NUM_THREADS ich nie równolegli.
+Nie zmierzono osobno kosztu tych pętli i wewnętrznego C findpts_setup_3.
+Pełnej symulacji RF ani GPU compute w tym eksperymencie nie uruchamiano.
+
+Artefakty: `artifacts/probe-gslib-threads-affinity-20261030/`, w tym
+`offline-audit.json`, raport, fazy, czasy CPU i kopia dokładnego narzędzia.
+Oryginalny kontroler zgłosił FAIL po poprawnym native exit0: oczekiwał znacznika
+ReportProbeLocator, którego jawna domyślna ścieżka GSLIB nie emituje. Niezależny
+audyt offline potwierdził cztery rzeczywiste fazy GSLIB, kompletne próbki,
+niezmienione źródła/native/wejście i sprzątnięcie. Oryginalny FAIL zachowano;
+nie powtarzano obliczeń ani nie przypisano im kwalifikacji RF.
+Pierwszy start z cpuset rootless odrzucono przed obliczeniami; osobna poprawna
+próba użyła taskset i tej samej binarki, bez ponownej kompilacji. Strata przywrócona.

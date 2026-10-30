@@ -45,3 +45,10 @@ Pełny RF nowego buildu i CMP: NOT RUN. Stara kwalifikacja M6 nie jest dziedzicz
 
 Dokumentacja i włączenie: [probe-openmp](docs/probe-openmp.md).
 Artefakty review: `artifacts/probe-openmp-review-20261030/review.json`.
+
+Kontrola GSLIB OMP1 vs OMP12: cztery nowe konstruktory 1/12/12/1,
+mediany 102,5966 / 102,1824 s (0,40%; brak użytecznego skalowania).
+12 fizycznych rdzeni, rzeczywisty zespół 12, CPU/wall~1. Bez RF/rebuilda zależności.
+Audyt offline PASS pomiarów; wrapper FAIL przez błędne oczekiwanie znacznika
+jawnego GSLIB zachowany. Szczegóły w docs/probe-openmp.md i artefaktach
+probe-gslib-threads-affinity-20261030/offline-audit.json. Strata active/health200.
