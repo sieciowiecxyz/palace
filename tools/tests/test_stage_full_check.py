@@ -63,6 +63,15 @@ class FullCompletionTests(unittest.TestCase):
         self.assertEqual(result['total_solves'],2)
         self.assertEqual(result['max_raw_relative_rhs'],8e-7)
 
+    def test_full_expectations_allow_only_initial_restart_index(self):
+        self.config['Solver']['Driven']['Restart']=1
+        self.assertEqual(expectations(self.config,self.out),self.expected)
+        for restart in (0,2):
+            with self.subTest(restart=restart):
+                self.config['Solver']['Driven']['Restart']=restart
+                with self.assertRaisesRegex(ValueError,'without restart'):
+                    expectations(self.config,self.out)
+
     def test_partial_solver_metadata_is_rejected(self):
         for key,value in [('TotalSolves',1),('TotalSolves',True),('TotalIts',0)]:
             with self.subTest(key=key,value=value):

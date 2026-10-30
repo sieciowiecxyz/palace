@@ -1,3 +1,36 @@
+## M5 checked / M6 ACTIVE — końcowa integracja (2026-10-30)
+
+14unikalnychparRF+actualsource/native/mesh replayPASS. Threepairedcombinedmedian
+738,280→630,324s(−14,62%)/66,056→57,029GiB(−13,67%). Sweep3freq+oldM7geometryPASS.
+RestarttinycheckedFAILbaselinelegacyCSVidxmap, sourcebyteproof z frozen a6;
+NOOP/PREregression, NOTqualifiedRestart>1. UniformRestart1profileguardbeforefailure.
+Rootnie naprawiał/niepromowałunrelatedCSVrewrite; IO-06DEFER. Originalfailures
+orazinterrupted2690 pozostają;świeżyresumeB2690PASS, starypartialnietknięty.
+NextM6mergequalifiedintegration→root, scopedsidecarbezmutacjimanifestufalse,
+commands/rollback/docsreview iresourcecleanup. PoauditprzywrócićStratę.
+
+## USER RESUME — M5 kontynuowane (2026-10-30)
+
+Użytkownik jawnie polecił wyłączyć Stratę i wznowić; serviceinactive/dead0,
+79GiBavailable, GPUidle1855MiB. Nowy plan freq2690/B-combined-resume1,
+oryginalnyUSER_INTERRUPTED pozostaje. UkończonyA2690 i1710A/B niepowtarzane.
+Po2690B pozostają3800A/B+inna geometriaA/B, następnieM6audit/merge/recommendation.
+RepoModegoal/ActiveM5. Panelget_goalwciążpaused; narzędzia nie mająopcji resume,
+więc nie fałszowaćukończenia staregocelu ani nie tworzyćduplikatu.
+Brak nowychGPU/cloudruns na etapieprzygotowania. Parametrysource/native/medium/RFgatesbez zmian.
+
+## USER PAUSE — czekaj na polecenie wznowienia (2026-10-30)
+
+Użytkownik jawnie wstrzymał symulacje i cały goal do czasu jego zgody na wznowienie.
+Aktywny M5/freq-2690/B-combined zatrzymany: ownedcontainerpalace-stage-ece616adf370,
+SIGTERM2s potemSIGKILL; świadomeUSER_INTERRUPTED, nie błąd algorytmu.
+Partialwyniki pozostają; nie wykonywaćstaregoplanuponownie/nieukrywaćprzerwania.
+Freq1710A/B+RF PASS; freq2690Acompleted (Bprzerwane), freq3800/geometryNOTRUN.
+M5trzypary1,92GHzPASS: mediana738,280→630,324s/cgroup66,056→57,029GiB.
+M5MPI2PASS. M6jeszczeniedomknięte. Source95822/lib048f/integrationworktreezachowane.
+Strataactive/runningMainPID3358116, endpoint8081. Nie wyłączać ani nie wznawiać
+symulacji bez nowego polecenia użytkownika. Pauseproof w M5-sweep-geometry-20261030/user-pause-*.json.
+
 ## M4 PASS zakresowo / M5 ACTIVE (2026-10-30)
 
 Combined95822/lib048f zkwalifikowaneOP+PRE: cachedbuild8,43s,749+55986tinyPASS.

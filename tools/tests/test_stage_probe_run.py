@@ -276,6 +276,44 @@ class StageProbeRunnerTests(unittest.TestCase):
             return runner.prepare(self.root,self.build,self.run,self.root/'out',self.driver_record,
                                   stage='full',**kwargs)
 
+    def test_full_execute_invalidates_changed_staged_physics_or_raw_mesh_before_create(self):
+        # This tests the real controller hash guard, not any electromagnetic result.
+        self.config['Domains']={'Materials':[{'Attributes':[2],'Permittivity':2.94}]}
+        self.config['Boundaries']={'PEC':{'Attributes':[20]}}
+        self.config['Solver']['Order']=2
+        runner.dev.write(self.run/'config.json',self.config)
+        command=runner.dev.read(self.run/'command.json')
+        command['actual_config_sha256']=runner.dev.sha(self.run/'config.json')
+        runner.dev.write(self.run/'command.json',command)
+        mutations={'material':lambda c:c['Domains']['Materials'][0].update(Permittivity=3.1),
+                   'boundary':lambda c:c['Boundaries']['PEC'].update(Attributes=[21]),
+                   'order':lambda c:c['Solver'].update(Order=3),
+                   'backend':lambda c:c['Solver'].update(Backend='/cpu/self'),
+                   'mesh':None}
+        original_mesh=self.mesh.read_bytes()
+        for name,mutate in mutations.items():
+            with self.subTest(change=name):
+                output=self.root/('out-'+name)
+                with mock.patch.object(runner,'full_expectations',return_value={'fixture':'schema'}):
+                    runner.prepare(self.root,self.build,self.run,output,self.driver_record,stage='full')
+                if mutate:
+                    config=runner.dev.read(output/'config.json');mutate(config)
+                    runner.dev.write(output/'config.json',config)
+                else:
+                    self.mesh.write_bytes(b'X'+original_mesh[1:])  # Same size, different hash.
+                self.capture.reset_mock()
+                with mock.patch.object(runner,'no_inference',return_value={}), \
+                     mock.patch.object(runner.subprocess,'Popen') as start, \
+                     mock.patch.object(runner.subprocess,'run') as command_run:
+                    with self.assertRaisesRegex(ValueError,'Prepared inputs changed|Mesh identity changed'):
+                        runner.execute(output/'plan.json')
+                    start.assert_not_called();command_run.assert_not_called()
+                self.capture.assert_not_called()  # Not even image inspect/create after invalidation.
+                receipt=runner.dev.read(output/'full-result.json')
+                self.assertFalse(receipt['complete']);self.assertFalse(receipt['solver_executed'])
+                self.assertFalse(receipt.get('container_started',False))
+                self.mesh.write_bytes(original_mesh)
+
     def test_full_prepare_is_explicit_gpu_trace_off_without_stage_stop_or_config_changes(self):
         flags={'PALACE_PROBE_LOCATOR':'mfem','PALACE_SINGLE_RANK_DIRECT_MESH':'1'}
         plan=self.full_prepare(seconds=1800,memory_gib=70,features=flags)

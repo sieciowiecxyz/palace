@@ -917,3 +917,16 @@ phasesCPU/wall, timers, counts, ROI i ograniczenia. Osobne stage-profile-report,
 stdout/stderr, diagnostic-result, container-state i telemetry w obu katalogach.
 Oba kontenery usunięte, exit0/OOMfalse, lockzwolniony; sourcecache/antenna/
 .toolchain bez zmian i bez dodatkowego205MBzapisu. Nie uruchomiono retry.
+
+## IO-07 — legacy restart: BASELINE_BUG_CONFIRMED / OUTSIDE_QUALIFIED_PROFILE
+
+2026-10-30: mały natywny test legalnego CSVprefix1/1/0 + Restart2 zakończyłsię
+`Column idx not found in table` w wariancieA(gslib/direct0), po zbieżnym GMRES.
+Parserindeksuje kolumny col_N; reload nadpisuje Column.name bez name_to_index,
+PrintDomainE szuka idx. Insert/lookup/reload/PrintDomainEbyte-identicalzfrozen a6;
+zmianytrace nie zmieniająmapy. Bez fixaproduktu, bez native retry; Bnieuruchomione.
+Artefakty M5-restart-smoke-20261030 i M6-final-audit-20261030/restart-source-review.json.
+To znanydefekt odziedziczony, nie nieudanaoptymalizacja. Kwalifikacjadotyczy
+uniform Restart1; pozytywne wsparcielegacyrestartwymaga osobnejnaprawy i testów.
+Nie promowanozmianCSV/cache; IO-06zostajeDEFER. Niepowtarzaćtejsamejpróby
+bez zmianynativepoprawiającejindeksnazw lub nowejfalsyfikowalnejhipotezy.

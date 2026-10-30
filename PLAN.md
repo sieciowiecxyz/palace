@@ -1,7 +1,7 @@
 # Plan: preprocessing, operatory i I/O
 
 Mode: goal
-Active: M5
+Active: M6
 
 ## Cel i zakres
 
@@ -10,7 +10,7 @@ bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obi
 zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
 Wykonanie uruchomione na polecenie użytkownika 2026-10-29. Trzej wykonawcy:
 GPT-6.1 Sol high, każdy na swoim branchu; koordynator zbiera i weryfikuje wyniki.
-M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; M3 zamknięte zakresowo; M4 zamknięte zakresowo; aktywny M5: reprezentatywna walidacja. Użytkownik zgodził się na zatrzymanie
+M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; M3 zamknięte zakresowo; M4 zamknięte zakresowo; M5 sprawdzone dla uniform Restart1; aktywny M6: audyt i rekomendacja. Użytkownik zgodził się na zatrzymanie
 Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez cloud i publikacji.
 
 ## Milestones
@@ -20,7 +20,7 @@ Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez clo
 - [x] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
 - [x] M3 — Oddzielnie zakwalifikować każdy patch: poprawność, pamięć, czas; odrzucić nieudane hipotezy.
 - [x] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
-- [ ] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
+- [x] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
 - [ ] M6 — Zamknąć rejestry, wskazać build rekomendowany, rollback i ograniczenia.
 
 ## Organizacja

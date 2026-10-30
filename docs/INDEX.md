@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M5; M4 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M6; M5 sprawdzone zakresowo dla Restart1. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -337,3 +337,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [M5: kwalifikacja integracji](milestones/M5.md)
   - Czytaj gdy: oceniasz powtórzenia combined, sweep i inną geometrię.
   - Opis: Trzy pary1,92GHz,1,71/2,69/3,80GHz, osobna geometria i CPU/MPI2; brak globalnej promocji.
+
+- [Optymalizacja faz: wyniki i zakres](optimization-stages/results.md)
+  - Czytaj gdy: oceniasz rzeczywisty zysk, bramki RF i ograniczenia kwalifikacji.
+  - Opis: Wyniki trzech par combined, świadome IO DEFER i otwarte bramki M6 preaudit.
