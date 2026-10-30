@@ -450,6 +450,35 @@ class StageProbeRunnerTests(unittest.TestCase):
         self.mocked_execution('deadline')
 
 
+    def test_probe_workers_keep_global_omp_serial_and_are_recorded(self):
+        header=self.root/'palace/fem/probesearch.hpp'
+        header.parent.mkdir(parents=True)
+        header.write_text('threaded source identity fixture')
+        self.manifest['source_sha256']=runner.source_hash(runner.compiler_inputs(self.root))
+        runner.dev.write(self.build/'manifest.json',self.manifest)
+        features={'PALACE_PROBE_LOCATOR':'mfem','PALACE_PROBE_THREADS':'4'}
+        plan=runner.prepare(self.root,self.build,self.run,self.root/'out',self.driver_record,
+                            stage='operators',cpu=True,threads=1,features=features)
+        self.assertEqual(plan['environment']['OMP_NUM_THREADS'],'1')
+        self.assertEqual(plan['environment']['PALACE_PROBE_THREADS'],'4')
+        self.assertEqual(plan['features'],features)
+        self.assertIn('PALACE_PROBE_THREADS=4',plan['argv'])
+
+    def test_probe_workers_reject_wrong_locator_old_source_or_preprocess(self):
+        for features in [{'PALACE_PROBE_THREADS':'4'},
+                         {'PALACE_PROBE_LOCATOR':'gslib','PALACE_PROBE_THREADS':'4'},
+                         {'PALACE_PROBE_LOCATOR':'mfem','PALACE_PROBE_THREADS':'0'},
+                         {'PALACE_PROBE_LOCATOR':'mfem','PALACE_PROBE_THREADS':'65'}]:
+            with self.subTest(features=features),self.assertRaises(ValueError):
+                runner.checked_features(features)
+        good={'PALACE_PROBE_LOCATOR':'mfem','PALACE_PROBE_THREADS':'4'}
+        with self.assertRaisesRegex(ValueError,'matching threaded'):
+            runner.prepare(self.root,self.build,self.run,self.root/'out',self.driver_record,
+                            stage='operators',cpu=True,features=good)
+        with self.assertRaisesRegex(ValueError,'operator/full'):
+            self.prepare(cpu=True,features=good)
+
+
 class MonitorEndRaceTests(unittest.TestCase):
     def inspection(self):
         return {'Id':'owned-id','Name':'owned-name','State':{'Status':'exited','Pid':0,

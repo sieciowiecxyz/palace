@@ -20,7 +20,8 @@ FROZEN = ROOT/'artifacts/m7-sm120-bundle-r3-20261022'
 LEGACY_SOURCE = 'a6ec732f11cc7fe920365ba2aae354b68fe97e81f732d5afd4659ed5187c3338'
 FROZEN_MANIFEST_SHA = 'dc8fa9d99d62138ca547b38278565adf24338784daa8a543e386aec16889ff1d'
 FEATURE_VALUES = {'PALACE_PROBE_LOCATOR': {'gslib','mfem'},
-                  'PALACE_SINGLE_RANK_DIRECT_MESH': {'0','1'}}
+                  'PALACE_SINGLE_RANK_DIRECT_MESH': {'0','1'},
+                  'PALACE_PROBE_THREADS': {str(n) for n in range(1,65)}}
 Z0 = 376.730313668  # Preserved legacy diagnostic constant, not fitted to flux.
 FIELD_REL = 1e-5
 FIELD_ABS = 1e-12  # L2 absolute gate for near-zero reference; in each CSV field's units.

@@ -47,7 +47,7 @@ Z katalogu `/home/sieciowiec/dev/cpp/palace`, przy wyłączonym serwerze inferen
 
 ```sh
 python tools/stage_probe_run.py prepare \
-  --source "$PWD" \
+  --source "$PWD/../palace-opt-integration" \
   --build "$PWD/build/optimization-stages-m4-integration-20261030" \
   --run "$PWD/artifacts/optimization-stages/M5-inputs-20261030/freq-1710" \
   --output "$PWD/artifacts/my-new-run" \
@@ -82,3 +82,9 @@ błąd bazowej ścieżki, a nie poluzowany próg RF czy poprawiony wynik ekspery
 Końcowe rozliczenie22punktów: `M6-final-audit-20261030/final-audit.json`.
 Nie ma nierozstrzygniętego eksperymentu tej kampanii; jawny legacyCSVbug pozostaje
 poza kwalifikowanym profilem. Nie wysyłano kodu ani wiadomości na GitHub.
+
+Po dodaniu opcjonalnego OpenMP do głównego kodu, źródła source95822 pozostały
+w worktree `palace-opt-integration`. Stąd powyższe `--source` wskazuje snapshot,
+nie aktualny root. Przykład zapisany w M6 powstał przed tą zmianą; dawnych planów
+z `source=root` nie wykonywać ponownie po zmianie źródeł. Nową opcję opisuje
+[OpenMP](../probe-openmp.md); jej build/zakres walidacji są osobne.

@@ -125,6 +125,7 @@ InterpolationOperator::InterpolationOperator(const std::map<int, config::ProbeDa
 #if defined(MFEM_USE_GSLIB)
 const char *InterpolationOperator::TryMFEMLocator()
 {
+  const int threads = fem::probe::RequestedThreads();
   auto &mesh = *probe_mesh;
   if (Mpi::Size(mesh.GetComm()) != 1)
   {
@@ -159,12 +160,15 @@ const char *InterpolationOperator::TryMFEMLocator()
   if (initial_found != npts)
   {
     StageProfile rescue_profile("operators.probes.mfem_rescue");
-    const auto search = fem::probe::Rescue(mesh, points, probe_elements, probe_references);
+    const auto search = fem::probe::Rescue(mesh, points, probe_elements, probe_references,
+                                           nullptr, threads);
     std::fprintf(stderr,
                  "PALACE_PROBE_SEARCH {\"initial_found\":%d,\"rescued\":%d,"
-                 "\"cap\":%d,\"tried\":%d,\"remaining\":%d}\n",
+                 "\"cap\":%d,\"tried\":%d,\"remaining\":%d,"
+                 "\"threads_requested\":%d,\"threads_used\":%d,\"snapshot_bytes\":%zu}\n",
                  search.initial_found, search.rescued, fem::probe::CandidateCap,
-                 search.tried, search.remaining);
+                 search.tried, search.remaining, threads, search.selection_threads,
+                 search.snapshot_bytes);
     if (search.remaining != 0)
     {
       return "not_found";

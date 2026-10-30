@@ -345,3 +345,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [M6: audyt i rekomendowany profil optymalizacji faz](milestones/stages-final-audit.md)
   - Czytaj gdy: odtwarzasz build, uruchamiasz szybki profil lub wykonujesz rollback.
   - Opis: Macierz bramek, lokalna integracja, manifest i komendy; jawny legacy Restart2 FAIL.
+
+- [OpenMP lokalnego wyszukiwania sond](probe-openmp.md)
+  - Czytaj gdy: włączasz dodatkowe wątki CPU lub oceniasz ich rzeczywisty zysk.
+  - Opis: Prywatne bufory, globalOMP1, pomiary1/2/4/8 i walidacja GPU; fullRF/CMP jeszcze NOT RUN.
