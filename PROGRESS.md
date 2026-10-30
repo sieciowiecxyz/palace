@@ -1,3 +1,27 @@
+## GPU ponownie zwolnione; M3 PRE ostatnia para przygotowana (2026-10-30)
+
+Użytkownik jawnie polecił wyłączyć Stratę i kontynuować; service inactive/dead0,
+80GiB RAM available, bezswap. Nie obowiązuje już poprzednia blokada StrataON.
+Monitor end-race poprawiony failclosed; 91 testów PASS i niezależny review PASS.
+PREpair2 nativeexit0 udowodniony events/metadata; jawny offline supplemental
+completion-recovery.json + pair2-rf.json PASS, pierwotny FAILf543... zachowany.
+Wall tego kontrolera nie jest clean wall sample; nativePalaceczas739,007857s ważny.
+Żadnego powtórzenia obliczeń. PREma2paryRF PASS,6plannedoriginaltylko4nativewykonane.
+Świeże pair3r2 A→B po fixie, stare pair3plany NIE wykonywać (runnerSHAinvalid).
+Źródła/native/config/mesh bez zmiany, nowy prereg opisuje wersje monitora.
+M4/M5 pending, OP3pary zakwalifikowane. Po pomiarach przywrócić Stratę.
+
+## Użytkownik włączył Stratę — GPU zarezerwowane dla inference (2026-10-30)
+
+Na jawne polecenie użytkownika uruchomiono localai-nvfp4.service:
+active/running, PID2369460; http://127.0.0.1:8081/health HTTP200.
+Nie uruchamiać kolejnych symulacji ani samodzielnie ponownie zatrzymywać Straty.
+IO może dokończyć wyłącznie Python/CPU fix monitora i przygotowanie offline recovery.
+PRE zatrzymane po pair2-A-off monitoring-only FileNotFound cgroup po nativeexit0;
+authoritative Podman diedexit0 i pierwotny FAIL zachowane. Nie ponawiać native.
+Pair3 PRE i M4/M5 czekają na ponowne zwolnienie GPU przez użytkownika.
+Cel optymalizacji pozostaje aktywny; gotowe trzy pary OP RF/PERF PASS zachowane.
+
 ## M3 — RF checker i przegląd OP zamknięte (2026-10-30)
 
 81 Python testów PASS. Root+niezależny OP review RFcheckera i source-unitproof PASS;

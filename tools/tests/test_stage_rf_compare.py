@@ -199,6 +199,26 @@ class RFComparisonTests(unittest.TestCase):
                 path.write_text(text)
                 with self.subTest(text=text),self.assertRaises(ValueError):rf.table(path)
 
+    def test_recovered_controller_failure_is_declared_not_rewritten_as_clean_wall(self):
+        self.a['fingerprint'].update(recovered_controller_failure=True,
+                                     controller_result_complete=False,
+                                     controller_wall_scope='Recovered controller failure')
+        report=self.compare()
+        self.assertTrue(report['passed'])
+        self.assertTrue(report['recovered_controller_failure']['reference'])
+        self.assertFalse(report['reference']['controller_result_complete'])
+        self.assertIn('never a clean successful wall',report['timing_scope'])
+
+    def test_forged_supplement_cannot_bypass_incomplete_full_result(self):
+        with tempfile.TemporaryDirectory(dir='/dev/shm') as directory:
+            root=Path(directory)
+            (root/'config.json').write_text(json.dumps({'Problem':{'Output':'postpro'}}))
+            (root/'plan.json').write_text(json.dumps({'source':directory}))
+            (root/'full-result.json').write_text(json.dumps({'complete':False}))
+            (root/'completion-recovery.json').write_text(json.dumps({'complete':True}))
+            with self.assertRaisesRegex(ValueError,'supplemental'):
+                rf.load_run(root)
+
     def test_legacy_mode_is_labelled_diagnostic_not_timing_evidence(self):
         result=self.compare(legacy=True)
         self.assertTrue(result['passed']);self.assertTrue(result['legacy_reference'])

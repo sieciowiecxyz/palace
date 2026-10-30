@@ -349,6 +349,37 @@ class StageProbeRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'existing execution result'):
             runner.execute(self.root/'out/plan.json')
 
+    def test_terminal_end_race_does_not_bypass_full_completion_or_cleanup(self):
+        plan=self.full_prepare()
+        terminal={'Status':'exited','Pid':0,'StartedAt':'2026-10-30T10:00:00Z',
+                  'FinishedAt':'2026-10-30T10:00:01Z','ExitCode':0,'OOMKilled':False,'Error':''}
+        inspection={'Id':'owned-id','Name':plan['name'],'State':terminal,'Image':runner.IMAGE,
+                    'Mounts':[],'HostConfig':{'Memory':8*runner.GIB,'MemorySwap':8*runner.GIB}}
+        def capture(argv):
+            if argv[:3]==['podman','image','inspect']:return 'sha256:'+runner.IMAGE
+            if argv[:2]==['podman','inspect']:return json.dumps([inspection])
+            if argv[:2]==['podman','create']:return 'owned-id'
+            raise AssertionError(argv)
+        self.capture.side_effect=capture
+        def launch(*args,**kwargs):
+            kwargs['stderr'].write('PALACE_LOG_BUFFERING: stdout=line\n');kwargs['stderr'].flush()
+            process=mock.Mock();process.poll.return_value=None;process.wait.return_value=0
+            return process
+        proof=runner.terminal_container_proof(inspection,'owned-id',plan['name'])
+        with mock.patch.object(runner,'no_inference',return_value={}), \
+             mock.patch.object(runner,'full_expectations',return_value=plan['full_expectations']), \
+             mock.patch.object(runner,'check_full',side_effect=ValueError('synthetic incomplete output')), \
+             mock.patch.object(runner,'helper_hashes',return_value=plan['helper_sha256']), \
+             mock.patch.object(runner,'sample_cgroup',return_value=({},proof)), \
+             mock.patch.object(runner.subprocess,'Popen',side_effect=launch), \
+             mock.patch.object(runner.subprocess,'run',return_value=mock.Mock(returncode=0)) as cleanup:
+            with self.assertRaisesRegex(ValueError,'synthetic incomplete'):
+                runner.execute(self.root/'out/plan.json')
+        result=runner.dev.read(self.root/'out/full-result.json')
+        self.assertFalse(result['complete']);self.assertFalse(result['solver_executed'])
+        self.assertEqual(result['monitor_terminal_state_proof']['state']['ExitCode'],0)
+        self.assertTrue(result['own_container_removed']);cleanup.assert_called_once()
+
     def mocked_execution(self, failure):
         plan=self.prepare()
         inspection={'State':{'Pid':0},'Image':runner.IMAGE,'Mounts':[],
@@ -379,6 +410,139 @@ class StageProbeRunnerTests(unittest.TestCase):
 
     def test_outer_deadline_cleans_only_owned_container_and_records_failure(self):
         self.mocked_execution('deadline')
+
+
+class MonitorEndRaceTests(unittest.TestCase):
+    def inspection(self):
+        return {'Id':'owned-id','Name':'owned-name','State':{'Status':'exited','Pid':0,
+                'ExitCode':0,'OOMKilled':False,'Error':'',
+                'StartedAt':'2026-10-30T10:00:00Z','FinishedAt':'2026-10-30T10:00:01Z'}}
+
+    def test_disappeared_cgroup_requires_owned_terminal_exit0(self):
+        with tempfile.TemporaryDirectory(dir='/dev/shm') as directory:
+            path=Path(directory)/'gone'
+            with mock.patch.object(runner.dev,'cgroup_memory',return_value={}), \
+                 mock.patch.object(runner,'capture',return_value=json.dumps([self.inspection()])) as capture:
+                memory,proof=runner.sample_cgroup(path,'owned-name','owned-id')
+            self.assertEqual(memory,{})
+            self.assertEqual(proof['state']['ExitCode'],0)
+            capture.assert_called_once_with(['podman','inspect','owned-name'])
+
+    def test_live_nonzero_oom_unknown_id_or_missing_finished_time_fail_closed(self):
+        for key,value in [('Status','running'),('ExitCode',1),('ExitCode',False),('Pid',12),
+                          ('OOMKilled',True),('Error','failed'),('FinishedAt','')]:
+            inspection=self.inspection();inspection['State'][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):
+                runner.terminal_container_proof(inspection,'owned-id','owned-name')
+        with self.assertRaises(ValueError):
+            runner.terminal_container_proof(self.inspection(),'other-id','owned-name')
+
+    def test_unknown_active_sample_is_not_silently_ignored(self):
+        with tempfile.TemporaryDirectory(dir='/dev/shm') as directory:
+            path=Path(directory)
+            for leaf in ('memory.current','memory.peak','memory.stat','memory.swap.max'):
+                (path/leaf).write_text('0')
+            with mock.patch.object(runner.dev,'cgroup_memory',return_value={}), \
+                 mock.patch.object(runner,'capture') as capture:
+                with self.assertRaisesRegex(ValueError,'Unknown live'):
+                    runner.sample_cgroup(path,'owned-name','owned-id')
+                capture.assert_not_called()
+
+
+class CompletionRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        temp=tempfile.TemporaryDirectory(dir='/dev/shm');self.addCleanup(temp.cleanup)
+        self.root=Path(temp.name);post=self.root/'postpro';post.mkdir()
+        self.archived='Archived failed-controller source\n'
+        self.auth=dict(runner.AUTHORIZED_CGROUP_RECOVERY)
+        self.auth.update(container_id='a'*64,container_name='owned-name',
+                         failed_runner_sha256=runner.hashlib.sha256(self.archived.encode()).hexdigest())
+        self.original={'complete':False,'solver_executed':False,'diagnostic_only':False,
+              'own_container_removed':True,'error':"FileNotFoundError(2, 'No such file or directory')",
+              'features':{'PALACE_SINGLE_RANK_DIRECT_MESH':'0'},
+              'started_utc':'2026-10-30T10:00:00+00:00','finished_utc':'2026-10-30T10:00:10+00:00',
+              'elapsed_seconds':10.}
+        for name in ('config.json','postpro/config_resolved.json'):
+            runner.dev.write(self.root/name,{})
+        self.observed={'postpro':'postpro','config_sha256':runner.dev.sha(self.root/'config.json')}
+        self.expected={'schema':'synthetic completion fixture'}
+        self.plan={'name':'owned-name','identity':self.observed,'full_expectations':self.expected,
+                   'source':str(self.root),'build':str(self.root),'input_run':str(self.root),
+                   'driver_record':str(self.root/'driver.json'),'stage':'full','stage_trace':False,
+                   'cpu':False,'threads':1,'runner_sha256':self.auth['failed_runner_sha256'],
+                   'features':self.original['features'],'staged_config_sha256':self.observed['config_sha256']}
+        self.full={'complete':True,'solver_executed':True,'rf_qualified':False,'total_solves':2,
+                   'total_iterations':85,'max_raw_relative_rhs':8e-7}
+        self.events=[]
+        for status,second in [('create',.1),('init',.2),('start',1),('attach',1.1),
+                              ('died',9),('cleanup',9.1),('remove',9.2)]:
+            event={'ID':self.auth['container_id'],'Name':'owned-name','Type':'container','Status':status,
+                   'timeNano':int((runner.utc_timestamp(self.original['started_utc'])+second)*1e9)}
+            if status=='died':event['ContainerExitCode']=0
+            self.events.append(event)
+        self.proof={'command_exit_code':0,'plan_container_name':'owned-name',
+            'since_utc':self.original['started_utc'],'until_utc':'2026-10-30T10:00:11+00:00',
+            'events_count':7,'events_path':str(self.root/'monitor-race-podman-events.jsonl'),
+            'native_died_events':[self.events[4]]}
+        self.proof['command']=['podman','events','--stream=false','--filter','container=owned-name',
+                              '--since',self.original['started_utc'],'--until',self.proof['until_utc'],
+                              '--format','json']
+        runner.dev.write(self.root/'plan.json',self.plan)
+        runner.dev.write(self.root/'full-result.json',self.original)
+        (self.root/'monitor-race-podman-events.jsonl').write_text(''.join(json.dumps(x)+'\n' for x in self.events))
+        for name in ('original','plan','events'):
+            filename={'original':'full-result.json','plan':'plan.json','events':'monitor-race-podman-events.jsonl'}[name]
+            self.auth[name+'_sha256']=runner.dev.sha(self.root/filename)
+        self.proof.update(events_sha256=self.auth['events_sha256'],original_full_result_sha256=self.auth['original_sha256'])
+        runner.dev.write(self.root/'monitor-race-events-proof.json',self.proof)
+        self.auth['events_proof_sha256']=runner.dev.sha(self.root/'monitor-race-events-proof.json')
+        runner.dev.write(post/'palace.json',{'ElapsedTime':{'Durations':{'Total':9.}}})
+        (post/'port-S.csv').write_text('f (GHz),x\n1.92,.1\n')
+        (self.root/'palace.stdout.log').write_text('synthetic completed log')
+        (self.root/'palace.stderr.log').write_text('')
+        for target,value in [('AUTHORIZED_CGROUP_RECOVERY',self.auth)]:
+            patch=mock.patch.object(runner,target,value);patch.start();self.addCleanup(patch.stop)
+        for target,value in [('identity',(self.observed,{})),('full_expectations',self.expected),
+                             ('check_full',self.full),('capture',self.archived)]:
+            patch=mock.patch.object(runner,target,return_value=value);patch.start();self.addCleanup(patch.stop)
+
+    def test_preview_is_offline_and_write_is_supplemental_and_exclusive(self):
+        original=(self.root/'full-result.json').read_bytes()
+        preview=runner.recover_completion(self.root)
+        self.assertTrue(preview['complete']);self.assertFalse(preview['rf_qualified'])
+        self.assertFalse((self.root/'completion-recovery.json').exists())
+        runner.recover_completion(self.root,write=True)
+        self.assertTrue(runner.validate_completion_recovery(self.root)['recovered_controller_failure'])
+        self.assertEqual((self.root/'full-result.json').read_bytes(),original)
+        self.assertFalse(runner.dev.read(self.root/'full-result.json')['complete'])
+        with self.assertRaises(FileExistsError):runner.recover_completion(self.root,write=True)
+        self.assertTrue(all(call.args[0][0]=='git' for call in runner.capture.call_args_list))
+
+    def test_forged_exit_different_cid_or_death_after_cleanup_are_rejected(self):
+        import copy
+        variants=[]
+        events=copy.deepcopy(self.events);events[4]['ContainerExitCode']=1;variants.append(events)
+        events=copy.deepcopy(self.events);events[4]['ID']='b'*64;variants.append(events)
+        events=copy.deepcopy(self.events);events[4],events[5]=events[5],events[4];variants.append(events)
+        for events in variants:
+            with self.subTest(events=events),self.assertRaises(ValueError):
+                runner.check_recovery_events(events,self.proof,self.original,self.plan,self.auth)
+
+    def test_modified_csv_or_supplement_binding_is_rejected(self):
+        runner.recover_completion(self.root,write=True)
+        data=self.root/'postpro/port-S.csv';original=data.read_bytes();data.write_text('modified physical output')
+        with self.assertRaisesRegex(ValueError,'binding/evidence'):runner.validate_completion_recovery(self.root)
+        data.write_bytes(original)
+        saved=runner.dev.read(self.root/'completion-recovery.json');saved['bindings']['file_sha256']['original']='fake'
+        runner.dev.write(self.root/'completion-recovery.json',saved)
+        with self.assertRaisesRegex(ValueError,'binding/evidence'):runner.validate_completion_recovery(self.root)
+
+    def test_other_original_failure_or_input_identity_is_rejected(self):
+        (self.root/'full-result.json').write_text('{}')
+        with self.assertRaisesRegex(ValueError,'not authorized'):runner.recover_completion(self.root)
+        runner.dev.write(self.root/'full-result.json',self.original)
+        with mock.patch.object(runner,'identity',return_value=({'different':True},{})):
+            with self.assertRaisesRegex(ValueError,'identity after'):runner.recover_completion(self.root)
 
 
 if __name__=='__main__': unittest.main()

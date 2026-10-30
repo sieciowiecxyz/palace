@@ -320,6 +320,181 @@ def gpu_sample():
         return {'devices':[],'error':str(error)}
 
 
+def terminal_container_proof(inspection, expected_id, expected_name):
+    """Disappearing cgroup is completion only with this exact owned container's exit proof."""
+    state = inspection.get('State', {})
+    if (not expected_id or inspection.get('Id') != expected_id or
+            inspection.get('Name', '').lstrip('/') != expected_name or
+            state.get('Status') not in ('exited', 'stopped') or
+            type(state.get('ExitCode')) is not int or state['ExitCode'] != 0 or
+            state.get('OOMKilled') is not False or type(state.get('Pid')) is not int or state['Pid'] != 0 or
+            state.get('Error') not in (None, '')):
+        raise ValueError('Cgroup disappeared without authoritative owned-container exit0')
+    started = utc_timestamp(state.get('StartedAt', ''))
+    finished = utc_timestamp(state.get('FinishedAt', ''))
+    if finished < started:
+        raise ValueError('Terminal container finished before it started')
+    return dict(container_id=expected_id, container_name=expected_name, state=state,
+                scope='Terminal exit0 observed after cgroup disappeared; attach wait and normal checks still required')
+
+
+def utc_timestamp(value):
+    if not isinstance(value, str):
+        raise ValueError('Missing/invalid authoritative UTC timestamp')
+    parsed = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.tzinfo is None or parsed.year <= 1:
+        raise ValueError('Missing/invalid authoritative UTC timestamp')
+    return parsed.timestamp()
+
+
+def sample_cgroup(directory, container_name, container_id):
+    try:
+        memory = dev.cgroup_memory(directory)
+        if directory and not memory:
+            # dev's generic sampler suppresses OSError; distinguish disappearance from unknown data.
+            for leaf in ('memory.current', 'memory.peak', 'memory.stat'):
+                (directory/leaf).stat()
+            raise ValueError('Unknown live cgroup memory sample')
+        if directory and int((directory/'memory.swap.max').read_text()) != 0:
+            raise ValueError('Cgroup swap was not disabled')
+        return memory, None
+    except FileNotFoundError:
+        if directory is None:
+            raise
+        inspection = json.loads(capture(['podman', 'inspect', container_name]))[0]
+        return {}, terminal_container_proof(inspection, container_id, container_name)
+
+
+# Explicit root authorization for one recorded controller end-race; not a generic retry policy.
+AUTHORIZED_CGROUP_RECOVERY = {
+    'original_sha256': 'f543e23205ea0a64346d78c69483bd1dc9af9b3e473d570962d33bb88d3c0cd0',
+    'plan_sha256': '019b40013e92435429c100c91a35d3a6c55ca28e3bbe92018ead80b62b2c3efe',
+    'events_sha256': '7c500a3b86ad60990d5717ad0e4fb054b0563e74cb3627bbf0057f8ed4505b03',
+    'events_proof_sha256': '05aa09468a434c88673622248aae12edd7f3154c68979d5799595540c6997689',
+    'container_id': '04180b54a7b7c1fe1f2c7519be76e2cc6da220e092b739e878791cf5cb0d966f',
+    'container_name': 'palace-stage-6b67ea4d21a6',
+    'failed_runner_git': '252fa4f48',
+    'failed_runner_sha256': '303ea41b9bfc463fc673ff30147c4b5bf63d1b78d1148b2d98128741cf083816',
+}
+
+
+def check_recovery_events(events, proof, original, plan, authorization):
+    """Validate the recorded exact-CID history, never current/name-only runtime status."""
+    cid, name = authorization['container_id'], authorization['container_name']
+    start, end = utc_timestamp(original['started_utc']), utc_timestamp(original['finished_utc'])
+    if (proof.get('command_exit_code') != 0 or proof.get('plan_container_name') != name or
+            proof.get('since_utc') != original['started_utc'] or
+            proof.get('events_count') != len(events) or not events or plan['name'] != name):
+        raise ValueError('Recorded event query proof does not match failed execution')
+    command = ['podman', 'events', '--stream=false', '--filter', 'container='+name,
+               '--since', original['started_utc'], '--until', proof['until_utc'], '--format', 'json']
+    if proof.get('command') != command or utc_timestamp(proof['until_utc']) < end:
+        raise ValueError('Recorded event query window/command differs')
+    times = []
+    for event in events:
+        if (event.get('ID') != cid or event.get('Name') != name or
+                event.get('Type') != 'container' or type(event.get('timeNano')) is not int or
+                event.get('Status') not in ('create', 'init', 'start', 'attach', 'died', 'cleanup', 'remove')):
+            raise ValueError('Different CID/name or unapproved/ambiguous container event')
+        stamp = event['timeNano']/1e9
+        if not start <= stamp <= end:
+            raise ValueError('Container event outside original controller execution window')
+        times.append(stamp)
+    if times != sorted(times):
+        raise ValueError('Container event order is not monotonic')
+    statuses = [event['Status'] for event in events]
+    if (statuses.count('start') != 1 or statuses.count('died') != 1 or
+            statuses.count('cleanup') != 1 or statuses.count('remove') != 1 or
+            not statuses.index('start') < statuses.index('died') < statuses.index('cleanup') < statuses.index('remove')):
+        raise ValueError('Missing authoritative start/died/before-cleanup history')
+    died = events[statuses.index('died')]
+    if type(died.get('ContainerExitCode')) is not int or died['ContainerExitCode'] != 0:
+        raise ValueError('Recorded native exit was not integer0')
+    if proof.get('native_died_events') != [died]:
+        raise ValueError('Recorded query summary differs from raw died event')
+    return dict(container_id=cid, container_name=name, native_exit_code=0,
+                started_event=events[statuses.index('start')], died_event=died,
+                died_before_cleanup=True)
+
+
+def completion_recovery_evidence(run):
+    """Offline checks only. No Podman mutation, service, solver or input/result rewrites."""
+    run = Path(run).resolve()
+    authorization = AUTHORIZED_CGROUP_RECOVERY
+    files = {'original': run/'full-result.json', 'plan': run/'plan.json',
+             'events': run/'monitor-race-podman-events.jsonl',
+             'events_proof': run/'monitor-race-events-proof.json'}
+    hashes = {name: dev.sha(path) for name, path in files.items()}
+    if any(hashes[name] != authorization[name+'_sha256'] for name in files):
+        raise ValueError('Recovery is not authorized for these original/plan/events hashes')
+    original, plan, proof = (dev.read(files[name]) for name in ('original', 'plan', 'events_proof'))
+    if (original.get('complete') is not False or original.get('solver_executed') is not False or
+            original.get('diagnostic_only') is not False or original.get('own_container_removed') is not True or
+            original.get('error') != "FileNotFoundError(2, 'No such file or directory')" or
+            plan.get('stage') != 'full' or plan.get('stage_trace') is not False or plan.get('cpu') or
+            plan.get('threads') != 1 or plan.get('runner_sha256') != authorization['failed_runner_sha256'] or
+            original.get('features') != plan.get('features')):
+        raise ValueError('Original failure is not the approved cgroup end-race')
+    events = [json.loads(line) for line in files['events'].read_text().splitlines() if line.strip()]
+    if (proof.get('events_sha256') != hashes['events'] or
+            proof.get('original_full_result_sha256') != hashes['original'] or
+            Path(proof.get('events_path', '')).resolve() != files['events']):
+        raise ValueError('Recorded event proof binding differs')
+    terminal = check_recovery_events(events, proof, original, plan, authorization)
+    archived = capture(['git', '-C', str(Path(__file__).resolve().parents[1]), 'show',
+                        authorization['failed_runner_git']+':tools/stage_probe_run.py'])
+    archived_sha = hashlib.sha256(archived.encode()).hexdigest()
+    if archived_sha != authorization['failed_runner_sha256']:
+        raise ValueError('Archived failure-context runner source differs')
+    observed, config = identity(*(Path(plan[key]) for key in ('source','build','input_run','driver_record')))
+    if observed != plan['identity'] or dev.sha(run/'config.json') != plan['staged_config_sha256']:
+        raise ValueError('Source/native/input identity after failure differs from original plan')
+    if observed['config_sha256'] != plan['staged_config_sha256']:
+        raise ValueError('Recovery requires byte-identical original full-run config')
+    if full_expectations(config, Path(plan['input_run'])/observed['postpro']) != plan['full_expectations']:
+        raise ValueError('Original completion expectations differ')
+    full = check_full(run/observed['postpro'], run/'palace.stdout.log', run/'palace.stderr.log', plan['full_expectations'])
+    artifacts = [run/'config.json', run/'palace.stdout.log', run/'palace.stderr.log',
+                 run/observed['postpro']/'palace.json', run/observed['postpro']/'config_resolved.json']
+    artifacts.extend(sorted((run/observed['postpro']).rglob('*.csv')))
+    bindings = dict(file_sha256=hashes, identity_after=observed,
+                    artifact_sha256={str(path.relative_to(run)): dev.sha(path) for path in artifacts},
+                    archived_runner_git=authorization['failed_runner_git'], archived_runner_sha256=archived_sha)
+    return dict(bindings=bindings, terminal=terminal, full=full,
+                native_elapsed_seconds=dev.read(run/observed['postpro']/'palace.json')['ElapsedTime']['Durations']['Total'],
+                original_controller_elapsed_seconds=original['elapsed_seconds'])
+
+
+def recover_completion(run, write=False):
+    run = Path(run).resolve()
+    evidence = completion_recovery_evidence(run)
+    record = dict(schema=1, complete=True, diagnostic_only=False, solver_executed=True,
+                  recovered_controller_failure=True, original_failure_preserved=True, rf_qualified=False,
+                  scope='Authorized offline native-completion recovery only; original controller result remains FAIL',
+                  wall_time_scope='Recovered controller failure: native Palace elapsed valid; original wall is not a clean successful controller-wall sample',
+                  created_utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  recovery_runner_sha256=dev.sha(Path(__file__)), **evidence)
+    if write:
+        with (run/'completion-recovery.json').open('x') as stream:
+            json.dump(record, stream, indent=2, allow_nan=False); stream.write('\n')
+    return record
+
+
+def validate_completion_recovery(run):
+    """Supplemental proof is useful only if all original evidence still replays exactly."""
+    run = Path(run).resolve()
+    saved = dev.read(run/'completion-recovery.json')
+    if (saved.get('schema') != 1 or saved.get('complete') is not True or
+            saved.get('diagnostic_only') is not False or saved.get('solver_executed') is not True or
+            saved.get('recovered_controller_failure') is not True or
+            saved.get('original_failure_preserved') is not True or saved.get('rf_qualified') is not False):
+        raise ValueError('Invalid supplemental completion recovery classification')
+    fresh = completion_recovery_evidence(run)
+    if any(saved.get(key) != value for key,value in fresh.items()):
+        raise ValueError('Supplemental recovery binding/evidence changed')
+    return saved
+
+
 def _execute(plan, output):
     result = dict(diagnostic_only=plan['stage'] != 'full', rf_result=False, rf_qualified=False, solver_executed=False, complete=False,
                   stage_trace=plan.get('stage_trace',False), features=plan.get('features',{}),
@@ -363,9 +538,11 @@ def _execute(plan, output):
                     state = json.loads(capture(['podman','inspect',plan['name']]))[0]['State']
                     if state.get('Pid'):
                         cgroup = dev.container_memory_path(state['Pid'])
-                memory = dev.cgroup_memory(cgroup)
-                if cgroup and int((cgroup/'memory.swap.max').read_text()) != 0:
-                    raise ValueError('Cgroup swap was not disabled')
+                memory, terminal = sample_cgroup(cgroup, plan['name'], inspection.get('Id'))
+                if terminal is not None:
+                    result['monitor_terminal_state_proof'] = terminal
+                    dev.write(output/'monitor-terminal-state.json', terminal)
+                    break
                 telemetry.write(json.dumps(dict(unix_s=time.time(),elapsed_s=elapsed,
                                                 host_available_bytes=free,cgroup=memory,
                                                 gpu=None if plan['cpu'] else gpu_sample()))+'\n');telemetry.flush()
@@ -429,7 +606,13 @@ def main():
     p.add_argument('--probe-locator',choices=('gslib','mfem'),help='Explicit experimental locator; default leaves production choice unchanged')
     p.add_argument('--direct-mesh',choices=('0','1'),help='Explicit experimental rank-one mesh distribution')
     sub.add_parser('execute').add_argument('plan',type=Path)
+    recovery = sub.add_parser('recover-completion', help='Offline approved cgroup end-race proof; default read-only preview')
+    recovery.add_argument('--run', type=Path, required=True)
+    recovery.add_argument('--write', action='store_true', help='Write a new exclusive supplemental completion-recovery.json; preserve original FAIL')
     args=parser.parse_args()
+    if args.action == 'recover-completion':
+        print(json.dumps(recover_completion(args.run, args.write), indent=2, allow_nan=False))
+        return
     features = {}
     if args.action == 'prepare':
         if args.probe_locator is not None:

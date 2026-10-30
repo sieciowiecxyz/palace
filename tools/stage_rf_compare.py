@@ -13,6 +13,7 @@ import re
 
 from stage_full_check import expectations, check_full
 from stage_operator_reference import compiler_inputs, source_hash
+from stage_probe_run import validate_completion_recovery
 
 ROOT = Path(__file__).resolve().parents[1]
 FROZEN = ROOT/'artifacts/m7-sm120-bundle-r3-20261022'
@@ -175,11 +176,17 @@ def load_run(path, legacy=False, frozen=FROZEN):
     else:
         plan=read(path/'plan.json'); source=Path(plan['source'])
         result=read(path/'full-result.json')
-        if (not math.isfinite(result.get('full',{}).get('max_raw_relative_rhs',math.inf)) or
-                not result.get('complete') or result.get('diagnostic_only') is not False or
-                result.get('solver_executed') is not True or result.get('exit_code')!=0 or
-                result.get('full',{}).get('max_raw_relative_rhs',math.inf)>1e-6):
-            raise ValueError('Actual full-result is missing or incomplete')
+        if (path/'completion-recovery.json').exists():
+            recovery=validate_completion_recovery(path)
+            recorded_completion=recovery['full']
+        else:
+            recovery=None
+            if (not math.isfinite(result.get('full',{}).get('max_raw_relative_rhs',math.inf)) or
+                    not result.get('complete') or result.get('diagnostic_only') is not False or
+                    result.get('solver_executed') is not True or result.get('exit_code')!=0 or
+                    result.get('full',{}).get('max_raw_relative_rhs',math.inf)>1e-6):
+                raise ValueError('Actual full-result is missing or incomplete')
+            recorded_completion=result['full']
         if sha(path/'config.json')!=plan['staged_config_sha256']:
             raise ValueError('Staged config changed after execution')
         if sha(plan['identity']['mesh'])!=plan['identity']['mesh_sha256']:
@@ -194,7 +201,7 @@ def load_run(path, legacy=False, frozen=FROZEN):
         raise ValueError('Current compiler source tree differs from actual executed build')
     expected=plan['full_expectations'] if plan else expectations(config,post)
     completion=check_full(post,path/'palace.stdout.log',path/'palace.stderr.log',expected)
-    if plan and any(result['full'].get(k)!=completion[k] for k in
+    if plan and any(recorded_completion.get(k)!=completion[k] for k in
                     ('total_solves','total_iterations','max_raw_relative_rhs')):
         raise ValueError('Stored full-result differs from actual completion/residual replay')
     tables={p.name:table(p) for p in post.glob('*.csv')}
@@ -204,7 +211,13 @@ def load_run(path, legacy=False, frozen=FROZEN):
                      config_sha256=sha(path/'config.json'), mesh_sha256=plan['identity']['mesh_sha256'] if plan else read(path/'fixture.json')['mesh_sha256'],
                      metadata_sha256=sha(post/'palace.json'), csv_sha256={p.name:sha(p) for p in post.glob('*.csv')},
                      stdout_sha256=sha(path/'palace.stdout.log'),stderr_sha256=sha(path/'palace.stderr.log'),
-                     full_result_sha256=sha(path/'full-result.json') if not legacy else None)
+                     full_result_sha256=sha(path/'full-result.json') if not legacy else None,
+                     controller_result_complete=result.get('complete') if plan else None,
+                     recovered_controller_failure=bool(plan and recovery),
+                     completion_recovery_sha256=sha(path/'completion-recovery.json') if plan and recovery else None,
+                     controller_wall_scope=recovery['wall_time_scope'] if plan and recovery else 'Clean controller completion' if plan else 'Legacy diagnostic only',
+                     original_controller_elapsed_seconds=result.get('elapsed_seconds') if plan else None,
+                     native_elapsed_seconds=read(post/'palace.json')['ElapsedTime']['Durations']['Total'])
     return dict(path=path,config=config,plan=plan,tables=tables,completion=completion,
                 source_proof=proof,fingerprint=fingerprint)
 
@@ -395,6 +408,9 @@ def compare_runs(reference,candidate,legacy_reference=False,frozen=FROZEN):
     return dict(scope='Diagnostic legacy comparison, not same-build timing evidence' if legacy_reference else 'One matched full RF A/B pair; not repeated medians or hardware generalization',
                 passed=passed,one_pair_rf_gates_passed=passed,production_promoted=False,
                 legacy_reference=legacy_reference,intentional_feature_changes=feature_changes,
+                recovered_controller_failure={'reference':a['fingerprint'].get('recovered_controller_failure',False),
+                                              'candidate':b['fingerprint'].get('recovered_controller_failure',False)},
+                timing_scope='Native Palace elapsed remains available; any controller-recovered wall is explicitly tagged, never a clean successful wall sample',
                 reference=a['fingerprint'],candidate=b['fingerprint'],
                 completion={'reference':a['completion'],'candidate':b['completion']},
                 source_unit_proof={'reference':a['source_proof'],'candidate':b['source_proof']},
