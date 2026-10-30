@@ -1,7 +1,7 @@
 # Plan: preprocessing, operatory i I/O
 
 Mode: goal
-Active: M2
+Active: M3
 
 ## Cel i zakres
 
@@ -10,14 +10,14 @@ bez utraty dokładności medium i dotychczasowych optymalizacji solvera. Nie obi
 zysku przed pomiarem. Osobno mierzyć pamięć, czas fazy oraz całe wykonanie.
 Wykonanie uruchomione na polecenie użytkownika 2026-10-29. Trzej wykonawcy:
 GPT-6.1 Sol high, każdy na swoim branchu; koordynator zbiera i weryfikuje wyniki.
-M0 i M1 zamknięte w zakresie diagnostyki/profilowania; aktywny M2: niezależne prototypy. Użytkownik zgodził się na zatrzymanie
+M0 i M1 zamknięte w zakresie diagnostyki/profilowania; M2 zamknięte zakresowo; aktywny M3: kwalifikacja prototypów. Użytkownik zgodził się na zatrzymanie
 Straty na czas pomiarów; localai-nvfp4.service inactive/dead, MainPID0. Bez cloud i publikacji.
 
 ## Milestones
 
 - [x] M0 — Zamrozić zgodną referencję, źródła/build, testy krótkie i kontrakt pomiaru.
 - [x] M1 — Zintegrować minimalne profilowanie trzech faz, zmierzyć narzut i wybrać rzeczywiste hotspoty.
-- [ ] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
+- [x] M2 — Trzy równoległe ścieżki: po jednym uzasadnionym prototypie preprocessing / operatory / I/O.
 - [ ] M3 — Oddzielnie zakwalifikować każdy patch: poprawność, pamięć, czas; odrzucić nieudane hipotezy.
 - [ ] M4 — Scalić wyłącznie zakwalifikowane zmiany lokalnie i sprawdzić interakcje.
 - [ ] M5 — Potwierdzić zysk całego medium, sweepu i drugiej geometrii; bez zmiany dokładności.
@@ -41,7 +41,8 @@ Nie należy rezygnować z niezależnego, taniego audytu I/O z powodu niższego p
 ## Historia
 
 [Poprzedni plan PR i jego M0](docs/optimization-stages/previous-pr-plan.md) zachowany.
-Stare docs/milestones/M3–M4 i optimization-M* dotyczą wcześniejszych kampanii;
+Stary docs/milestones/M4 i pliki optimization-M* dotyczą wcześniejszych kampanii;
+obecne docs/milestones/M2–M3 opisują już tę kampanię.
 poprzednie checkpointy M1 i M2 zachowano w archiwum. Te dokumenty
 nie zaliczają bramek obecnego planu. Nowe M0–M6 mają dowody w ledgerach tej kampanii
 oraz PROGRESS.md. Obecne zamrożone runtime/bundle pozostają nietknięte.

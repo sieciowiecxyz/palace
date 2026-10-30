@@ -155,3 +155,14 @@ Wyłączenie flagi wraca do oryginału. Tiny+medium3,55 poprawne, lecz bez wykaz
 netzysku; nie zalecany default. [Raport/argv/fallback](pc-basis-fp32.md).
 Probe recipe osobno hashuje współdzielony header; po zmianie native wymaga własnego
 cached build przed kolejnym użyciem. Stare mikrobenchmarki zachowują dawne manifesty.
+
+## Worktree: mtime zgodne z cache
+
+Checkout innego worktree może odświeżyć mtimes setek niezmienionych źródeł.
+Po zgodności hashy z manifestem bazowego native można użyć
+`tools/stage_align_mtimes.py --reference REF --source WORKTREE --manifest REF_MANIFEST --report REPORT.json`.
+Narzędzie zapisuje poprzednie mtimes, zmienia wyłącznie metadane plików identycznych
+bajtowo, nie rusza zmienionych źródeł ani obiektów; potem obowiązkowo dry-run.
+To nie naprawia zmian flag, ABI lub dependencies. Dowód OP06: dry-run110→15TU,
+400 identycznych compiler inputs, sourcehash bez zmian, build42,76s.
+Kompilacje nadal jobs2 i osobne klony cache; zwykły cache nie jest solver offloadem.

@@ -225,6 +225,115 @@ class StageProbeRunnerTests(unittest.TestCase):
             (proc/str(pid)/'cmdline').write_bytes(command)
         self.assertEqual({x['pid'] for x in runner.inference_processes(proc)}, {1,2,3})
 
+    def test_prototype_features_are_explicit_and_canonical(self):
+        self.assertNotIn('PALACE_PROBE_LOCATOR', self.prepare(cpu=True)['environment'])
+        # A new output is required for each prepared case.
+        import shutil
+        shutil.rmtree(self.root/'out')
+        flags={'PALACE_PROBE_LOCATOR':'mfem','PALACE_SINGLE_RANK_DIRECT_MESH':'1'}
+        plan=self.prepare(cpu=True,features=flags)
+        self.assertEqual(plan['features'], flags)
+        for key,value in flags.items():
+            self.assertEqual(plan['environment'][key],value)
+            self.assertIn(key+'='+value, plan['argv'])
+        plan['features']['PALACE_PROBE_LOCATOR']='gslib'
+        runner.dev.write(self.root/'out/plan.json',plan)
+        with self.assertRaisesRegex(ValueError,'command/environment changed'):
+            runner.execute(self.root/'out/plan.json')
+
+    def test_distinct_worktrees_share_a_real_exclusive_host_lock(self):
+        import shutil
+        shared = self.root/'shared-runtime/host.lock'
+        shared.parent.mkdir()
+        other = self.root/'other-source'
+        other.mkdir()
+        for directory in ('palace','cmake','tools'):
+            shutil.copytree(self.root/directory,other/directory)
+        shutil.copyfile(self.root/'CMakeLists.txt',other/'CMakeLists.txt')
+        with mock.patch.object(runner,'host_lock_path',return_value=shared):
+            first=self.prepare(cpu=True)
+            second=runner.prepare(other,self.build,self.run,self.root/'second-out',
+                                  self.driver_record,stage='preprocess',cpu=True)
+            self.assertNotEqual(first['source'],second['source'])
+            self.assertEqual(first['host_lock'],second['host_lock'])
+            with shared.open('a') as held:
+                runner.fcntl.flock(held,runner.fcntl.LOCK_EX|runner.fcntl.LOCK_NB)
+                with self.assertRaises(BlockingIOError):
+                    runner.execute(self.root/'second-out/plan.json')
+
+    def test_unknown_prototype_features_are_rejected(self):
+        for flags in [{'PALACE_STAGE_STOP':'operators'}, {'PALACE_PROBE_LOCATOR':'fast'},
+                      {'PALACE_SINGLE_RANK_DIRECT_MESH':True}, ['mfem']]:
+            with self.subTest(flags=flags),self.assertRaises(ValueError):
+                runner.checked_features(flags)
+
+    def full_prepare(self, **kwargs):
+        with mock.patch.object(runner,'full_expectations',return_value={'fixture':'completion schema'}):
+            return runner.prepare(self.root,self.build,self.run,self.root/'out',self.driver_record,
+                                  stage='full',**kwargs)
+
+    def test_full_prepare_is_explicit_gpu_trace_off_without_stage_stop_or_config_changes(self):
+        flags={'PALACE_PROBE_LOCATOR':'mfem','PALACE_SINGLE_RANK_DIRECT_MESH':'1'}
+        plan=self.full_prepare(seconds=1800,memory_gib=70,features=flags)
+        self.assertFalse(plan['diagnostic_only']);self.assertFalse(plan['rf_qualified'])
+        self.assertEqual(plan['configuration_changes'],{})
+        self.assertEqual((self.root/'out/config.json').read_bytes(),(self.run/'config.json').read_bytes())
+        self.assertNotIn('PALACE_STAGE_STOP',plan['environment'])
+        self.assertNotIn('PALACE_STAGE_TRACE',plan['environment'])
+        self.assertEqual({k:v for k,v in plan['environment'].items() if k in runner.GPU_BASELINE_KEYS},self.baseline)
+        self.assertEqual(plan['features'],flags)
+        self.assertEqual(plan['argv'][plan['argv'].index('--timeout')+1],'1800')
+        self.assertFalse(any('PALACE_STAGE_STOP=' in x or 'PALACE_STAGE_TRACE=' in x for x in plan['argv']))
+        self.assertEqual([call.args[0][:3] for call in self.capture.call_args_list],
+                         [['podman','image','inspect']])
+        plan['environment']['PALACE_STAGE_STOP']='operators'
+        runner.dev.write(self.root/'out/plan.json',plan)
+        with self.assertRaisesRegex(ValueError,'command/environment changed'):
+            runner.execute(self.root/'out/plan.json')
+
+    def test_full_cpu_trace_threads_and_resource_bounds_are_rejected(self):
+        for seconds,memory,threads,cpu,trace in [(1801,8,1,False,False),(0,8,1,False,False),
+                (1800,71,1,False,False),(1800,8,2,False,False),
+                (1800,8,1,True,False),(1800,8,1,False,True)]:
+            with self.subTest(seconds=seconds,memory=memory,threads=threads,cpu=cpu,trace=trace):
+                with self.assertRaises(ValueError):
+                    runner.validate_policy('full',seconds,memory,threads,cpu,96*runner.GIB,trace)
+        runner.validate_policy('full',1800,70,1,False,78*runner.GIB,False)
+        for cpu,threads,trace in [(True,1,False),(False,2,False),(False,1,True)]:
+            with self.assertRaises(ValueError):runner.make_environment('full',threads,cpu,self.baseline,trace)
+
+    def test_full_native_completion_uses_separate_result_and_cleanup(self):
+        plan=self.full_prepare()
+        state={'Pid':0,'StartedAt':'2026-10-30T00:00:00Z','OOMKilled':False}
+        inspection={'State':state,'Image':runner.IMAGE,'Mounts':[],
+                    'HostConfig':{'Memory':8*runner.GIB,'MemorySwap':8*runner.GIB}}
+        def capture(argv):
+            if argv[:3]==['podman','image','inspect']:return 'sha256:'+runner.IMAGE
+            if argv[:2]==['podman','inspect']:return json.dumps([inspection])
+            if argv[:2]==['podman','create']:return 'own-container-id'
+            raise AssertionError(argv)
+        self.capture.side_effect=capture
+        def launch(*args,**kwargs):
+            kwargs['stderr'].write('PALACE_LOG_BUFFERING: stdout=line\n');kwargs['stderr'].flush()
+            process=mock.Mock();process.poll.return_value=0;process.wait.return_value=0
+            return process
+        full={'complete':True,'diagnostic_only':False,'solver_executed':True,'rf_qualified':False}
+        with mock.patch.object(runner,'no_inference',return_value={}), \
+             mock.patch.object(runner,'full_expectations',return_value=plan['full_expectations']), \
+             mock.patch.object(runner,'check_full',return_value=full) as checked, \
+             mock.patch.object(runner,'helper_hashes',return_value=plan['helper_sha256']), \
+             mock.patch.object(runner.subprocess,'Popen',side_effect=launch), \
+             mock.patch.object(runner.subprocess,'run',return_value=mock.Mock(returncode=0)) as cleanup:
+            result=runner.execute(self.root/'out/plan.json')
+        self.assertTrue(result['complete']);self.assertTrue(result['solver_executed'])
+        self.assertFalse(result['diagnostic_only']);self.assertFalse(result['rf_qualified'])
+        self.assertTrue(result['own_container_removed']);checked.assert_called_once()
+        cleanup.assert_called_once()
+        self.assertTrue((self.root/'out/full-result.json').is_file())
+        self.assertFalse((self.root/'out/diagnostic-result.json').exists())
+        with self.assertRaisesRegex(ValueError,'existing execution result'):
+            runner.execute(self.root/'out/plan.json')
+
     def mocked_execution(self, failure):
         plan=self.prepare()
         inspection={'State':{'Pid':0},'Image':runner.IMAGE,'Mounts':[],

@@ -1,3 +1,78 @@
+## Bieżący checkpoint — M2 CLOSED / M3 ACTIVE (2026-10-30)
+
+OP `15045a30a`, PRE `2ab140620`, IO `2e1150c7e`: trzy lokalne commity,
+własne worktree czyste; C++ prototypy nadal NIE zmergowane do root.
+Matched OP source b834/libbc7: operatory 113,196→12,166 s; przygotowanie
+166,716→65,568 s; peak cgroup 12,742→3,633 GiB. Jedna para, bez solve.
+GPU replay E/B 164 sond i 492 complex składowe/pole PASS: relL2
+4,9133e-14 / 9,5320e-14; CUDA witness1200/managedtype3, exact strided
+patterns, firstHostRead15,117/19,852 ms. To syntetyczne FE, nie RF.
+PRE singlepair 53,361→46,025 s /55986tiny PASS.
+IO actual production parser19,040→17,000 s; cold34,049/warm0,441 s;
+≥22 identycznych loads do zwrotu: DEFER auto cache. Strict representation PASS.
+
+Nowy bounded full stage istniejącego runnera: 61 testów Python PASS + archived
+REF completion PASS (2 solves/85its/maxrawrelative8,334129e-7). Rootreview pending;
+checker nie zastępuje A/B RF. Następny krok nieprofilowany OP 1,92 GHz/oba porty,
+exact same build i output, później PRE, powtarzane pary i M4. Actual fullRF NOT RUN.
+Strata inactive/dead0, brak cloud. System goal zachowuje rzeczywisty stan panelu;
+repo Mode goal/Active M3. Nie sumować niezależnych oszczędności przed combined test.
+
+## Bieżący M2 — rzeczywiste zyski przygotowania, RF jeszcze NOT RUN (2026-10-30)
+
+OP06 po negatywnym141/164 i3nieudanychinitialguess: boundedK128/ONEcenterpass
+odnalazł23braki w0,61s, wszystkiepozapierwotnymMFEMsąsiedztwem—udowodnionaprzyczyna.
+Nowysharedhelper/prototype tylkoactorbranch: sourceb834/libbc7a,749assertions/10casesPASS
+(old664+85adversarial:128distractorscap/fallback,ties,outside,boundary,ND/RT/H1complex).
+ACTUALproductionmediumoperators-only:164/164selectedmfem,141+23rescue72trials,
+locator1,623s bezGSLIB, Ops12,166s, Total65,568s. Cgrouppeak3,63GiB (constructoronly),
+GlobalGPUmax7952MiB nieprocesspeak. History115s/169s innybuild; nowySAMEBUILDcontrol
+przygotowanybaseline-medium i oczekuje. PełnyRF/actualfields/speedupfullsimNOTRUN.
+
+PRE03actualsinglewarmOFF/ONpair: Total53,3609→46,0250s(-13,75%),
+Mesh27,7696→21,1045s, cgroup2,3077→1,8349GB(-20,49%);55986tinychecksPASS.
+NiefullRFpromotion. Native493d/source02dd, opt-inrank1directonlyactorbranch.
+
+IO06 pierwszafullcoldstrictFAIL33,77s zachowany. RootznalazłoficjalneMesh.PreserveNumberingMsh2
+(Gmsh4.15.2default0); sparse/permutedtinyreprooldFAIL→explicit1strictPASS, bez poluzowania.
+NowydurableSemanticMismatch witness przedcleanup. CorrectedONEfullcoldPASS:
+source355110567B→binary205675032B hashd91077...; wszystkieIDS/P2conn/nodebits/groupssame,
+cold34,049s peak2,40GiB; ONEHIT0,441s bezGmshAPI/bezwrite. Cachetylkoordinaryinput,
+noSSDsolveroffload. ActualMFEMmediumspeed/equivalencepending; tiny22986assertionsPASS.
+
+Rootcommonhostlockfixedperuser(/run/user/<uid>) cross-worktreeexclusiveflocktestPASS;
+Featureflagsrecordedcanonicalsource/build/config. Metadata-mtime alignment helpersource
+hashverified400unchangedfiles avoids110needlessTUs, nativebuildrescue1CPP4,62s.
+ROOTCPP nadalM1reference0341, prototypyNIEzmergowane. Strataoffforcampaign/userconsent,
+allownedjobscontainersstoppedatsnapshot, nocloud. NextSAMEBUILDOPcontrol, IOnativemedium,
+independentsourcereview thenM3fullRF+unprofiled pairs. Nie zaliczaćM2/M3 za samczasfazy.
+
+## Bieżący M2 — trzy odrębne prototypy, 2026-10-30
+
+OP06: freshnative8854/libfb3d,664assertions/5casesPASS. Actual164probe medium
+kandydat NIE daje speedupu: MFEMFindPoints~0,995s nie znajduje wszystkich punktów,
+więcbezpiecznywholebatchfallbackGSLIB104,33s; Total169,13s. Niepromowany.
+Następna falsyfikowalnapróba: osobnygeometry-onlytool zsameproductionloader,
+missingIDs i3istniejąceinitialguessmetody wjednymwczytaniu; bez104sfallback.
+
+PRE03: native02dd/lib493d,1rankdirectParMesh+Finalize bezASCIIroundtrip i bez
+GeneratePartitioning(1) adjacency.55,986assertionsPASS/0,71s. Pierwszytest29,826
+miałjedenFAIL: błędnezałożenie CheckRefinementFlags poUniformRefinement;
+referencealsofalse0/0, rawperTetflagsidentical. Test-onlycorrection zachowuje
+wszystkietolerancje i dodaje reFinalizebothvalid1/1. Produkcyjnykod bez zmian.
+Nativebuild8,07s. Przygotowane rootdokładne2plany mediumpreprocessOFF/ON; wykonaniepending.
+
+IO06: pinnedMFEMreader supportsbinaryMSH2.2; tinyGmshP2semanticsbits/connectivity
+physicalnamesPASS130nodes100elements (ASCII11896→binary9403B),7testsguardPASS.
+NativeMFEMequivalence/medium/timeNOTRUN. Limitdefault4MiB, żadnej dużejkonwersji.
+
+Naprawaharnessu: jedenniezależny odworktree hostlock /run/user/<uid>/,
+regresjarzeczywistegoflockdlasourcesA/BPASS. Dwa jawneprototypefeatureflags
+wspólnyrunnerwithcanonicalfingerprints. Cache metadatarepairunchangedsources
+110→15TU,42,76sbuildOP; nowyhelperstage_align_mtimes.py2testsPASS i docs/build.
+Nie ma nowychRFkwalifikacji ani promowanego speedupu. ROOTniezawieraprototypów
+actorCPP, tylko narzędzia i dowody. Strata nieaktywna za zgodąnakampanię; cloudwyłączony.
+
 ## Aktywny checkpoint — M1 CLOSED / M2 ACTIVE (2026-10-30)
 
 M1 Solhighdocs-garden i rootreview PASS po doprecyzowaniu IO06gate, zamknięciu stanówPRE E08/E09 i czasachR2; pokrycie99,80%, operatorgap0,024%; ta sama binarkaR2 traceON/OFF

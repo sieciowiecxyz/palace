@@ -4,7 +4,7 @@ Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla z
 
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
-Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M2. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
+Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; wykonanie aktywne, M3; M2 zamknięte zakresowo. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
 
 - [Lokalny pakiet PR](upstream-prs.md)
   - Czytaj gdy: przeglądasz pilot, powtarzasz testy lub ręcznie publikujesz branch
@@ -321,3 +321,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [Archiwum poprzedniego planu PR](optimization-stages/previous-pr-plan.md)
   - Czytaj gdy: potrzebujesz zastąpionych PLAN/MILESTONES i M0 PR.
   - Opis: Zapis stanu sprzed nowej kampanii; nie aktualny status GitHub.
+
+- [Poprzedni checkpoint PR M3](optimization-stages/previous-pr-checkpoint-M3.md)
+  - Czytaj gdy: odtwarzasz historyczną kampanię PR sprzed optymalizacji faz.
+  - Opis: Archiwalny przegląd zasad upstream; nie kwalifikuje obecnego M3.

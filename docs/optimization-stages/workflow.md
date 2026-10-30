@@ -2,7 +2,7 @@
 
 ## Stan i dowody początkowe
 
-2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M2; M0/M1 zamknięte zakresowo 2026-10-30.
+2026-10-29: użytkownik uruchomił wykonanie; Mode goal / Active M3; M0/M1/M2 zamknięte zakresowo 2026-10-30.
 Wykonawcy: GPT-6.1 Sol high. Strata zatrzymana za zgodą użytkownika na czas kampanii; po pomiarach przywrócić usługę.
 Panel systemowy goal wciąż ma stary paused goal; create_goal odrzucone
 z powodu unfinished goal. Nie zamykać starego celu bez osiągnięcia jego kryteriów.
@@ -94,7 +94,9 @@ cały pomiar i cleanup; nie polegać wyłącznie na deklaracji agenta, użyć ws
 host lock w runnerze po sprawdzeniu jego istniejącego API (wdrożenie M0).
 
 Drabina: replay/micro ≤60 s → tiny smoke ≤120 s → same-mesh assembly-only ≤300 s
-→ pełny medium ≤1200 s; sweep ≤3600 s, zawsze osobny limit total i zasobów.
+→ pełny medium początkowo ≤1200 s; sweep ≤3600 s, zawsze osobny limit total i zasobów.
+W M3 koordynator jawnie zatwierdził pełny runner do1800s/case (GPU/OMP1/traceOFF);
+to limit dla przygotowanych planów, bez automatycznego wydłużenia lub retry.
 To początkowe limity lokalne, nie obietnica czasu. Przekroczenie: zatrzymać własne
 zadanie, zapisać fazę i powód; nie automatycznie wydłużać/runować ponownie.
 Mały test nie musi generować/rozwiązywać całej anteny. Gdy nie ma gotowego

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare/execute one bounded M0 native diagnostic; never claim an RF result.
+"""Prepare/execute one bounded native diagnostic or full completion run; no RF qualification.
 
 Uses pinned local Podman image, read-only native/mesh mounts and existing helpers.
 `prepare` performs no container creation or simulation. Execution is explicit.
@@ -11,6 +11,7 @@ import datetime
 import fcntl
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -18,6 +19,7 @@ import time
 import dev
 from stage_operator_reference import compiler_inputs, source_hash
 from stage_preprocess import check_diagnostic
+from stage_full_check import check_full, expectations as full_expectations
 
 IMAGE = '43ac46f6430cf44d7a2da0a618a0f5c67c6965cca2fde510f2a96116333e6d76'
 GIB = 1024**3
@@ -40,14 +42,18 @@ def environment_hash(environment):
 def helper_hashes():
     return {'dev': dev.sha(Path(dev.__file__)),
             'stage_operator_reference': dev.sha(Path(compiler_inputs.__code__.co_filename)),
-            'stage_preprocess': dev.sha(Path(check_diagnostic.__code__.co_filename))}
+            'stage_preprocess': dev.sha(Path(check_diagnostic.__code__.co_filename)),
+            'stage_full_check': dev.sha(Path(check_full.__code__.co_filename))}
 
 
-def validate_policy(stage, seconds, memory_gib, threads, cpu, available):
-    if stage not in ('preprocess', 'operators'):
-        raise ValueError('Only diagnostic stages preprocess/operators are permitted')
-    if type(seconds) is not int or type(memory_gib) is not int or not 1 <= seconds <= 300 or not 4 <= memory_gib <= 70:
-        raise ValueError('Deadline must be 1..300 s and memory budget 4..70 GiB')
+def validate_policy(stage, seconds, memory_gib, threads, cpu, available, stage_trace=False):
+    if stage not in ('preprocess', 'operators', 'full'):
+        raise ValueError('Only preprocess/operators/full stages are permitted')
+    maximum = 1800 if stage == 'full' else 300
+    if type(seconds) is not int or type(memory_gib) is not int or not 1 <= seconds <= maximum or not 4 <= memory_gib <= 70:
+        raise ValueError(f'Deadline must be 1..{maximum} s and memory budget 4..70 GiB')
+    if stage == 'full' and (cpu or threads != 1 or stage_trace is not False):
+        raise ValueError('Full runs require GPU, OMP1 and trace OFF')
     if type(threads) is not int or not 1 <= threads <= 8 or (cpu and threads != 1):
         raise ValueError('Threads must be 1..8; controlled CPU diagnostics require OMP1')
     if available < (memory_gib + 8) * GIB:
@@ -149,9 +155,33 @@ def identity(source, build, run, driver_record):
                 driver_record_sha256=dev.sha(driver_record), cdi=cdi_identity(driver_path)), config
 
 
-def make_environment(stage, threads, cpu, baseline=None, stage_trace=False):
+FEATURE_VALUES = {'PALACE_PROBE_LOCATOR': frozenset(('gslib', 'mfem')),
+                  'PALACE_SINGLE_RANK_DIRECT_MESH': frozenset(('0', '1'))}
+
+
+def checked_features(features):
+    if features is None:
+        return {}
+    if (not isinstance(features, dict) or any(key not in FEATURE_VALUES or
+            not isinstance(value, str) or value not in FEATURE_VALUES[key]
+            for key, value in features.items())):
+        raise ValueError('Only reviewed prototype feature names/values are allowed')
+    return dict(features)
+
+
+def host_lock_path():
+    # One user/host lock across all source checkouts; never put it in a worktree.
+    runtime = Path('/run/user') / str(os.getuid())
+    if not runtime.is_dir():
+        runtime = Path.home() / '.cache/palace'
+    return runtime / 'optimization-stages-host.lock'
+
+
+def make_environment(stage, threads, cpu, baseline=None, stage_trace=False, features=None):
     if type(stage_trace) is not bool:
         raise ValueError('Stage trace must be an explicit boolean')
+    if stage == 'full' and (cpu or threads != 1 or stage_trace):
+        raise ValueError('Full runs require GPU, OMP1 and trace OFF')
     if cpu:
         # CPU tiny is an explicit controlled diagnostic, not the archived GPU profile.
         environment = {'PALACE_LINE_BUFFERED_LOG': '1', 'MFEM_MEMORY': 'host',
@@ -164,11 +194,14 @@ def make_environment(stage, threads, cpu, baseline=None, stage_trace=False):
         if baseline['LD_PRELOAD'] != '/opt/precision/libcudss_fp32.so':
             raise ValueError('Unexpected baseline adapter preload')
         environment = dict(baseline)
-    environment.update(PALACE_STAGE_STOP=stage, OMP_NUM_THREADS=str(threads),
+    if stage != 'full':
+        environment['PALACE_STAGE_STOP'] = stage
+    environment.update(OMP_NUM_THREADS=str(threads),
                        OPENBLAS_NUM_THREADS='1',
                        LD_LIBRARY_PATH='/opt/palace-cudss/lib:/opt/view/lib:/opt/view/lib64:/opt/cudss/lib')
     if stage_trace:
         environment['PALACE_STAGE_TRACE'] = '1'
+    environment.update(checked_features(features))
     return environment
 
 
@@ -184,7 +217,7 @@ def create_argv(plan):
             '-w', '/work']
     for name_, destination in dev.NATIVE_PATHS.items():
         argv += ['-v', f'{native / name_}:{destination}:ro']
-    environment = make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False))
+    environment = make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False),plan.get('features',{}))
     for key, value in environment.items():
         if key != 'LD_PRELOAD':
             argv += ['-e', key+'='+value]
@@ -196,10 +229,11 @@ def create_argv(plan):
 
 
 def prepare(source, build, run, output, driver_record, stage, seconds=120,
-            memory_gib=8, threads=1, cpu=False, stage_trace=False):
+            memory_gib=8, threads=1, cpu=False, stage_trace=False, features=None):
     source, build, run, output, driver_record = (Path(p).resolve() for p in
                                                (source, build, run, output, driver_record))
-    validate_policy(stage, seconds, memory_gib, threads, cpu, dev.available_memory())
+    validate_policy(stage, seconds, memory_gib, threads, cpu, dev.available_memory(), stage_trace)
+    features = checked_features(features)
     observed, config = identity(source, build, run, driver_record)
     image = json.loads(capture(['podman', 'image', 'inspect', IMAGE]))[0]
     if image['Id'].removeprefix('sha256:') != IMAGE:
@@ -214,18 +248,27 @@ def prepare(source, build, run, output, driver_record, stage, seconds=120,
     # Image environment contains no PALACE flags; do not inherit host process env.
     if any(value.startswith('PALACE_') for value in image.get('Config', {}).get('Env', [])):
         raise ValueError('Image carries unexpected inherited PALACE flags')
-    plan = dict(schema=1, stage=stage, diagnostic_only=True, rf_result=False,
+    plan = dict(schema=1, stage=stage, diagnostic_only=stage != 'full', rf_result=False, rf_qualified=False,
                 source=str(source), build=str(build), input_run=str(run), output=str(output),
                 driver_record=str(driver_record), identity=observed, name=name,
-                image_id=IMAGE, seconds=seconds, memory_gib=memory_gib, threads=threads,
-                cpu=cpu, stage_trace=stage_trace, scope='Controlled diagnostic only; CPU override/thread and quota policy are explicit, not an E2E speedup benchmark',
-                configuration_changes=changes, environment=make_environment(stage,threads,cpu,observed['baseline_environment'],stage_trace),
+                image_id=IMAGE, host_lock=str(host_lock_path()), seconds=seconds, memory_gib=memory_gib, threads=threads,
+                cpu=cpu, stage_trace=stage_trace, features=features, scope='Controlled diagnostic only; CPU override/thread and quota policy are explicit, not an E2E speedup benchmark',
+                configuration_changes=changes, environment=make_environment(stage,threads,cpu,observed['baseline_environment'],stage_trace,features),
                 image_config_sha256=hashlib.sha256(json.dumps(image['Config'],sort_keys=True).encode()).hexdigest(),
                 runner_sha256=dev.sha(Path(__file__)), helper_sha256=helper_hashes(), prepared_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
+    if stage == 'full':
+        if config.get('Solver', {}).get('Device') != 'GPU' or not config['Solver'].get('Backend', '').startswith('/gpu/cuda/'):
+            raise ValueError('Full run requires unchanged GPU/CUDA config')
+        plan['full_expectations'] = full_expectations(config, run/observed['postpro'])
+        plan['scope'] = 'Full completion/residual checks only; RF equivalence requires a separate matched comparison'
     plan['argv'] = create_argv(plan)
     output.mkdir(parents=True, exist_ok=False)
-    with (output/'config.json').open('x') as stream:
-        json.dump(config, stream, indent=2); stream.write('\n')
+    if stage == 'full':
+        with (output/'config.json').open('xb') as stream:
+            stream.write((run/'config.json').read_bytes())
+    else:
+        with (output/'config.json').open('x') as stream:
+            json.dump(config, stream, indent=2); stream.write('\n')
     plan['staged_config_sha256'] = dev.sha(output/'config.json')
     dev.write(output/'plan.json', plan)
     return plan
@@ -234,13 +277,20 @@ def prepare(source, build, run, output, driver_record, stage, seconds=120,
 def execute(plan_path):
     plan_path = Path(plan_path).resolve(); plan = dev.read(plan_path)
     output = plan_path.parent
-    if Path(plan['output']) != output or (output/'diagnostic-result.json').exists():
+    if Path(plan['output']) != output or any((output/name).exists() for name in ('diagnostic-result.json', 'full-result.json')):
         raise ValueError('Wrong plan location or existing execution result; no automatic retry')
-    if plan['argv'] != create_argv(plan) or plan['environment'] != make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False)):
+    validate_policy(plan['stage'], plan['seconds'], plan['memory_gib'], plan['threads'], plan['cpu'], dev.available_memory(), plan.get('stage_trace',False))
+    if plan.get('diagnostic_only') != (plan['stage'] != 'full'):
+        raise ValueError('Prepared execution stage classification changed')
+    if plan['argv'] != create_argv(plan) or plan['environment'] != make_environment(plan['stage'],plan['threads'],plan['cpu'],plan['identity']['baseline_environment'],plan.get('stage_trace',False),plan.get('features',{})):
         raise ValueError('Prepared command/environment changed')
     if dev.sha(Path(__file__)) != plan['runner_sha256'] or helper_hashes() != plan['helper_sha256']:
         raise ValueError('Runner or helper changed since preparation')
-    with (Path(plan['source'])/'build/optimization-stages-host.lock').open('a') as lock:
+    shared_lock = host_lock_path()
+    if plan.get('host_lock') != str(shared_lock):
+        raise ValueError('Prepared host lock changed')
+    shared_lock.parent.mkdir(parents=True, exist_ok=True)
+    with shared_lock.open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return _execute(plan, output)
 
@@ -269,18 +319,22 @@ def gpu_sample():
 
 
 def _execute(plan, output):
-    result = dict(diagnostic_only=True, rf_result=False, complete=False,
-                  stage_trace=plan.get('stage_trace',False),
+    result = dict(diagnostic_only=plan['stage'] != 'full', rf_result=False, rf_qualified=False, solver_executed=False, complete=False,
+                  stage_trace=plan.get('stage_trace',False), features=plan.get('features',{}),
                   started_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
     created = False; process = None; cgroup = None
     started = time.monotonic()
     try:
         validate_policy(plan['stage'], plan['seconds'], plan['memory_gib'], plan['threads'],
-                        plan['cpu'], dev.available_memory())
+                        plan['cpu'], dev.available_memory(), plan.get('stage_trace',False))
         result['inference_guard'] = no_inference()
         observed, _ = identity(*(Path(plan[k]) for k in ('source','build','input_run','driver_record')))
         if observed != plan['identity'] or dev.sha(output/'config.json') != plan['staged_config_sha256']:
             raise ValueError('Prepared inputs changed before execution')
+        if plan['stage'] == 'full':
+            expected = full_expectations(dev.read(output/'config.json'), Path(plan['input_run'])/observed['postpro'])
+            if expected != plan.get('full_expectations'):
+                raise ValueError('Full completion expectations changed since preparation')
         # No implicit pull: this exact local image must still exist.
         if capture(['podman','image','inspect',plan['image_id'],'--format','{{.Id}}']).strip().removeprefix('sha256:') != plan['image_id']:
             raise ValueError('Prepared image changed')
@@ -328,7 +382,11 @@ def _execute(plan, output):
         observed_after, _ = identity(*(Path(plan[k]) for k in ('source','build','input_run','driver_record')))
         if observed_after != observed:
             raise ValueError('Input/native identity changed during execution')
-        result['diagnostic'] = check_diagnostic(output/observed['postpro'],output/'palace.stdout.log',plan['stage'])
+        if plan['stage'] == 'full':
+            result['full'] = check_full(output/observed['postpro'],output/'palace.stdout.log',output/'palace.stderr.log',plan['full_expectations'])
+            result['solver_executed'] = result['full']['solver_executed']
+        else:
+            result['diagnostic'] = check_diagnostic(output/observed['postpro'],output/'palace.stdout.log',plan['stage'])
         result['complete'] = True
     except BaseException as error:
         result['error'] = repr(error)
@@ -348,7 +406,7 @@ def _execute(plan, output):
         finally:
             result['elapsed_seconds'] = time.monotonic()-started
             result['finished_utc'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            dev.write(output/'diagnostic-result.json',result)
+            dev.write(output/('full-result.json' if plan['stage'] == 'full' else 'diagnostic-result.json'),result)
         if cleanup_error is not None and 'error' not in result:
             raise RuntimeError('Diagnostic cleanup failed') from cleanup_error
     return result
@@ -360,15 +418,23 @@ def main():
     p=sub.add_parser('prepare')
     for key in ('source','build','run','output','driver-record'):
         p.add_argument('--'+key,type=Path,required=True)
-    p.add_argument('--stage',choices=['preprocess','operators'],required=True)
+    p.add_argument('--stage',choices=['preprocess','operators','full'],required=True)
     p.add_argument('--seconds',type=int,default=120)
     p.add_argument('--memory-gib',type=int,default=8)
     p.add_argument('--threads',type=int,default=1)
     p.add_argument('--cpu',action='store_true')
     p.add_argument('--stage-trace',action='store_true',help='Opt-in inclusive host phase trace; does not change numerical config')
+    p.add_argument('--probe-locator',choices=('gslib','mfem'),help='Explicit experimental locator; default leaves production choice unchanged')
+    p.add_argument('--direct-mesh',choices=('0','1'),help='Explicit experimental rank-one mesh distribution')
     sub.add_parser('execute').add_argument('plan',type=Path)
     args=parser.parse_args()
-    result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu,args.stage_trace)
+    features = {}
+    if args.action == 'prepare':
+        if args.probe_locator is not None:
+            features['PALACE_PROBE_LOCATOR'] = args.probe_locator
+        if args.direct_mesh is not None:
+            features['PALACE_SINGLE_RANK_DIRECT_MESH'] = args.direct_mesh
+    result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu,args.stage_trace,features)
     print(json.dumps(result,indent=2))
 
 if __name__=='__main__': main()
