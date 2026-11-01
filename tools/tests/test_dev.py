@@ -13,6 +13,33 @@ spec.loader.exec_module(dev)
 
 
 class ToolRegressionTests(unittest.TestCase):
+    def test_builder_reuses_cache_through_relocated_source_alias(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / 'source'
+            root.mkdir()
+            alias = Path(td) / 'old-source'
+            alias.symlink_to(root, target_is_directory=True)
+            settings = {'builder_image': 'image'}
+            for mount, allowed in [(alias, True), (Path(td) / 'other', False)]:
+                container = {'Image': 'image', 'Mounts': [
+                    {'Destination': '/src/palace', 'Source': str(mount)}]}
+                with (
+                    self.subTest(mount=mount),
+                    patch.object(dev, 'ROOT', root),
+                    patch.object(dev, 'image_id', return_value='image'),
+                    patch.object(dev, 'read_output', return_value=[container]),
+                    patch.object(dev.subprocess, 'run', return_value=Mock(returncode=0)),
+                    patch.object(dev, 'command') as command,
+                ):
+                    if allowed:
+                        dev.builder(settings)
+                        command.assert_called_once_with(
+                            ['podman', 'start', dev.container_name()], stdout=subprocess.DEVNULL)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'another source tree'):
+                            dev.builder(settings)
+                        command.assert_not_called()
+
     def test_cleanup_and_incomplete_receipt_cover_metadata_and_container_create_failures(self):
         real_write=dev.write
         for stage in ['metadata','create']:

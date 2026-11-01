@@ -1,5 +1,13 @@
 # Build i cache — lokalny SM120
 
+Kanoniczny checkout: `~/dev/python/anteny/infra/palace/source` (od 2026-11-01).
+Uruchamiaj poniższe komendy z tego katalogu. `~/dev/cpp/palace` jest linkiem
+zgodności. Zachowano katalogi cache, pliki buildów i systemy plików builderów;
+nie kompiluj zależności od nowa z powodu zmiany ścieżki. Bind mount może nadal
+wskazywać starą ścieżkę, jeśli rozwiązuje się do tego samego checkoutu.
+Zachowane buildery przemianowano według hasha nowej ścieżki, bez zmiany ich
+ID, obrazów ani systemów plików.
+
 ## Wymagania i pierwsze uruchomienie
 
 Linux x86-64, Python 3.11+, Podman, zstd. GPU run wymaga NVIDIA driver/CDI (`nvidia.com/gpu=all`). Nie są potrzebne pip ani systemowy CUDA toolkit: kompilatory i zależności są w builderze. Profil: CUDA 12.9.1, cuDSS 0.7.1.4, SM120, Release.

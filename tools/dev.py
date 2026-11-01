@@ -90,7 +90,8 @@ def builder(settings):
         if actual['Image'].removeprefix('sha256:') != expected:
             raise ValueError('Builder image changed; preserve/export its cache before recreating it')
         mounts = {m['Destination']: m['Source'] for m in actual['Mounts']}
-        if mounts.get('/src/palace') != str(ROOT):
+        source_mount = mounts.get('/src/palace')
+        if not source_mount or Path(source_mount).resolve() != ROOT.resolve():
             raise ValueError('Existing builder points at another source tree')
     else:
         cache = ROOT / '.cache/ccache'
