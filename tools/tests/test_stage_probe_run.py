@@ -271,6 +271,43 @@ class StageProbeRunnerTests(unittest.TestCase):
             with self.subTest(flags=flags),self.assertRaises(ValueError):
                 runner.checked_features(flags)
 
+    def test_mixed_coarse_requires_paired_flags_and_full_native_cuda_context(self):
+        flags = {'PALACE_NATIVE_COARSE_FP32': '1', 'PALACE_NATIVE_COARSE_CORRECTIONS': '2'}
+        actual = runner.make_environment('full', 1, False, self.baseline, features=flags)
+        self.assertEqual({k: actual[k] for k in flags}, flags)
+        default = runner.make_environment('full', 1, False, self.baseline)
+        self.assertNotIn('PALACE_NATIVE_COARSE_FP32', default)
+        for invalid in ({'PALACE_NATIVE_COARSE_FP32': '1'},
+                        {'PALACE_NATIVE_COARSE_CORRECTIONS': '2'},
+                        {**flags, 'PALACE_NATIVE_COARSE_CORRECTIONS': '4'},
+                        {**flags, 'PALACE_NATIVE_COARSE_FP32': True}):
+            with self.subTest(flags=invalid), self.assertRaises(ValueError):
+                runner.checked_features(invalid)
+        for stage, cpu, baseline in [('operators', False, self.baseline),
+                                     ('preprocess', True, None),
+                                     ('full', False, {**self.baseline, 'PALACE_NATIVE_COMPLEX_COARSE': '0'})]:
+            with self.subTest(stage=stage, cpu=cpu), self.assertRaises(ValueError):
+                runner.make_environment(stage, 1, cpu, baseline, features=flags)
+
+    def test_mixed_coarse_requires_actual_dtype_and_bounded_fp64_corrections(self):
+        flags = {'PALACE_NATIVE_COARSE_FP32': '1', 'PALACE_NATIVE_COARSE_CORRECTIONS': '2'}
+        log = self.root/'mixed.log'
+        dtype = 'PALACE_NATIVE_COMPLEX_COARSE: dimension=10 nnz=30 dtype=complex_fp32 matrix=general\n'
+        good = 'PALACE_NATIVE_MIXED_COARSE: solves=4 corrections=2 max_relative_residual=2.0e-5 backend=cuda_fp64\n'
+        log.write_text(dtype + good)
+        self.assertEqual(runner.check_mixed_coarse(log, flags)['max_relative_residual'], 2e-5)
+        fixed3 = {**flags, 'PALACE_NATIVE_COARSE_CORRECTIONS': '3'}
+        log.write_text(dtype + good.replace('corrections=2', 'corrections=3'))
+        self.assertEqual(runner.check_mixed_coarse(log, fixed3)['corrections'], 3)
+        for invalid in ('', dtype, good, dtype.replace('complex_fp32', 'complex_fp64') + good,
+                        dtype + good.replace('corrections=2', 'corrections=3'),
+                        dtype + good.replace('solves=4', 'solves=0'),
+                        dtype + good.replace('2.0e-5', 'nan'),
+                        dtype + good.replace('2.0e-5', '1.1e-3')):
+            with self.subTest(log=invalid), self.assertRaises(ValueError):
+                log.write_text(invalid)
+                runner.check_mixed_coarse(log, flags)
+
     def full_prepare(self, **kwargs):
         with mock.patch.object(runner,'full_expectations',return_value={'fixture':'completion schema'}):
             return runner.prepare(self.root,self.build,self.run,self.root/'out',self.driver_record,

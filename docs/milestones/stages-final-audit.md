@@ -88,3 +88,25 @@ w worktree `palace-opt-integration`. Stąd powyższe `--source` wskazuje snapsho
 nie aktualny root. Przykład zapisany w M6 powstał przed tą zmianą; dawnych planów
 z `source=root` nie wykonywać ponownie po zmianie źródeł. Nową opcję opisuje
 [OpenMP](../probe-openmp.md); jej build/zakres walidacji są osobne.
+
+## Explicit mixed-coarse admission (2026-11-02)
+
+The prepared runner accepts `--native-coarse-fp32` with an explicit fixed
+FP64-correction count of `2` or `3`; when the correction option is omitted,
+the opt-in defaults to `2`. Both feature flags must be paired. The default
+FP64-coarse profile is unchanged. This exposes the already compiled solver
+path without rebuilding dependencies or changing FEM physics.
+
+The runner admits mixed coarse only for a full CUDA run with the explicit
+native-complex baseline. Completion requires log evidence of complex-FP32
+coarse factors and the requested number of original-FP64 corrections, a
+finite relative coarse residual no greater than `1e-3`, and the independent
+outer raw-residual gate no greater than `1e-6`. Partial/CPU runs, unpaired
+flags, unsupported correction counts, or missing/mismatched execution markers
+fail.
+
+Tiny agreement does not qualify a larger antenna: the current C20 cases fail
+this coarse gate. Keep campaign evidence in the antenna workspace's
+`docs/research/ap06-local-memory.md`; these controls do not promote that profile.
+Do not relax either residual gate or increase the count without a separate
+reviewed experiment.

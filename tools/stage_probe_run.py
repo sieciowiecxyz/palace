@@ -11,8 +11,10 @@ import datetime
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import time
 
@@ -157,7 +159,9 @@ def identity(source, build, run, driver_record):
 
 FEATURE_VALUES = {'PALACE_PROBE_LOCATOR': frozenset(('gslib', 'mfem')),
                   'PALACE_SINGLE_RANK_DIRECT_MESH': frozenset(('0', '1')),
-                  'PALACE_PROBE_THREADS': frozenset(str(n) for n in range(1,65))}
+                  'PALACE_PROBE_THREADS': frozenset(str(n) for n in range(1,65)),
+                  'PALACE_NATIVE_COARSE_FP32': frozenset(('1',)),
+                  'PALACE_NATIVE_COARSE_CORRECTIONS': frozenset(('2', '3'))}
 
 
 def checked_features(features):
@@ -169,6 +173,9 @@ def checked_features(features):
         raise ValueError('Only reviewed prototype feature names/values are allowed')
     if 'PALACE_PROBE_THREADS' in features and features.get('PALACE_PROBE_LOCATOR') != 'mfem':
         raise ValueError('Probe threads require the explicit MFEM locator')
+    mixed = {'PALACE_NATIVE_COARSE_FP32', 'PALACE_NATIVE_COARSE_CORRECTIONS'}
+    if mixed.intersection(features) and not mixed <= features.keys():
+        raise ValueError('Mixed coarse requires explicit FP32 factors and a fixed FP64 correction count')
     return dict(features)
 
 
@@ -205,7 +212,32 @@ def make_environment(stage, threads, cpu, baseline=None, stage_trace=False, feat
     if stage_trace:
         environment['PALACE_STAGE_TRACE'] = '1'
     environment.update(checked_features(features))
+    if 'PALACE_NATIVE_COARSE_FP32' in environment and (
+            stage != 'full' or cpu or environment.get('PALACE_NATIVE_COMPLEX_COARSE') != '1'):
+        raise ValueError('Mixed coarse requires a full CUDA native-complex run')
     return environment
+
+
+def check_mixed_coarse(stdout, features):
+    """Require executed dtype and original-FP64 correction evidence, not just flags."""
+    if 'PALACE_NATIVE_COARSE_FP32' not in features:
+        return None
+    text = Path(stdout).read_text()
+    dtypes = re.findall(r'^PALACE_NATIVE_COMPLEX_COARSE: .* dtype=(\w+) matrix=general$',
+                        text, re.MULTILINE)
+    summaries = re.findall(r'^PALACE_NATIVE_MIXED_COARSE: solves=(\d+) corrections=(\d+) '
+                           r'max_relative_residual=(\S+) backend=cuda_fp64$', text, re.MULTILINE)
+    if not dtypes or set(dtypes) != {'complex_fp32'} or not summaries:
+        raise ValueError('Mixed coarse executed dtype/correction evidence missing')
+    residuals = []
+    for solves, corrections, value in summaries:
+        residual = float(value)
+        if (int(solves) < 1 or corrections != features['PALACE_NATIVE_COARSE_CORRECTIONS']
+                or not math.isfinite(residual) or not 0 <= residual <= 1e-3):
+            raise ValueError('Mixed coarse original FP64 residual/correction guard failed')
+        residuals.append(residual)
+    return dict(dtype='complex_fp32', corrections=int(features['PALACE_NATIVE_COARSE_CORRECTIONS']), correction_residual_dtype='fp64',
+                max_relative_residual=max(residuals), residual_limit=1e-3)
 
 
 def create_argv(plan):
@@ -569,6 +601,8 @@ def _execute(plan, output):
             raise ValueError('Input/native identity changed during execution')
         if plan['stage'] == 'full':
             result['full'] = check_full(output/observed['postpro'],output/'palace.stdout.log',output/'palace.stderr.log',plan['full_expectations'])
+            if 'PALACE_NATIVE_COARSE_FP32' in plan.get('features', {}):
+                result['mixed_coarse'] = check_mixed_coarse(output/'palace.stdout.log', plan['features'])
             result['solver_executed'] = result['full']['solver_executed']
         else:
             result['diagnostic'] = check_diagnostic(output/observed['postpro'],output/'palace.stdout.log',plan['stage'])
@@ -612,6 +646,8 @@ def main():
     p.add_argument('--probe-locator',choices=('gslib','mfem'),help='Explicit experimental locator; default leaves production choice unchanged')
     p.add_argument('--direct-mesh',choices=('0','1'),help='Explicit experimental rank-one mesh distribution')
     p.add_argument('--probe-threads',type=int,metavar='N',help='Local OpenMP candidate search team,1..64; requires --probe-locator mfem, leaves global OMP unchanged')
+    p.add_argument('--native-coarse-fp32', action='store_true', help='Experimental full-run complex FP32 factors with two original-FP64 corrections; requires native-complex baseline')
+    p.add_argument('--native-coarse-corrections', type=int, choices=(2, 3), help='Explicit fixed correction count; requires --native-coarse-fp32, default2')
     sub.add_parser('execute').add_argument('plan',type=Path)
     recovery = sub.add_parser('recover-completion', help='Offline approved cgroup end-race proof; default read-only preview')
     recovery.add_argument('--run', type=Path, required=True)
@@ -628,6 +664,11 @@ def main():
             features['PALACE_SINGLE_RANK_DIRECT_MESH'] = args.direct_mesh
         if args.probe_threads is not None:
             features['PALACE_PROBE_THREADS'] = str(args.probe_threads)
+        if args.native_coarse_corrections is not None and not args.native_coarse_fp32:
+            parser.error('--native-coarse-corrections requires --native-coarse-fp32')
+        if args.native_coarse_fp32:
+            features.update(PALACE_NATIVE_COARSE_FP32='1',
+                            PALACE_NATIVE_COARSE_CORRECTIONS=str(args.native_coarse_corrections or 2))
     result=execute(args.plan) if args.action=='execute' else prepare(args.source,args.build,args.run,args.output,args.driver_record,args.stage,args.seconds,args.memory_gib,args.threads,args.cpu,args.stage_trace,features)
     print(json.dumps(result,indent=2))
 
