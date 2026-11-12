@@ -55,8 +55,19 @@ BilinearForm::PartialAssemble(const FiniteElementSpace &trial_fespace,
     PalacePragmaOmp(parallel if (ceed::internal::NumCeeds() > 1))
     {
       Ceed ceed = ceed::internal::GetCeedObjects()[utils::GetThreadNum()];
-      for (const auto &[geom, data] : mesh.GetCeedGeomFactorData(ceed))
+      const auto &geometry_data = [&]() -> const auto &
       {
+        StageProfile profile("operators.geom_factor_data");
+        return mesh.GetCeedGeomFactorData(ceed);
+      }();
+      for (const auto &[geom, data] : geometry_data)
+      {
+        const char *trace = std::getenv("PALACE_STAGE_TRACE");
+        if (trace && std::strcmp(trace, "1") == 0)
+        {
+          std::fprintf(stderr, "PALACE_STAGE_GEOMETRY {\"geom\":%d,\"dimension\":%d,\"elements\":%zu}\n",
+                       static_cast<int>(geom), mfem::Geometry::Dimension[geom], data.indices.size());
+        }
         const auto trial_map_type =
             trial_fespace.GetFEColl().GetMapType(mfem::Geometry::Dimension[geom]);
         const auto test_map_type =
@@ -65,40 +76,80 @@ BilinearForm::PartialAssemble(const FiniteElementSpace &trial_fespace,
         if (mfem::Geometry::Dimension[geom] == mesh.Dimension() && !domain_integs.empty())
         {
           // Assemble domain integrators on this element geometry type.
-          CeedElemRestriction trial_restr =
-              trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-          CeedElemRestriction test_restr =
-              test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-          CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
-          CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
+          CeedElemRestriction trial_restr = [&]()
+          {
+            StageProfile profile("operators.trial_restriction");
+            return trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          }();
+          CeedElemRestriction test_restr = [&]()
+          {
+            StageProfile profile("operators.test_restriction");
+            return test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          }();
+          CeedBasis trial_basis = [&]()
+          {
+            StageProfile profile("operators.trial_basis");
+            return trial_fespace.GetCeedBasis(ceed, geom);
+          }();
+          CeedBasis test_basis = [&]()
+          {
+            StageProfile profile("operators.test_basis");
+            return test_fespace.GetCeedBasis(ceed, geom);
+          }();
 
           for (const auto &integ : domain_integs)
           {
             CeedOperator sub_op;
             integ->SetMapTypes(trial_map_type, test_map_type);
-            integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
-                            data.geom_data, data.geom_data_restr, &sub_op);
-            op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+            {
+              StageProfile profile("operators.integrator_assemble");
+              integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
+                              data.geom_data, data.geom_data_restr, &sub_op);
+            }
+            {
+              StageProfile profile("operators.add_suboperator");
+              op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+            }
           }
         }
         else if (mfem::Geometry::Dimension[geom] == mesh.Dimension() - 1 &&
                  !boundary_integs.empty())
         {
           // Assemble boundary integrators on this element geometry type.
-          CeedElemRestriction trial_restr =
-              trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-          CeedElemRestriction test_restr =
-              test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
-          CeedBasis trial_basis = trial_fespace.GetCeedBasis(ceed, geom);
-          CeedBasis test_basis = test_fespace.GetCeedBasis(ceed, geom);
+          CeedElemRestriction trial_restr = [&]()
+          {
+            StageProfile profile("operators.trial_restriction");
+            return trial_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          }();
+          CeedElemRestriction test_restr = [&]()
+          {
+            StageProfile profile("operators.test_restriction");
+            return test_fespace.GetCeedElemRestriction(ceed, geom, data.indices);
+          }();
+          CeedBasis trial_basis = [&]()
+          {
+            StageProfile profile("operators.trial_basis");
+            return trial_fespace.GetCeedBasis(ceed, geom);
+          }();
+          CeedBasis test_basis = [&]()
+          {
+            StageProfile profile("operators.test_basis");
+            return test_fespace.GetCeedBasis(ceed, geom);
+          }();
 
           for (const auto &integ : boundary_integs)
           {
             CeedOperator sub_op;
             integ->SetMapTypes(trial_map_type, test_map_type);
-            integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
-                            data.geom_data, data.geom_data_restr, &sub_op);
-            op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+            {
+              StageProfile profile("operators.integrator_assemble");
+              integ->Assemble(ceed, trial_restr, test_restr, trial_basis, test_basis,
+                              data.geom_data, data.geom_data_restr, &sub_op);
+            }
+            {
+              StageProfile profile("operators.add_suboperator");
+              op->AddSubOperator(sub_op);  // Sub-operator owned by ceed::Operator
+            }
           }
         }
       }
