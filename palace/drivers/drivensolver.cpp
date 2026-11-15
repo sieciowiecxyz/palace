@@ -37,6 +37,7 @@
 #include "utils/iodata.hpp"
 #include "utils/memorymark.hpp"
 #include "utils/prettyprint.hpp"
+#include "utils/portadjoint.hpp"
 #include "utils/timer.hpp"
 #include "utils/sweepprojection.hpp"
 #include "utils/stageprobe.hpp"
@@ -129,6 +130,17 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   if (RequestedStageProbe() == StageProbe::Operators)
   {
     throw StageProbeComplete{StageProbe::Operators};
+  }
+
+  PortAdjointProbe port_adjoint(iodata, space_op, omega_sample.front());
+  if (port_adjoint.OperatorOnly())
+  {
+    const auto omega = omega_sample.front();
+    auto A2 = space_op.GetExtraSystemOperator(omega, Operator::DIAG_ZERO);
+    auto A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i*omega, -omega*omega + 0.0i,
+                                    K.get(), C.get(), M.get(), A2.get());
+    port_adjoint.Apply(*A);
+    return ErrorIndicator();
   }
 
   // Set up the linear solver.
@@ -534,6 +546,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
     Mpi::Print("\n");
     MemoryMark("gmres.begin");
     ksp->Mult(RHS, E);
+    port_adjoint.Capture(excitation_idx, E, *(reuse_port_setup ? retained_A : A));
     MemoryMark("gmres.end");
     if (frequency_batch && iodata.solver.linear.initial_guess)
     {

@@ -2,6 +2,10 @@
 
 Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla zmienianej części.
 
+- [Port adjoint probe](port-adjoint.md)
+  - Czytaj gdy: przygotowujesz lub przeglądasz stałosiatkowy eksperyment adjoint z dwoma portami.
+  - Opis: Kontrakt opt-in capture/replay true-DOF, twarda bramka true-RHS i ograniczenia pilota.
+
 Pliki główne: [PLAN](../PLAN.md) — kolejka i postęp, [MILESTONES](../MILESTONES.md) — bramki akceptacji, [PROGRESS](../PROGRESS.md) — bieżący stan i wyniki eksperymentów.
 
 Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operatorów i I/O; kampania zakończona zakresowo, M6; rekomendowany profil Restart1. Starsze badania i przygotowanie PR mają osobny zakres historyczny.
