@@ -27,8 +27,8 @@ public:
   void SetReorderReuse(bool reorder_reuse);
 };
 
-// Experimental single-rank complex coarse without a real 2N block: FP64 default;
-// opt-in scaled FP32 LU with two original-FP64 corrections.
+// Experimental single-rank complex coarse without a real 2N block: scaled FP32 LU
+// with original-FP64 corrections by default; PALACE_NATIVE_COARSE_FP32=0 selects FP64.
 // The default MfemWrapperSolver path remains separate.
 class ComplexCuDSSSolver final : public Solver<ComplexOperator>
 {
