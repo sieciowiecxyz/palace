@@ -80,8 +80,14 @@ void reserve_memory() {
     std::fprintf(stderr,"CUDA_UVM_PRESSURE: reserved_device_bytes=%zu\n",s.reserved);
   });
 }
+// Smallest traced allocation; PALACE_CUDA_ALLOC_TRACE_MIN_KIB lowers the 16 MiB default.
+size_t trace_min() {
+  static const size_t value=[]{const char *s=std::getenv("PALACE_CUDA_ALLOC_TRACE_MIN_KIB");
+    return s?size_t(std::strtoull(s,nullptr,10))*1024:size_t(16)*1024*1024;}();
+  return value;
+}
 void trace_managed(const char *event, void *p, size_t n, uint64_t live) {
-  if(!flag("PALACE_CUDA_ALLOC_TRACE") || n<16*1024*1024)return;
+  if(!flag("PALACE_CUDA_ALLOC_TRACE") || n<trace_min())return;
   auto t=std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
   std::fprintf(stderr,"PALACE_ALLOC {\"event\":\"%s\",\"kind\":\"managed\",\"pointer\":\"%p\",\"bytes\":%zu,\"logical_live_bytes\":%llu,\"t_s\":%.9f}\n",
                event,p,n,(unsigned long long)live,t);

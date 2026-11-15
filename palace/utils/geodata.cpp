@@ -323,10 +323,12 @@ std::unique_ptr<mfem::ParMesh> Partition(IoData &iodata, std::unique_ptr<mfem::M
   MFEM_VERIFY(!direct_option || std::strcmp(direct_option, "0") == 0 ||
                   std::strcmp(direct_option, "1") == 0,
               "PALACE_SINGLE_RANK_DIRECT_MESH must be 0 or 1!");
-  const bool direct_requested = direct_option && std::strcmp(direct_option, "1") == 0;
+  // On by default: one rank needs no partition graph and no MeshPart ASCII round trip.
+  // PALACE_SINGLE_RANK_DIRECT_MESH=0 restores the original distribution path.
+  const bool direct_requested = !direct_option || std::strcmp(direct_option, "1") == 0;
   const bool direct = direct_requested && Mpi::Size(comm) == 1 && !use_amr &&
                       smesh && smesh->Conforming() && !smesh->NURBSext;
-  if (direct_requested && !direct)
+  if (direct_option && direct_requested && !direct)
   {
     Mpi::Print(comm, "PALACE_SINGLE_RANK_DIRECT_MESH: fallback=original "
                      "requires=single-rank,conforming,non-NURBS,no-AMR\n");
