@@ -55,7 +55,7 @@ int FixedCorrections(bool mixed)
   if (!value) return 2;
   MFEM_VERIFY(mixed, "Fixed coarse corrections require native mixed precision!");
   const std::string_view count(value);
-  MFEM_VERIFY(count == "2" || count == "3" || count == "4",
+  MFEM_VERIFY(count == "0" || count == "1" || count == "2" || count == "3" || count == "4",
               "Fixed coarse corrections must be 2, 3 or 4!");
   return value[0] - '0';
 }
@@ -76,11 +76,15 @@ struct ComplexCuDSSSolver::Impl
   // The driven coarse matrix is complex symmetric (A^T = A, not Hermitian): LDL^T on the
   // upper triangle needs about half the factor memory and work of a general LU.
   // PALACE_COARSE_GENERAL=1 restores the general LU on the full matrix.
-  const bool symmetric = !mixed && !std::getenv("PALACE_COARSE_GENERAL");
+  const bool symmetric = !std::getenv("PALACE_COARSE_GENERAL");
   // The sparsity is the same at every frequency: keep the symbolic analysis and only
   // refactorize. PALACE_COARSE_NO_REUSE=1 restores a full rebuild per operator.
-  const bool reuse = !mixed && !std::getenv("PALACE_COARSE_NO_REUSE") &&
+  const bool reuse = !std::getenv("PALACE_COARSE_NO_REUSE") &&
                      !std::getenv("PALACE_CUDSS_HYBRID_MIB");
+  // Mixed + symmetric: cuDSS gets the FP32 upper triangle, while the FP64 corrections
+  // keep the full CSR in offsets/columns/values.
+  mfem::Array<int> upper_offsets, upper_columns;
+  Vector upper_values;
   const int corrections = FixedCorrections(mixed);
   Vector scale;
   mutable Vector residual;
@@ -163,11 +167,19 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   std::vector<int> offsets(n + 1), columns;
   std::vector<double> values;
   std::vector<double> scales(impl->mixed ? n : 0);
+  // offsets/columns/values: the full matrix when it is needed (general LU, or the FP64
+  // residual of the mixed mode), else only the upper triangle. upper_*: the cuDSS input
+  // of the symmetric mixed mode.
+  const bool keep_full = impl->mixed || !impl->symmetric;
+  const bool keep_upper = impl->mixed && impl->symmetric;
+  std::vector<int> upper_offsets(keep_upper ? n + 1 : 0), upper_columns;
+  std::vector<double> upper_values;
   const double threshold = drop_small_entries ? std::pow(std::numeric_limits<double>::epsilon(), 2) : -1.0;
   std::vector<std::pair<int, std::complex<double>>> entries;
   for (int row = 0; row < n; ++row)
   {
     offsets[row] = int(columns.size());
+    if (keep_upper) upper_offsets[row] = int(upper_columns.size());
     entries.clear();
     if (ar) for (int k = ri[row]; k < ri[row + 1]; ++k) entries.emplace_back(rj[k], rv[k]);
     if (ai) for (int k = ii[row]; k < ii[row + 1]; ++k)
@@ -181,10 +193,16 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
       for (; first < entries.size() && entries[first].first == column; ++first)
         value += entries[first].second;
       MFEM_VERIFY(column >= 0 && column < n, "Invalid single-rank coarse column!");
-      if (impl->symmetric && column < row) continue;
       if (std::abs(value.real()) < threshold) value.real(0.0);
       if (std::abs(value.imag()) < threshold) value.imag(0.0);
       if (drop_small_entries && value == 0.0) continue;
+      if (keep_upper && column >= row)
+      {
+        upper_columns.push_back(column);
+        upper_values.push_back(value.real());
+        upper_values.push_back(value.imag());
+      }
+      if (!keep_full && column < row) continue;
       MFEM_VERIFY(values.size() + 2 <= size_t(std::numeric_limits<int>::max()),
                   "Native complex CSR exceeds supported int-sized MFEM storage!");
       columns.push_back(column);
@@ -193,6 +211,7 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     }
   }
   offsets[n] = int(columns.size());
+  if (keep_upper) upper_offsets[n] = int(upper_columns.size());
   if (impl->mixed)
   {
     // Equilibrate the exact stored coarse CSR, including the existing drop policy.
@@ -236,6 +255,29 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
                hash(hash(seed, offsets), columns), hash(seed, values));
   }
   const auto merge_end = std::chrono::steady_clock::now();
+  // Scaled FP32 values of the cuDSS matrix (mixed mode), from the arrays already stored
+  // in impl; returns the device pointer.
+  const auto pack_mixed = [&]() -> void *
+  {
+    if (keep_upper)
+    {
+      impl->upper_values.UseDevice(true);
+      impl->upper_values.SetSize(int(upper_values.size()));
+      std::copy(upper_values.begin(), upper_values.end(), impl->upper_values.HostWrite());
+      impl->float_values.SetSize(impl->upper_columns.Size());
+      CheckCuda(mixedcoarse::MatrixPack(n, impl->upper_offsets.Read(), impl->upper_columns.Read(),
+          reinterpret_cast<const cuDoubleComplex *>(impl->upper_values.Read()), impl->scale.Read(),
+          impl->float_values.Write()));
+    }
+    else
+    {
+      impl->float_values.SetSize(impl->columns.Size());
+      CheckCuda(mixedcoarse::MatrixPack(n, impl->offsets.Read(), impl->columns.Read(),
+          reinterpret_cast<const cuDoubleComplex *>(impl->values.Read()), impl->scale.Read(),
+          impl->float_values.Write()));
+    }
+    return impl->float_values.Write();
+  };
   if (impl->reuse && impl->handle && impl->offsets.Size() == n + 1 &&
       impl->columns.Size() == int(columns.size()) &&
       std::equal(offsets.begin(), offsets.end(), impl->offsets.HostRead()) &&
@@ -247,7 +289,8 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     imag.Clear();
     if (pr) pr->StealParallelAssemble();
     if (pi) pi->StealParallelAssemble();
-    Check(cudssMatrixSetValues(impl->matrix, const_cast<double *>(impl->values.Read())));
+    Check(cudssMatrixSetValues(impl->matrix, impl->mixed ? pack_mixed()
+                                                          : const_cast<double *>(impl->values.Read())));
     Sync();
     const auto factor_begin = std::chrono::steady_clock::now();
     Check(cudssExecute(impl->handle, CUDSS_PHASE_FACTORIZATION, impl->config, impl->data,
@@ -271,6 +314,13 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   std::copy(offsets.begin(), offsets.end(), impl->offsets.HostWrite());
   std::copy(columns.begin(), columns.end(), impl->columns.HostWrite());
   std::copy(values.begin(), values.end(), impl->values.HostWrite());
+  if (keep_upper)
+  {
+    impl->upper_offsets.SetSize(n + 1);
+    impl->upper_columns.SetSize(int(upper_columns.size()));
+    std::copy(upper_offsets.begin(), upper_offsets.end(), impl->upper_offsets.HostWrite());
+    std::copy(upper_columns.begin(), upper_columns.end(), impl->upper_columns.HostWrite());
+  }
   // Release assembly and temporary host copies before factorization.
   real.Clear();
   imag.Clear();
@@ -306,22 +356,20 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     // use the original FP64 CSR. A fixed count preserves the chosen PC structure.
     int refinement = 0;
     Check(cudssConfigSet(impl->config, CUDSS_CONFIG_IR_N_STEPS, &refinement, sizeof(refinement)));
-    impl->float_values.SetSize(impl->columns.Size());
     impl->float_rhs.SetSize(n);
     impl->float_solution.SetSize(n);
     impl->residual.SetSize(2*n);
     impl->invalid.SetSize(1);
-    CheckCuda(mixedcoarse::MatrixPack(n, impl->offsets.Read(), impl->columns.Read(),
-        reinterpret_cast<const cuDoubleComplex *>(impl->values.Read()), impl->scale.Read(),
-        impl->float_values.Write()));
-    matrix_values = impl->float_values.Write();
+    matrix_values = pack_mixed();
     rhs_values = impl->float_rhs.Write();
     solution_values = impl->float_solution.Write();
   }
   // A complex-symmetric Maxwell matrix is not Hermitian: SYMMETRIC (LDL^T), never HERMITIAN.
-  Check(cudssMatrixCreateCsr(&impl->matrix, n, n, impl->columns.Size(),
-                            const_cast<int *>(impl->offsets.Read()), nullptr,
-                            const_cast<int *>(impl->columns.Read()),
+  const auto &solver_offsets = keep_upper ? impl->upper_offsets : impl->offsets;
+  const auto &solver_columns = keep_upper ? impl->upper_columns : impl->columns;
+  Check(cudssMatrixCreateCsr(&impl->matrix, n, n, solver_columns.Size(),
+                            const_cast<int *>(solver_offsets.Read()), nullptr,
+                            const_cast<int *>(solver_columns.Read()),
                             matrix_values, CUDA_R_32I, dtype,
                             impl->symmetric ? CUDSS_MTYPE_SYMMETRIC : CUDSS_MTYPE_GENERAL,
                             impl->symmetric ? CUDSS_MVIEW_UPPER : CUDSS_MVIEW_FULL,
