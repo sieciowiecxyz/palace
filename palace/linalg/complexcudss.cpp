@@ -284,6 +284,19 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   Check(cudssCreate(&impl->handle));
   Check(cudssConfigCreate(&impl->config));
   Check(cudssDataCreate(impl->handle, &impl->data));
+  // Optional cuDSS tuning; unset keeps the library defaults.
+  if (const char *levels = std::getenv("PALACE_CUDSS_ND_NLEVELS"))
+  {
+    int value = std::atoi(levels);
+    Check(cudssConfigSet(impl->config, CUDSS_CONFIG_ND_NLEVELS, &value, sizeof(value)),
+          "nested dissection levels");
+  }
+  if (const char *algorithm = std::getenv("PALACE_CUDSS_REORDERING"))
+  {
+    cudssAlgType_t value = cudssAlgType_t(CUDSS_ALG_DEFAULT + std::atoi(algorithm));
+    Check(cudssConfigSet(impl->config, CUDSS_CONFIG_REORDERING_ALG, &value, sizeof(value)),
+          "reordering algorithm");
+  }
   const auto dtype = impl->mixed ? CUDA_C_32F : CUDA_C_64F;
   void *matrix_values = const_cast<double *>(impl->values.Read());
   void *rhs_values = impl->rhs.Write(), *solution_values = impl->solution.Write();
