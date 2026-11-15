@@ -14,7 +14,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
-#include <map>
+#include <algorithm>
+#include <complex>
+#include <utility>
+#include <vector>
 #include <string_view>
 #include "linalg/rap.hpp"
 #include "linalg/mixedcoarse.hpp"
@@ -70,6 +73,14 @@ struct ComplexCuDSSSolver::Impl
   mutable Vector rhs, solution;
   MPI_Comm comm;
   const bool mixed = Enabled("PALACE_NATIVE_COARSE_FP32");
+  // The driven coarse matrix is complex symmetric (A^T = A, not Hermitian): LDL^T on the
+  // upper triangle needs about half the factor memory and work of a general LU.
+  // PALACE_COARSE_GENERAL=1 restores the general LU on the full matrix.
+  const bool symmetric = !mixed && !std::getenv("PALACE_COARSE_GENERAL");
+  // The sparsity is the same at every frequency: keep the symbolic analysis and only
+  // refactorize. PALACE_COARSE_NO_REUSE=1 restores a full rebuild per operator.
+  const bool reuse = !mixed && !std::getenv("PALACE_COARSE_NO_REUSE") &&
+                     !std::getenv("PALACE_CUDSS_HYBRID_MIB");
   const int corrections = FixedCorrections(mixed);
   Vector scale;
   mutable Vector residual;
@@ -129,7 +140,7 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   const int n = op.Height();
   MFEM_VERIFY(n > 0 && n == op.Width() && n <= std::numeric_limits<int>::max() / 2,
               "Invalid native complex coarse dimension!");
-  impl->Clear();  // Prototype: rebuild analysis, no symbolic reuse claim.
+  const auto merge_begin = std::chrono::steady_clock::now();
 
   const auto *ar = dynamic_cast<const mfem::HypreParMatrix *>(op.Real());
   const auto *ai = dynamic_cast<const mfem::HypreParMatrix *>(op.Imag());
@@ -153,15 +164,24 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   std::vector<double> values;
   std::vector<double> scales(impl->mixed ? n : 0);
   const double threshold = drop_small_entries ? std::pow(std::numeric_limits<double>::epsilon(), 2) : -1.0;
+  std::vector<std::pair<int, std::complex<double>>> entries;
   for (int row = 0; row < n; ++row)
   {
     offsets[row] = int(columns.size());
-    std::map<int, std::complex<double>> merged;
-    if (ar) for (int k = ri[row]; k < ri[row + 1]; ++k) merged[rj[k]] += rv[k];
-    if (ai) for (int k = ii[row]; k < ii[row + 1]; ++k) merged[ij[k]] += std::complex<double>(0, iv[k]);
-    for (auto [column, value] : merged)
+    entries.clear();
+    if (ar) for (int k = ri[row]; k < ri[row + 1]; ++k) entries.emplace_back(rj[k], rv[k]);
+    if (ai) for (int k = ii[row]; k < ii[row + 1]; ++k)
+      entries.emplace_back(ij[k], std::complex<double>(0, iv[k]));
+    std::sort(entries.begin(), entries.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+    for (std::size_t first = 0; first < entries.size();)
     {
+      const int column = entries[first].first;
+      std::complex<double> value = 0.0;
+      for (; first < entries.size() && entries[first].first == column; ++first)
+        value += entries[first].second;
       MFEM_VERIFY(column >= 0 && column < n, "Invalid single-rank coarse column!");
+      if (impl->symmetric && column < row) continue;
       if (std::abs(value.real()) < threshold) value.real(0.0);
       if (std::abs(value.imag()) < threshold) value.imag(0.0);
       if (drop_small_entries && value == 0.0) continue;
@@ -215,6 +235,36 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     Mpi::Print("PALACE_COARSE_CSR: algorithm=fnv1a64 structure={:016x} values={:016x}\n",
                hash(hash(seed, offsets), columns), hash(seed, values));
   }
+  const auto merge_end = std::chrono::steady_clock::now();
+  if (impl->reuse && impl->handle && impl->offsets.Size() == n + 1 &&
+      impl->columns.Size() == int(columns.size()) &&
+      std::equal(offsets.begin(), offsets.end(), impl->offsets.HostRead()) &&
+      std::equal(columns.begin(), columns.end(), impl->columns.HostRead()))
+  {
+    // Same sparsity as the factorized operator: new values, same symbolic analysis.
+    std::copy(values.begin(), values.end(), impl->values.HostWrite());
+    real.Clear();
+    imag.Clear();
+    if (pr) pr->StealParallelAssemble();
+    if (pi) pi->StealParallelAssemble();
+    Check(cudssMatrixSetValues(impl->matrix, const_cast<double *>(impl->values.Read())));
+    Sync();
+    const auto factor_begin = std::chrono::steady_clock::now();
+    Check(cudssExecute(impl->handle, CUDSS_PHASE_FACTORIZATION, impl->config, impl->data,
+                      impl->matrix, impl->solution_matrix, impl->rhs_matrix),
+          "factorization with reused analysis");
+    Sync();
+    int info = 0;
+    size_t written = 0;
+    Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_INFO, &info, sizeof(info), &written));
+    MFEM_VERIFY(written == sizeof(info) && info == 0,
+                "Native complex cuDSS refactorization device error: " << info);
+    Mpi::Print("PALACE_COARSE_SETUP: merge_s={:.3f} analysis_s=reused factor_s={:.3f}\n",
+               std::chrono::duration<double>(merge_end - merge_begin).count(),
+               std::chrono::duration<double>(std::chrono::steady_clock::now() - factor_begin).count());
+    return;
+  }
+  impl->Clear();
   impl->offsets.SetSize(n + 1);
   impl->columns.SetSize(int(columns.size()));
   impl->values.SetSize(int(values.size()));
@@ -255,12 +305,14 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
     rhs_values = impl->float_rhs.Write();
     solution_values = impl->float_solution.Write();
   }
-  // A complex-symmetric Maxwell matrix is not generally Hermitian. Use GENERAL.
+  // A complex-symmetric Maxwell matrix is not Hermitian: SYMMETRIC (LDL^T), never HERMITIAN.
   Check(cudssMatrixCreateCsr(&impl->matrix, n, n, impl->columns.Size(),
                             const_cast<int *>(impl->offsets.Read()), nullptr,
                             const_cast<int *>(impl->columns.Read()),
                             matrix_values, CUDA_R_32I, dtype,
-                            CUDSS_MTYPE_GENERAL, CUDSS_MVIEW_FULL, CUDSS_BASE_ZERO));
+                            impl->symmetric ? CUDSS_MTYPE_SYMMETRIC : CUDSS_MTYPE_GENERAL,
+                            impl->symmetric ? CUDSS_MVIEW_UPPER : CUDSS_MVIEW_FULL,
+                            CUDSS_BASE_ZERO));
   Check(cudssMatrixCreateDn(&impl->rhs_matrix, n, 1, n, rhs_values, dtype,
                            CUDSS_LAYOUT_COL_MAJOR));
   Check(cudssMatrixCreateDn(&impl->solution_matrix, n, 1, n, solution_values, dtype,
@@ -305,20 +357,18 @@ void ComplexCuDSSSolver::SetOperator(const ComplexOperator &op)
   Check(cudssExecute(impl->handle, CUDSS_PHASE_FACTORIZATION, impl->config, impl->data,
                     impl->matrix, impl->solution_matrix, impl->rhs_matrix), "factorization");
   Sync();
-  if (audit)
-  {
-    const auto end = std::chrono::steady_clock::now();
-    Mpi::Print("PALACE_COARSE_SETUP: analysis_s={:.9e} factor_s={:.9e}\n",
-               std::chrono::duration<double>(factor_begin - analysis_begin).count(),
-               std::chrono::duration<double>(end - factor_begin).count());
-  }
+  Mpi::Print("PALACE_COARSE_SETUP: merge_s={:.3f} analysis_s={:.3f} factor_s={:.3f}\n",
+             std::chrono::duration<double>(merge_end - merge_begin).count(),
+             std::chrono::duration<double>(factor_begin - analysis_begin).count(),
+             std::chrono::duration<double>(std::chrono::steady_clock::now() - factor_begin).count());
   int info = 0;
   size_t written = 0;
   Check(cudssDataGet(impl->handle, impl->data, CUDSS_DATA_INFO, &info, sizeof(info), &written));
   MFEM_VERIFY(written == sizeof(info) && info == 0, "Native complex cuDSS factorization device error: " << info);
   height = width = n;
-  Mpi::Print("PALACE_NATIVE_COMPLEX_COARSE: dimension={} nnz={} dtype={} matrix=general\n",
-             n, impl->columns.Size(), impl->mixed ? "complex_fp32" : "complex_fp64");
+  Mpi::Print("PALACE_NATIVE_COMPLEX_COARSE: dimension={} nnz={} dtype={} matrix={}\n",
+             n, impl->columns.Size(), impl->mixed ? "complex_fp32" : "complex_fp64",
+             impl->symmetric ? "symmetric_upper" : "general");
 }
 
 void ComplexCuDSSSolver::Mult(const ComplexVector &x, ComplexVector &y) const
