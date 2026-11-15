@@ -4,9 +4,11 @@
 #include "operator.hpp"
 
 #include <cstring>
+#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <typeinfo>
+#include <type_traits>
 #include <utility>
 #include <ceed/backend.h>
 #include <mfem.hpp>
@@ -15,6 +17,7 @@
 #include "fem/qfunctions/apply/complex_apply_qf.h"
 #include "linalg/hypre.hpp"
 #include "utils/omp.hpp"
+#include "utils/stageprofile.hpp"
 
 namespace palace::ceed
 {
@@ -794,11 +797,17 @@ void CeedOperatorAssembleCOO(Ceed ceed, CeedOperator op, bool skip_zeros, CeedSi
   PalaceCeedCall(ceed, CeedGetPreferredMemType(ceed, mem));
 
   // Assemble sparsity pattern (rows, cols are always host pointers).
-  PalaceCeedCall(ceed, CeedOperatorLinearAssembleSymbolic(op, nnz, rows, cols));
+  {
+    StageProfile profile("operators.coo.libceed_symbolic");
+    PalaceCeedCall(ceed, CeedOperatorLinearAssembleSymbolic(op, nnz, rows, cols));
+  }
 
   // Assemble values.
   PalaceCeedCall(ceed, CeedVectorCreate(ceed, *nnz, vals));
-  PalaceCeedCall(ceed, CeedOperatorLinearAssemble(op, *vals));
+  {
+    StageProfile profile("operators.coo.libceed_values");
+    PalaceCeedCall(ceed, CeedOperatorLinearAssemble(op, *vals));
+  }
 
   // Filter out zero entries. For now, eliminating zeros happens all on the host.
   // std::cout << "  Operator full assembly (COO) has " << *nnz << " NNZ";
@@ -844,70 +853,239 @@ void CeedOperatorAssembleCOO(Ceed ceed, CeedOperator op, bool skip_zeros, CeedSi
   // std::cout << "\n";
 }
 
+namespace
+{
+// Only host indices survive assembly. No CEED operator, values or device allocation is
+// retained. Exact validation binds reuse to the complete ordered local topology, rather
+// than a pointer, mesh name, frequency or collision-prone hash. Two entries accommodate
+// different real/imaginary patterns. The budget is per assembly thread (512 MiB total).
+struct COOSortPattern
+{
+  Ceed ceed;
+  int m, n;
+  std::vector<int> I, J, perm, Jmap;
+
+  std::size_t Bytes() const
+  {
+    return sizeof(int) * (I.capacity() + J.capacity() + perm.capacity() + Jmap.capacity());
+  }
+
+  bool Matches(Ceed ctx, int h, int w, int nnz, const CeedInt *rows,
+               const CeedInt *cols) const
+  {
+    if (ceed != ctx || m != h || n != w || perm.size() != static_cast<std::size_t>(nnz))
+    {
+      return false;
+    }
+    // Each input position belongs to exactly one cached duplicate group. Checking its
+    // row and column proves equality of the entire ordered COO pattern, including zeros
+    // filtered by the caller. Consequently the original sort's tie order is preserved.
+    for (int row = 0; row < m; row++)
+    {
+      for (int k = I[row]; k < I[row + 1]; k++)
+      {
+        for (int p = Jmap[k]; p < Jmap[k + 1]; p++)
+        {
+          const int index = perm[p];
+          if (rows[index] != row || cols[index] != J[k])
+          {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+};
+
+struct COOSortCache
+{
+  static constexpr std::size_t budget = 512ULL * 1024 * 1024;
+  std::vector<COOSortPattern> entries;
+
+  const COOSortPattern *Find(Ceed ceed, int m, int n, int nnz, const CeedInt *rows,
+                             const CeedInt *cols)
+  {
+    for (auto &entry : entries)
+    {
+      if (entry.Matches(ceed, m, n, nnz, rows, cols))
+      {
+        return &entry;
+      }
+    }
+    return nullptr;
+  }
+
+  void MakeRoom(std::size_t bytes)
+  {
+    if (bytes > budget)
+    {
+      return;
+    }
+    std::size_t used = 0;
+    for (const auto &old : entries)
+    {
+      used += old.Bytes();
+    }
+    while (!entries.empty() && (entries.size() >= 2 || used + bytes > budget))
+    {
+      used -= entries.front().Bytes();
+      entries.erase(entries.begin());
+    }
+  }
+};
+
+// No static MFEM arrays: they might outlive the device memory manager at shutdown.
+thread_local COOSortCache coo_sort_cache;
+
+bool COOSortCacheEnabled()
+{
+  const char *value = std::getenv("PALACE_COO_SORT_CACHE");
+  return !value || std::strcmp(value, "0") != 0;
+}
+}  // namespace
+
 std::unique_ptr<hypre::HypreCSRMatrix> OperatorCOOtoCSR(Ceed ceed, CeedInt m, CeedInt n,
                                                         CeedSize nnz, CeedInt *rows,
                                                         CeedInt *cols, CeedVector vals,
-                                                        CeedMemType mem, bool set)
+                                                        CeedMemType mem, bool set, bool allow_cache = true)
 {
   // Preallocate CSR memory on host (like PETSc's MatSetValuesCOO). Check for overflow for
   // large nonzero counts.
   const int nnz_int = mfem::internal::to_int(nnz);
-  mfem::Array<int> I(m + 1), J(nnz_int), perm(nnz_int), Jmap(nnz_int + 1);
-  I = 0;
-  for (int k = 0; k < nnz_int; k++)
+  mfem::Array<int> I, J, perm, Jmap;
+  int nnz_new;
+  const bool cache_enabled = allow_cache && COOSortCacheEnabled();
+  const COOSortPattern *pattern = nullptr;
   {
-    perm[k] = k;
+    StageProfile profile("operators.coo.pattern_lookup");
+    if (cache_enabled)
+    {
+      pattern = coo_sort_cache.Find(ceed, m, n, nnz_int, rows, cols);
+    }
   }
-  std::sort(perm.begin(), perm.end(),
-            [&](const int &i, const int &j) { return (rows[i] < rows[j]); });
-
-  int q = -1;  // True nnz index
-  for (int k = 0; k < nnz_int;)
+  const bool cache_hit = pattern != nullptr;
+  if (cache_hit)
   {
-    // Sort column entries in the row.
-    const int row = rows[perm[k]];
-    const int start = k;
-    while (k < nnz_int && rows[perm[k]] == row)
+    StageProfile profile("operators.coo.pattern_copy");
+    auto Copy = [](const std::vector<int> &source, mfem::Array<int> &target)
     {
-      k++;
+      target.SetSize(source.size());
+      std::copy(source.begin(), source.end(), target.begin());
+    };
+    Copy(pattern->I, I);
+    Copy(pattern->J, J);
+    Copy(pattern->perm, perm);
+    Copy(pattern->Jmap, Jmap);
+    nnz_new = J.Size();
+  }
+  else
+  {
+    StageProfile profile("operators.coo.host_sort");
+    I.SetSize(m + 1);
+    J.SetSize(nnz_int);
+    perm.SetSize(nnz_int);
+    Jmap.SetSize(nnz_int + 1);
+    I = 0;
+    for (int k = 0; k < nnz_int; k++)
+    {
+      perm[k] = k;
     }
-    std::sort(perm.begin() + start, perm.begin() + k,
-              [&](const int &i, const int &j) { return (cols[i] < cols[j]); });
+    std::sort(perm.begin(), perm.end(),
+              [&](const int &i, const int &j) { return (rows[i] < rows[j]); });
 
-    q++;
-    I[row + 1] = 1;
-    J[q] = cols[perm[start]];
-    Jmap[q + 1] = 1;
-    for (int p = start + 1; p < k; p++)
+    int q = -1;  // True nnz index
+    for (int k = 0; k < nnz_int;)
     {
-      if (cols[perm[p]] != cols[perm[p - 1]])
+      // Sort column entries in the row.
+      const int row = rows[perm[k]];
+      const int start = k;
+      while (k < nnz_int && rows[perm[k]] == row)
       {
-        // New nonzero.
-        q++;
-        I[row + 1]++;
-        J[q] = cols[perm[p]];
-        Jmap[q + 1] = 1;
+        k++;
       }
-      else
+      std::sort(perm.begin() + start, perm.begin() + k,
+                [&](const int &i, const int &j) { return (cols[i] < cols[j]); });
+
+      q++;
+      I[row + 1] = 1;
+      J[q] = cols[perm[start]];
+      Jmap[q + 1] = 1;
+      for (int p = start + 1; p < k; p++)
       {
-        Jmap[q + 1]++;
+        if (cols[perm[p]] != cols[perm[p - 1]])
+        {
+          // New nonzero.
+          q++;
+          I[row + 1]++;
+          J[q] = cols[perm[p]];
+          Jmap[q + 1] = 1;
+        }
+        else
+        {
+          Jmap[q + 1]++;
+        }
       }
     }
+
+    // Finalize I, Jmap.
+    nnz_new = q + 1;
+    I[0] = 0;
+    for (int i = 0; i < m; i++)
+    {
+      I[i + 1] += I[i];
+    }
+    Jmap[0] = 0;
+    for (int k = 0; k < nnz_new; k++)
+    {
+      Jmap[k + 1] += Jmap[k];
+    }
+
+  }
+  std::unique_ptr<hypre::HypreCSRMatrix> reference;
+  if (const char *verify = std::getenv("PALACE_COO_VERIFY");
+      cache_hit && verify && std::strcmp(verify, "1") == 0)
+  {
+    // Diagnostic only: assemble twice from the SAME COO values, once with the original
+    // sorting path. Cross-run digests cannot distinguish cache errors from upstream
+    // numeric variability. The recursion has caching/verification/auditing disabled.
+    StageProfile profile("operators.coo.verify_reference");
+    CeedInt *ref_rows, *ref_cols;
+    PalaceCeedCall(ceed, CeedInternalCalloc(nnz_int, &ref_rows));
+    PalaceCeedCall(ceed, CeedInternalCalloc(nnz_int, &ref_cols));
+    std::copy(rows, rows + nnz_int, ref_rows);
+    std::copy(cols, cols + nnz_int, ref_cols);
+    CeedVector ref_vals = nullptr;
+    PalaceCeedCall(ceed, CeedVectorReferenceCopy(vals, &ref_vals));
+    reference = OperatorCOOtoCSR(ceed, m, n, nnz, ref_rows, ref_cols, ref_vals, mem, set,
+                                  false);
   }
   PalaceCeedCall(ceed, CeedInternalFree(&rows));
   PalaceCeedCall(ceed, CeedInternalFree(&cols));
-
-  // Finalize I, Jmap.
-  const int nnz_new = q + 1;
-  I[0] = 0;
-  for (int i = 0; i < m; i++)
+  if (cache_enabled && !cache_hit)
   {
-    I[i + 1] += I[i];
+    StageProfile profile("operators.coo.pattern_store");
+    // Conservative preflight prevents even transient allocation beyond the cache budget.
+    const std::size_t bytes = sizeof(int) *
+        (static_cast<std::size_t>(m) + 1 + nnz_int + 2ULL * nnz_new + 1);
+    if (bytes <= COOSortCache::budget)
+    {
+      coo_sort_cache.MakeRoom(bytes);
+      coo_sort_cache.entries.push_back({ceed, m, n,
+                            {I.begin(), I.end()}, {J.begin(), J.begin() + nnz_new},
+                            {perm.begin(), perm.end()},
+                            {Jmap.begin(), Jmap.begin() + nnz_new + 1}});
+    }
   }
-  Jmap[0] = 0;
-  for (int k = 0; k < nnz_new; k++)
+  if (const char *trace = std::getenv("PALACE_STAGE_TRACE"); allow_cache && trace && std::strcmp(trace, "1") == 0)
   {
-    Jmap[k + 1] += Jmap[k];
+    std::size_t bytes = 0;
+    for (const auto &entry : coo_sort_cache.entries)
+    {
+      bytes += entry.Bytes();
+    }
+    std::fprintf(stderr, "PALACE_COO_SORT_CACHE hit=%d enabled=%d coo_nnz=%d csr_nnz=%d retained_host_bytes=%zu\n",
+                 cache_hit, cache_enabled, nnz_int, nnz_new, bytes);
   }
 
   // Construct and fill the final CSR matrix. On GPU, MFEM and Hypre share the same memory
@@ -973,6 +1151,51 @@ std::unique_ptr<hypre::HypreCSRMatrix> OperatorCOOtoCSR(Ceed ceed, CeedInt m, Ce
     }
     PalaceCeedCall(ceed, CeedVectorRestoreArrayRead(vals, &vals_array));
     PalaceCeedCall(ceed, CeedVectorDestroy(&vals));
+  }
+
+  if (reference)
+  {
+    StageProfile profile("operators.coo.verify_compare");
+    MFEM_VERIFY(reference->NNZ() == nnz_new, "Cached CSR nnz differs from original sort!");
+    const auto location = hypre_CSRMatrixMemoryLocation(static_cast<hypre_CSRMatrix *>(*mat));
+    auto Compare = [&](const auto *a, const auto *b, std::size_t count)
+    {
+      using T = std::remove_cv_t<std::remove_reference_t<decltype(*a)>>;
+      std::vector<T> host_a(count), host_b(count);
+      hypre_TMemcpy(host_a.data(), a, T, count, HYPRE_MEMORY_HOST, location);
+      hypre_TMemcpy(host_b.data(), b, T, count, HYPRE_MEMORY_HOST, location);
+      return std::memcmp(host_a.data(), host_b.data(), count * sizeof(T)) == 0;
+    };
+    const bool equal = Compare(mat->GetI(), reference->GetI(), m + 1) &&
+                       Compare(mat->GetJ(), reference->GetJ(), nnz_new) &&
+                       Compare(mat->GetData(), reference->GetData(), nnz_new);
+    std::fprintf(stderr, "PALACE_COO_VERIFY matched=%d nnz=%d\n", equal, nnz_new);
+    MFEM_VERIFY(equal, "Cached CSR differs bitwise from original sort on the same COO!");
+  }
+
+  // Opt-in validation only: exact host CSR/value digest. Identical arithmetic must
+  // produce identical digests with cache off/on. Transfers and hashing are timed apart.
+  if (const char *audit = std::getenv("PALACE_COO_AUDIT"); allow_cache && audit && std::strcmp(audit, "1") == 0)
+  {
+    StageProfile profile("operators.coo.audit");
+    std::vector<double> data(nnz_new);
+    hypre_TMemcpy(data.data(), mat->GetData(), HYPRE_Complex, nnz_new,
+                  HYPRE_MEMORY_HOST,
+                  hypre_CSRMatrixMemoryLocation(static_cast<hypre_CSRMatrix *>(*mat)));
+    std::uint64_t hash = 14695981039346656037ULL;
+    auto Hash = [&hash](const void *ptr, std::size_t size)
+    {
+      const auto *bytes = static_cast<const unsigned char *>(ptr);
+      for (std::size_t i = 0; i < size; i++)
+      {
+        hash = (hash ^ bytes[i]) * 1099511628211ULL;
+      }
+    };
+    Hash(I.HostRead(), (static_cast<std::size_t>(m) + 1) * sizeof(int));
+    Hash(J.HostRead(), static_cast<std::size_t>(nnz_new) * sizeof(int));
+    Hash(data.data(), data.size() * sizeof(double));
+    std::fprintf(stderr, "PALACE_COO_AUDIT m=%d n=%d nnz=%d digest=%016llx\n",
+                 m, n, nnz_new, static_cast<unsigned long long>(hash));
   }
 
   return mat;

@@ -927,7 +927,11 @@ void GmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
     Mpi::Print(comm, "PALACE_BASIS_PREFETCH: managed=true stream=0 calls={:d} requested_bytes={:d}\n",
                stats.calls - prefetch_begin.calls, stats.bytes - prefetch_begin.bytes);
   }
-  if (std::getenv("PALACE_RELEASE_GMRES_BASIS"))
+  // The Arnoldi basis belongs to this RHS, not the next solve. Retaining it
+  // overlaps large FP64 allocations with postprocessing and the next setup.
+  // Packed FP32 vectors and their scratch already have per-Mult RAII lifetime.
+  const char *release_basis = std::getenv("PALACE_RELEASE_GMRES_BASIS");
+  if (!release_basis || std::string_view(release_basis) != "0")
   {
     MemoryMark("gmres.basis_release.begin");
     std::size_t bytes = 0, count = 0;

@@ -17,6 +17,11 @@ class FiniteElementSpace;
 namespace palace::ceed
 {
 
+// Preserve the L-vector layout and orientations, selecting elements in the supplied order.
+// Returns nullptr for unsupported restriction types or blocked layouts.
+CeedElemRestriction SelectRestrictionElements(CeedElemRestriction original,
+                                             const std::vector<CeedInt> &elements);
+
 void InitRestriction(const mfem::FiniteElementSpace &fespace,
                      const std::vector<int> &indices, bool use_bdr, bool is_interp,
                      bool is_interp_range, Ceed ceed, CeedElemRestriction *restr);

@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "integrator.hpp"
+#include "restriction.hpp"
+#include "utils/stageprofile.hpp"
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 #include <string>
 #include <ceed/backend.h>
@@ -11,6 +16,7 @@
 PalacePragmaDiagnosticPush
 PalacePragmaDiagnosticDisableUnused
 
+#include "fem/qfunctions/coeff/coeff_qf.h"
 #include "fem/qfunctions/apply_qf.h"
 #include "fem/qfunctions/geom_qf.h"
 
@@ -21,6 +27,100 @@ namespace palace::ceed
 
 namespace
 {
+
+// Only the 3D H(curl) mass build/apply paths have this single 3x3 context.
+// Other QFunction layouts retain their original path. No numerical threshold is used.
+std::vector<CeedInt> NonzeroMassElements(const CeedQFunctionInfo &info, const void *ctx,
+                                       std::size_t ctx_size, Ceed ceed,
+                                       CeedVector geom_data,
+                                       CeedElemRestriction geom_restr)
+{
+  const char *enabled = std::getenv("PALACE_EXACT_ZERO_SUBSET");
+  const bool mass_only =
+      info.apply_qf_path.find("33/hcurl_build_33_qf.h:") != std::string::npos ||
+      info.apply_qf_path.find("33/hcurl_33_qf.h:") != std::string::npos;
+  if ((enabled && std::strcmp(enabled, "0") == 0) || !mass_only)
+  {
+    return {};
+  }
+  StageProfile profile("operators.exact_zero_subset");
+  if (!ctx || ctx_size < 2 * sizeof(CeedIntScalar))
+  {
+    return {};
+  }
+  const auto *coeff = static_cast<const CeedIntScalar *>(ctx);
+  const CeedInt na = coeff[0].first;
+  const auto count = ctx_size / sizeof(CeedIntScalar);
+  if (na <= 0 || static_cast<std::size_t>(na) + 2 > count)
+  {
+    return {};
+  }
+  const CeedInt nm = coeff[1 + na].first;
+  if (nm <= 0 || static_cast<std::size_t>(na) + 2 + 9 * static_cast<std::size_t>(nm) != count)
+  {
+    return {};
+  }
+  std::vector<bool> zero(na);
+  bool has_zero = false;
+  for (CeedInt a = 0; a < na; a++)
+  {
+    const CeedInt mat = coeff[1 + a].first;
+    if (mat < 0 || mat >= nm)
+    {
+      return {};
+    }
+    zero[a] = true;
+    for (CeedInt j = 0; j < 9; j++)
+    {
+      // NaN and every nonzero (including subnormal values) must remain active.
+      zero[a] = zero[a] && (coeff[2 + na + 9 * mat + j].second == 0.0);
+    }
+    has_zero = has_zero || zero[a];
+  }
+  if (!has_zero)
+  {
+    return {};
+  }
+  CeedRestrictionType type;
+  CeedInt ne, nc, block, strides[3];
+  PalaceCeedCall(ceed, CeedElemRestrictionGetType(geom_restr, &type));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetBlockSize(geom_restr, &block));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetNumElements(geom_restr, &ne));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetNumComponents(geom_restr, &nc));
+  if (type != CEED_RESTRICTION_STRIDED || block != 1 || nc != 11)
+  {
+    return {};
+  }
+  PalaceCeedCall(ceed, CeedElemRestrictionGetLLayout(geom_restr, strides));
+  const CeedScalar *geometry;
+  PalaceCeedCall(ceed, CeedVectorGetArrayRead(geom_data, CEED_MEM_HOST, &geometry));
+  std::vector<CeedInt> elements;
+  for (CeedInt e = 0; e < ne; e++)
+  {
+    // Mesh attributes are constant on each element, stored in geometry component zero.
+    const auto attr_value = geometry[static_cast<CeedSize>(e) * strides[2]];
+    MFEM_VERIFY(attr_value >= 1 && attr_value <= na, "Invalid geometry attribute!");
+    const CeedInt attr = static_cast<CeedInt>(attr_value);
+    MFEM_VERIFY(attr_value == attr, "Nonintegral geometry attribute!");
+    if (!zero[attr - 1])
+    {
+      elements.push_back(e);
+    }
+  }
+  PalaceCeedCall(ceed, CeedVectorRestoreArrayRead(geom_data, &geometry));
+  const char *trace = std::getenv("PALACE_STAGE_TRACE");
+  if (trace && std::strcmp(trace, "1") == 0)
+  {
+    std::fprintf(stderr, "PALACE_EXACT_ZERO_SUBSET elements=%d active=%zu\n", ne,
+                 elements.size());
+  }
+  // Empty/all-active cases retain the original operator; no empty-composite changes.
+  if (elements.empty() || elements.size() == static_cast<std::size_t>(ne))
+  {
+    return {};
+  }
+  return elements;
+}
 
 void AddQFunctionActiveInputs(unsigned int ops, Ceed ceed, CeedBasis basis,
                               CeedQFunction qf, std::string name = "u")
@@ -426,6 +526,37 @@ void AssembleCeedOperator(const CeedQFunctionInfo &info, void *ctx, std::size_t 
                           CeedBasis test_basis, CeedVector geom_data,
                           CeedElemRestriction geom_data_restr, CeedOperator *op)
 {
+  const auto elements = NonzeroMassElements(info, ctx, ctx_size, ceed, geom_data,
+                                             geom_data_restr);
+  CeedElemRestriction selected_trial = nullptr, selected_test = nullptr,
+                      selected_geom = nullptr;
+  if (!elements.empty())
+  {
+    selected_trial = SelectRestrictionElements(trial_restr, elements);
+    if (selected_trial && trial_restr == test_restr)
+    {
+      PalaceCeedCall(ceed, CeedElemRestrictionReferenceCopy(selected_trial, &selected_test));
+    }
+    else
+    {
+      selected_test = SelectRestrictionElements(test_restr, elements);
+    }
+    selected_geom = SelectRestrictionElements(geom_data_restr, elements);
+    if (selected_trial && selected_test && selected_geom)
+    {
+      trial_restr = selected_trial;
+      test_restr = selected_test;
+      geom_data_restr = selected_geom;
+      const char *trace = std::getenv("PALACE_STAGE_TRACE");
+      if (trace && std::strcmp(trace, "1") == 0)
+      {
+        std::fprintf(stderr, "PALACE_EXACT_ZERO_APPLIED active=%zu assemble_q_data=%d\n",
+                     elements.size(), static_cast<int>(info.assemble_q_data));
+      }
+    }
+    // Unsupported layouts conservatively keep the complete original operator.
+  }
+
   // If we are going to be assembling the quadrature data, construct the storage vector for
   // it (to be owned by the operator).
   CeedVector q_data = nullptr;
@@ -510,6 +641,9 @@ void AssembleCeedOperator(const CeedQFunctionInfo &info, void *ctx, std::size_t 
     PalaceCeedCall(ceed, CeedElemRestrictionDestroy(&q_data_restr));
     PalaceCeedCall(ceed, CeedVectorDestroy(&q_data));
   }
+  PalaceCeedCall(ceed, CeedElemRestrictionDestroy(&selected_trial));
+  PalaceCeedCall(ceed, CeedElemRestrictionDestroy(&selected_test));
+  PalaceCeedCall(ceed, CeedElemRestrictionDestroy(&selected_geom));
 }
 
 void AssembleCeedInterpolator(Ceed ceed, CeedElemRestriction trial_restr,

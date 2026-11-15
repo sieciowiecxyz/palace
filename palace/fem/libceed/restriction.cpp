@@ -3,11 +3,107 @@
 
 #include "restriction.hpp"
 
+#include <algorithm>
+#include <memory>
 #include <mfem.hpp>
+#include <ceed/backend.h>
 #include "utils/omp.hpp"
 
 namespace palace::ceed
 {
+
+CeedElemRestriction SelectRestrictionElements(CeedElemRestriction original,
+                                             const std::vector<CeedInt> &elements)
+{
+  Ceed ceed;
+  CeedRestrictionType type;
+  CeedInt ne, es, nc, cs, block;
+  CeedSize length;
+  PalaceCeedCallBackend(CeedElemRestrictionGetCeed(original, &ceed));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetType(original, &type));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetBlockSize(original, &block));
+  if (block != 1 || (type != CEED_RESTRICTION_STANDARD &&
+                     type != CEED_RESTRICTION_ORIENTED &&
+                     type != CEED_RESTRICTION_CURL_ORIENTED &&
+                     type != CEED_RESTRICTION_STRIDED))
+  {
+    return nullptr;
+  }
+  PalaceCeedCall(ceed, CeedElemRestrictionGetNumElements(original, &ne));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetElementSize(original, &es));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetNumComponents(original, &nc));
+  PalaceCeedCall(ceed, CeedElemRestrictionGetLVectorSize(original, &length));
+  std::vector<CeedInt> offsets(elements.size() * es);
+  if (type == CEED_RESTRICTION_STRIDED)
+  {
+    CeedInt strides[3];
+    PalaceCeedCall(ceed, CeedElemRestrictionGetLLayout(original, strides));
+    cs = strides[1];
+    for (std::size_t k = 0; k < elements.size(); k++)
+    {
+      MFEM_VERIFY(elements[k] >= 0 && elements[k] < ne, "Invalid subset element!");
+      for (CeedInt i = 0; i < es; i++)
+      {
+        offsets[k * es + i] = elements[k] * strides[2] + i * strides[0];
+      }
+    }
+  }
+  else
+  {
+    PalaceCeedCall(ceed, CeedElemRestrictionGetCompStride(original, &cs));
+    const CeedInt *original_offsets;
+    PalaceCeedCall(ceed, CeedElemRestrictionGetOffsets(original, CEED_MEM_HOST,
+                                                      &original_offsets));
+    for (std::size_t k = 0; k < elements.size(); k++)
+    {
+      MFEM_VERIFY(elements[k] >= 0 && elements[k] < ne, "Invalid subset element!");
+      std::copy_n(original_offsets + elements[k] * es, es, offsets.data() + k * es);
+    }
+    PalaceCeedCall(ceed, CeedElemRestrictionRestoreOffsets(original, &original_offsets));
+  }
+  CeedElemRestriction selected;
+  const auto n = static_cast<CeedInt>(elements.size());
+  if (type == CEED_RESTRICTION_CURL_ORIENTED)
+  {
+    const CeedInt8 *original_orients;
+    PalaceCeedCall(ceed, CeedElemRestrictionGetCurlOrientations(original, CEED_MEM_HOST,
+                                                               &original_orients));
+    std::vector<CeedInt8> orients(3 * elements.size() * es);
+    for (std::size_t k = 0; k < elements.size(); k++)
+    {
+      std::copy_n(original_orients + 3 * elements[k] * es, 3 * es,
+                  orients.data() + 3 * k * es);
+    }
+    PalaceCeedCall(ceed, CeedElemRestrictionCreateCurlOriented(
+                            ceed, n, es, nc, cs, length, CEED_MEM_HOST, CEED_COPY_VALUES,
+                            offsets.data(), orients.data(), &selected));
+    PalaceCeedCall(ceed, CeedElemRestrictionRestoreCurlOrientations(original,
+                                                                   &original_orients));
+  }
+  else if (type == CEED_RESTRICTION_ORIENTED)
+  {
+    const bool *original_orients;
+    PalaceCeedCall(ceed, CeedElemRestrictionGetOrientations(original, CEED_MEM_HOST,
+                                                           &original_orients));
+    auto orients = std::make_unique<bool[]>(elements.size() * es);
+    for (std::size_t k = 0; k < elements.size(); k++)
+    {
+      std::copy_n(original_orients + elements[k] * es, es, orients.get() + k * es);
+    }
+    PalaceCeedCall(ceed, CeedElemRestrictionCreateOriented(
+                            ceed, n, es, nc, cs, length, CEED_MEM_HOST, CEED_COPY_VALUES,
+                            offsets.data(), orients.get(), &selected));
+    PalaceCeedCall(ceed, CeedElemRestrictionRestoreOrientations(original,
+                                                               &original_orients));
+  }
+  else
+  {
+    PalaceCeedCall(ceed, CeedElemRestrictionCreate(
+                            ceed, n, es, nc, cs, length, CEED_MEM_HOST, CEED_COPY_VALUES,
+                            offsets.data(), &selected));
+  }
+  return selected;
+}
 
 namespace
 {

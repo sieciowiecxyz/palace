@@ -545,9 +545,15 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
     Mpi::Print("\n");
     MemoryMark("gmres.begin");
+    const double solve_begin = MPI_Wtime();
+    const auto iterations_begin = ksp->NumTotalMultIterations();
     ksp->Mult(RHS, E);
+    const double solve_seconds = MPI_Wtime() - solve_begin;
     port_adjoint.Capture(excitation_idx, E, *(reuse_port_setup ? retained_A : A));
     MemoryMark("gmres.end");
+    Mpi::Print("PALACE_RHS_SOLVE: excitation={} frequency_index={} wall_s={:.9f} iterations={}\n",
+               excitation_idx, omega_i, solve_seconds,
+               ksp->NumTotalMultIterations() - iterations_begin);
     if (frequency_batch && iodata.solver.linear.initial_guess)
     {
       if (omega_i + 1 < omega_sample.size())
