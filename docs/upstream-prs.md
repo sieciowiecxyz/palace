@@ -1,5 +1,10 @@
 # Lokalny pilot PR do Palace
 
+Ten dokument zachowuje historyczną procedurę pilota. PR [1087](https://github.com/awslabs/palace/pull/1087)
+został scalony 2026-11-16 po poprawkach review. Dawny checkout PR usunięto po
+weryfikacji; jego commit zachowuje branch `pr/driven-release-workspace` w
+kanonicznym repo. Poniższe stare ścieżki i instrukcje publikacji są archiwalne.
+
 Stan 2026-10-23: fork `sieciowiecxyz/palace` i branch pilota są na GitHubie.
 PR do `awslabs/palace` nie został otwarty. Opis PR nadal lokalny.
 Badawczy fork zachowany; PR zawiera wyłącznie trzy pliki z czystego upstream.
