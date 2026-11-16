@@ -353,3 +353,7 @@ Bieżące M0–M6 w PLAN/MILESTONES dotyczą optymalizacji preprocessing, operat
 - [OpenMP lokalnego wyszukiwania sond](probe-openmp.md)
   - Czytaj gdy: włączasz dodatkowe wątki CPU lub oceniasz ich rzeczywisty zysk.
   - Opis: Prywatne bufory, globalOMP1, pomiary1/2/4/8 i walidacja GPU; fullRF/CMP jeszcze NOT RUN.
+
+- [Local source consolidation](local-consolidation-20261116.md)
+  - Czytaj gdy: budujesz lokalny fork po konsolidacji repozytoriow.
+  - Opis: Jedno kanoniczne zrodlo, import historii i zachowany build referencyjny.
