@@ -2,6 +2,10 @@
 
 Czytaj instrukcje lokalne na początku pracy; dokumentację upstream tylko dla zmienianej części.
 
+- [Build A100 / SM80](ampere.md)
+  - Czytaj gdy: przygotowujesz izolowany build M7 dla A100.
+  - Opis: Cache SM80, limity kompilacji i jawny brak kwalifikacji na GPU A100.
+
 - [Port adjoint probe](port-adjoint.md)
   - Czytaj gdy: przygotowujesz lub przeglądasz stałosiatkowy eksperyment adjoint z dwoma portami.
   - Opis: Kontrakt opt-in capture/replay true-DOF, twarda bramka true-RHS i ograniczenia pilota.
