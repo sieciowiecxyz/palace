@@ -297,9 +297,10 @@ struct NeuralCoarseSolver::Correction
 
 NeuralCoarseSolver::NeuralCoarseSolver(MPI_Comm comm, Limits limits,
                                        BasisBuilder build_basis,
-                                       ClassicalFactory make_classical)
+                                       ClassicalFactory make_classical, bool defer_classical)
   : comm(comm), limits(limits), build_basis(std::move(build_basis)),
-    make_classical(std::move(make_classical))
+    make_classical(std::move(make_classical)), defer_classical(defer_classical),
+    classical_allowed(!defer_classical)
 {
 }
 
@@ -309,6 +310,7 @@ void NeuralCoarseSolver::SetOperator(const ComplexOperator &next)
 {
   correction.reset();
   classical.reset();
+  classical_allowed = !defer_classical;
   op = &next;
   height = next.Height();
   width = next.Width();
@@ -399,6 +401,7 @@ void NeuralCoarseSolver::SetOperator(const ComplexOperator &next)
 void NeuralCoarseSolver::UseClassical()
 {
   correction.reset();
+  classical_allowed = true;
   apply_reason = "classical";
 }
 
@@ -409,6 +412,14 @@ int NeuralCoarseSolver::GetRank() const
 
 void NeuralCoarseSolver::ApplyClassical(const ComplexVector &rhs, ComplexVector &y) const
 {
+  if (!classical_allowed)
+  {
+    if (!initial_guess)
+    {
+      y = 0.0;
+    }
+    return;
+  }
   if (!classical)
   {
     MFEM_VERIFY(make_classical, "Neural coarse solver requires a classical fallback!");

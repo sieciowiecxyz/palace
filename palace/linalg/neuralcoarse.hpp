@@ -39,7 +39,7 @@ public:
   using ClassicalFactory = std::function<std::unique_ptr<Solver<ComplexOperator>>()>;
 
   NeuralCoarseSolver(MPI_Comm comm, Limits limits, BasisBuilder build_basis,
-                     ClassicalFactory make_classical);
+                     ClassicalFactory make_classical, bool defer_classical = false);
   ~NeuralCoarseSolver() override;
 
   void SetOperator(const ComplexOperator &op) override;
@@ -47,6 +47,9 @@ public:
 
   // Release correction state immediately. Classical setup is deferred until Mult().
   void UseClassical();
+  // The outer solve can defer the first classical setup until it admits a continuation.
+  bool HasCorrection() const { return static_cast<bool>(correction); }
+  bool HasRequestedClassical() const { return op && !correction && !classical_allowed; }
   int GetRank() const;
   const char *GetSetupReason() const { return setup_reason; }
   const char *GetLastApplyReason() const { return apply_reason; }
@@ -60,6 +63,7 @@ private:
   Limits limits;
   BasisBuilder build_basis;
   ClassicalFactory make_classical;
+  bool defer_classical, classical_allowed;
   const ComplexOperator *op = nullptr;
   mutable std::unique_ptr<Correction> correction;
   mutable std::unique_ptr<Solver<ComplexOperator>> classical;
