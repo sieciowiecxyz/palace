@@ -3482,6 +3482,53 @@
           "exclusiveMinimum": 0,
           "default": 100
         },
+        "MaxSolveSeconds": {
+          "type": "number",
+          "description": "Per-right-hand-side linear solve budget in seconds for Driven uniform sweeps with right FGMRES. Includes setup, trial, and continuation. Zero disables the deadline. An enabled NeuralCoarse mode requires a positive budget.",
+          "minimum": 0.0,
+          "default": 0.0,
+          "x-palace-advanced": true
+        },
+        "NeuralCoarse": {
+          "type": "object",
+          "description": "Experimental single-rank Driven uniform sweep coarse solver for right FGMRES with a conforming ND1 coarse space.",
+          "additionalProperties": false,
+          "x-palace-advanced": true,
+          "properties": {
+            "Mode": {
+              "type": "string",
+              "description": "Off uses the ordinary solver, S uses fixed Jacobi (B2), Phi adds the unlearned projected basis (B3), and Learned adds a model-predicted basis (M).",
+              "enum": ["Off", "S", "Phi", "Learned"],
+              "default": "Off"
+            },
+            "ModelManifest": {
+              "type": "string",
+              "description": "Path to manifest.json for Learned mode, with weights.bin in the same directory.",
+              "pattern": "(^|/)manifest\\.json$"
+            },
+            "MaxRows": {
+              "type": "integer",
+              "description": "Maximum coarse rows for experimental setup.",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "default": 100000
+            },
+            "MaxNonzeros": {
+              "type": "integer",
+              "description": "Maximum coarse structural nonzeros for experimental setup.",
+              "minimum": 1,
+              "default": 2000000
+            },
+            "MaxWorkingBytes": {
+              "type": "integer",
+              "description": "Maximum estimated working bytes for model inference.",
+              "minimum": 1,
+              "default": 268435456
+            }
+          },
+          "if": {"properties": {"Mode": {"const": "Learned"}}, "required": ["Mode"]},
+          "then": {"required": ["ModelManifest"]}
+        },
         "MaxSize": {
           "type": "integer",
           "description": "Maximum Krylov space size for GMRES/FGMRES. If omitted, Palace uses [`MaxIts`](@ref config-solver-linear-maxits).",

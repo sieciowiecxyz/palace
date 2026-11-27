@@ -42,6 +42,13 @@ target_sources(${LIB_TARGET_NAME}
   ${CMAKE_CURRENT_SOURCE_DIR}/vector.cpp
 )
 
+if(PALACE_WITH_ML)
+  target_sources(${LIB_TARGET_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/neuralcoarse.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/neuralmodel.cpp
+  )
+endif()
+
 # Handle device source code
 set(TARGET_SOURCES_DEVICE
   ${TARGET_SOURCES_DEVICE}

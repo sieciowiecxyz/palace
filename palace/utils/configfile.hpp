@@ -6,6 +6,7 @@
 
 #include <array>
 #include <complex>
+#include <cstddef>
 #include <map>
 #include <optional>
 #include <string>
@@ -1318,6 +1319,17 @@ public:
   BoundaryModeSolverData(const json &bm);
 };
 
+struct NeuralCoarseData
+{
+  std::string mode = "Off";
+  std::string model_manifest;
+  int max_rows = 100000;
+  std::size_t max_nnz = 2000000;
+  std::size_t max_working_bytes = 268435456;
+
+  bool Enabled() const { return mode != "Off"; }
+};
+
 struct LinearSolverData
 {
 public:
@@ -1335,6 +1347,11 @@ public:
 
   // Maximum iterations for iterative solver.
   int max_it = 100;
+
+  // Per-RHS deadline in seconds. Zero leaves the linear solve unbounded by time.
+  double max_solve_seconds = 0.0;
+
+  NeuralCoarseData neural_coarse;
 
   // Maximum Krylov space dimension for GMRES/FGMRES iterative solvers.
   int max_size = -1;

@@ -1987,6 +1987,19 @@ LinearSolverData::LinearSolverData(const json &linear)
   tol = linear.value("Tol", tol);
   abs_tol = linear.value("AbsTol", abs_tol);
   max_it = linear.value("MaxIts", max_it);
+  max_solve_seconds = linear.value("MaxSolveSeconds", max_solve_seconds);
+  if (auto nc = linear.find("NeuralCoarse"); nc != linear.end())
+  {
+    neural_coarse.mode = nc->value("Mode", neural_coarse.mode);
+    neural_coarse.model_manifest = nc->value("ModelManifest", neural_coarse.model_manifest);
+    neural_coarse.max_rows = nc->value("MaxRows", neural_coarse.max_rows);
+    neural_coarse.max_nnz = nc->value("MaxNonzeros", neural_coarse.max_nnz);
+    neural_coarse.max_working_bytes =
+        nc->value("MaxWorkingBytes", neural_coarse.max_working_bytes);
+    MFEM_VERIFY(!neural_coarse.Enabled() ||
+                    (std::isfinite(max_solve_seconds) && max_solve_seconds > 0.0),
+                "An enabled NeuralCoarse mode requires a positive MaxSolveSeconds!");
+  }
   max_size = linear.value("MaxSize", max_size);
   initial_guess = linear.value("InitialGuess", initial_guess);
 

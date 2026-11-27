@@ -32,6 +32,8 @@ project(palace LANGUAGES CXX VERSION 0.20.0)
 set(PALACE_WITH_OPENMP OFF CACHE BOOL "Use OpenMP for shared-memory parallelism")
 set(PALACE_WITH_CUDA OFF CACHE BOOL "Use CUDA for NVIDIA GPU support")
 set(PALACE_WITH_HIP OFF CACHE BOOL "Use HIP for AMD or NVIDIA GPU support")
+set(PALACE_WITH_ML OFF CACHE BOOL "Build experimental neural coarse correction")
+set(PALACE_LIBTORCH_ROOT "" CACHE PATH "LibTorch or Torch wheel directory (ML only)")
 
 set(PALACE_WITH_SUPERLU ON CACHE BOOL "Build with SuperLU_DIST sparse direct solver")
 set(PALACE_WITH_STRUMPACK OFF CACHE BOOL "Build with STRUMPACK sparse direct solver")
@@ -347,6 +349,32 @@ set(LIB_TARGET_NAME libpalace)
 add_library(${LIB_TARGET_NAME} "")
 target_include_directories(${LIB_TARGET_NAME} PUBLIC ${CMAKE_SOURCE_DIR})
 target_include_directories(${LIB_TARGET_NAME} PUBLIC ${CMAKE_BINARY_DIR}/generated)
+
+if(PALACE_WITH_ML)
+  if(NOT PALACE_LIBTORCH_ROOT)
+    message(FATAL_ERROR "PALACE_WITH_ML requires PALACE_LIBTORCH_ROOT")
+  endif()
+  # Use the ATen libraries directly so the pinned wheel works without Caffe2's
+  # build-time CUDA discovery. The caller selects a matching C++ ABI and CUDA major.
+  find_path(PALACE_ATEN_INCLUDE ATen/ATen.h PATHS "${PALACE_LIBTORCH_ROOT}/include"
+    NO_DEFAULT_PATH NO_CACHE REQUIRED)
+  find_library(PALACE_TORCH_CPU torch_cpu PATHS "${PALACE_LIBTORCH_ROOT}/lib"
+    NO_DEFAULT_PATH NO_CACHE REQUIRED)
+  find_library(PALACE_TORCH_C10 c10 PATHS "${PALACE_LIBTORCH_ROOT}/lib"
+    NO_DEFAULT_PATH NO_CACHE REQUIRED)
+  find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+  target_compile_definitions(${LIB_TARGET_NAME} PRIVATE PALACE_WITH_ML)
+  target_include_directories(${LIB_TARGET_NAME} SYSTEM PRIVATE "${PALACE_ATEN_INCLUDE}")
+  target_link_libraries(${LIB_TARGET_NAME} PRIVATE
+    "${PALACE_TORCH_CPU}" "${PALACE_TORCH_C10}" OpenSSL::Crypto)
+  if(PALACE_WITH_CUDA)
+    find_library(PALACE_TORCH_CUDA torch_cuda PATHS "${PALACE_LIBTORCH_ROOT}/lib"
+      NO_DEFAULT_PATH NO_CACHE REQUIRED)
+    # Preserve the shared library that registers ATen CUDA operators.
+    target_link_libraries(${LIB_TARGET_NAME} PRIVATE
+      "-Wl,--push-state,--no-as-needed" "${PALACE_TORCH_CUDA}" "-Wl,--pop-state")
+  endif()
+endif()
 
 # Add source files
 add_subdirectory(drivers)

@@ -109,6 +109,14 @@ void ConcretizeLinear(const config::LinearSolverData &linear, json &j_linear)
   // An explicit "ComplexCoarseSolve": true is disabled for the linear solver types which
   // do not support it (see IoData::CheckConfiguration): write the value which is used.
   j_linear["ComplexCoarseSolve"] = linear.complex_coarse_solve;
+  if (auto nc = j_linear.find("NeuralCoarse"); nc != j_linear.end())
+  {
+    const auto &n = linear.neural_coarse;
+    ApplyEntries(*nc, {{"Mode", n.mode},
+                       {"MaxRows", n.max_rows},
+                       {"MaxNonzeros", n.max_nnz},
+                       {"MaxWorkingBytes", n.max_working_bytes}});
+  }
 }
 
 void ConcretizeEigenmode(const config::EigenSolverData &eigenmode, json &j_eigen)
