@@ -4,10 +4,14 @@
 #include "drivensolver.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <complex>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <numbers>
+#include <string_view>
 #include <Eigen/Dense>
 #include <fmt/core.h>
 #include <mfem.hpp>
@@ -83,6 +87,10 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 {
   const auto &port_excitations = space_op.GetPortExcitations();
   const auto &omega_sample = iodata.solver.driven.sample_f;
+  const auto comm = space_op.GetComm();
+  const char *verify_env = std::getenv("PALACE_VERIFY_RESIDUAL");
+  int verify_residual = verify_env && std::string_view(verify_env) == "1";
+  Mpi::Broadcast(1, &verify_residual, 0, comm);
 
   // Initialize postprocessing for measurement and printers.
   // Initialize write directory with default path; will be changed for multi-excitations.
@@ -204,6 +212,9 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       // Solve linear system.
       space_op.GetExcitationVector(excitation_idx, omega, RHS);
+      const double rhs_norm = verify_residual ? linalg::Norml2(comm, RHS) : 0.0;
+      const double epsilon =
+          verify_residual ? std::max(ksp->GetAbsTol(), ksp->GetRelTol() * rhs_norm) : 0.0;
       if (E_prev.Size() > 1)
       {
         BlockTimer bt(Timer::KSP_INITIAL_GUESS);
@@ -212,6 +223,33 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       Mpi::Print("\n");
       ksp->Mult(RHS, E);
+      if (verify_residual)
+      {
+        ComplexVector residual(RHS.Size());
+        residual.UseDevice(true);
+        A->Mult(E, residual);
+        residual.Add(-1.0, RHS);
+        const double residual_norm = linalg::Norml2(comm, residual);
+        const bool passed = std::isfinite(rhs_norm) && std::isfinite(epsilon) &&
+                            std::isfinite(residual_norm) && residual_norm <= epsilon;
+        // The legacy marker requires a number in relative=. For a zero RHS the ratio
+        // is undefined, and the results reader derives a missing ratio from norm_b=0.
+        const bool relative_defined = rhs_norm > 0.0;
+        const double relative = relative_defined ? residual_norm / rhs_norm : 0.0;
+        Mpi::Print(comm,
+                   "PALACE_TRUE_RESIDUAL: norm_Ax_minus_b={:.17e} norm_b={:.17e} "
+                   "relative={:.17e} relative_defined={} epsilon={:.17e} "
+                   "qualified_linear_solve={}\n",
+                   residual_norm, rhs_norm, relative, relative_defined, epsilon, passed);
+        if (!passed && Mpi::Root(comm))
+        {
+          std::fflush(stdout);
+        }
+        MFEM_VERIFY(passed, "Physical residual check failed for excitation "
+                                << excitation_idx << ", frequency index " << omega_i + 1
+                                << ": ||b - A x|| = " << residual_norm
+                                << ", epsilon = " << epsilon);
+      }
       E_prev.Push(E);
 
       if (omega_i + 1 == omega_sample.size() &&
@@ -233,9 +271,8 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       // Start Post-processing.
       BlockTimer bt0(Timer::POSTPRO);
-      Mpi::Print(" Sol. ||E|| = {:.6e} (||RHS|| = {:.6e})\n",
-                 linalg::Norml2(space_op.GetComm(), E),
-                 linalg::Norml2(space_op.GetComm(), RHS));
+      Mpi::Print(" Sol. ||E|| = {:.6e} (||RHS|| = {:.6e})\n", linalg::Norml2(comm, E),
+                 verify_residual ? rhs_norm : linalg::Norml2(comm, RHS));
 
       // Compute B = -1/(iω) ∇ x E on the true dofs.
       Curl.Mult(E.Real(), B.Real());
