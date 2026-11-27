@@ -3,12 +3,18 @@
 #ifndef PALACE_LINALG_NEURAL_DATA_HPP
 #define PALACE_LINALG_NEURAL_DATA_HPP
 
+#include <cstddef>
+#include <filesystem>
+#include <memory>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace palace
 {
 
+class ComplexParOperator;
+class ComplexVector;
 class FiniteElementSpace;
 
 struct NeuralProbeFields
@@ -21,6 +27,39 @@ struct NeuralProbeFields
 // MFEM projection and bounding-box APIs require a mutable space and mesh.
 NeuralProbeFields ProjectNeuralProbeFields(FiniteElementSpace &space,
                                            std::span<const int> essential_tdofs);
+
+struct NeuralCaptureMetadata
+{
+  std::string geometry_id, mesh_sha256, source_sha, config_sha256;
+  double omega;
+  bool pc_mat_shifted, pc_mat_real;
+};
+
+struct NeuralCaptureLimits
+{
+  int max_rows;
+  std::size_t max_nnz, max_bytes, max_samples;
+};
+
+// One snapshot per SetOperator. Capture is opt-in and excluded from timed runs.
+class NeuralCapture
+{
+public:
+  NeuralCapture(const ComplexParOperator &bc, FiniteElementSpace &coarse_space,
+                const NeuralCaptureMetadata &metadata, const NeuralCaptureLimits &limits);
+  ~NeuralCapture();
+
+  // Call with X[0] just before the coarse solve. Returns false at the sample
+  // cap.
+  bool AppendRhs(const ComplexVector &rhs, int excitation_id);
+
+  // Publish one A06 capture to a fresh output path after the solve.
+  void Write(const std::filesystem::path &path) const;
+
+private:
+  struct Data;
+  std::unique_ptr<Data> data;
+};
 
 }  // namespace palace
 
