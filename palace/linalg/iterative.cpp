@@ -376,10 +376,16 @@ template <typename OperType, typename VecType>
 inline double CycleResidual(MPI_Comm comm, PreconditionerSide side, const OperType *A,
                             const Solver<OperType> *B, const VecType &b, VecType &x,
                             VecType &r, VecType &z, bool first_cycle, bool initial_guess,
-                            bool scale_guess, double &initial_res, bool use_timer = true)
+                            bool scale_guess, double &initial_res, bool use_timer = true,
+                            std::size_t *right_matvecs = nullptr)
 {
   if (first_cycle && initial_guess && linalg::Norml2(comm, x) != 0.0)
   {
+    // Both initial-guess paths apply A once with right preconditioning.
+    if (right_matvecs)
+    {
+      ++*right_matvecs;
+    }
     if (scale_guess)
     {
       initial_res = ScaledInitialResidual(comm, side, A, B, b, x, r, z, use_timer);
@@ -395,6 +401,10 @@ inline double CycleResidual(MPI_Comm comm, PreconditionerSide side, const OperTy
       initial_res = linalg::Norml2(comm, left ? z : b);
     }
     return linalg::Norml2(comm, r);
+  }
+  if (right_matvecs && !first_cycle)
+  {
+    ++*right_matvecs;
   }
   InitialResidual(side, A, B, b, x, r, z, !first_cycle, use_timer);
   const double beta = linalg::Norml2(comm, r);
@@ -887,6 +897,15 @@ void FgmresSolver<OperType>::Update(int j) const
 template <OperatorType OperType>
 void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 {
+  MultBounded(b, x, max_it, std::nullopt, false, {});
+}
+
+template <OperatorType OperType>
+void FgmresSolver<OperType>::MultBounded(const VecType &b, VecType &x, int iteration_limit,
+                                         std::optional<double> epsilon, bool continuation,
+                                         const std::function<bool()> &stop,
+                                         std::size_t *matvecs) const
+{
   // Set up workspace.
   RealType beta = 0.0, true_beta, eps = 0.0;
   MFEM_VERIFY(A && B, "Operator and preconditioner must be set for FgmresSolver::Mult!");
@@ -896,23 +915,33 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
 
   // Begin iterations.
   converged = false;
+  initial_res = 0.0;
+  const bool use_guess = continuation || this->initial_guess;
   int it = 0, restart = 0;
   if (print_opts.iterations)
   {
     Mpi::Print(comm, "{}Residual norms for FGMRES solve\n",
                std::string(tab_width + int_width - 1, ' '));
   }
-  for (; it < max_it; restart++)
+  for (; it < iteration_limit && !(stop && stop()); restart++)
   {
     // Initialize.
-    true_beta = CycleResidual(comm, PreconditionerSide::RIGHT, A, B, b, x, Z[0], V[0],
-                              it == 0, this->initial_guess, max_rel_correction <= 0.0,
-                              initial_res, this->use_timer);
+    true_beta = CycleResidual(
+        comm, PreconditionerSide::RIGHT, A, B, b, x, Z[0], V[0], it == 0, use_guess,
+        !continuation && max_rel_correction <= 0.0, initial_res, this->use_timer, matvecs);
+    if (stop && stop())
+    {
+      break;
+    }
+    if (stop && (!std::isfinite(true_beta) || !std::isfinite(initial_res)))
+    {
+      break;
+    }
     CheckDot(true_beta, "FGMRES residual norm is not valid: beta = ");
     if (it == 0)
     {
       CheckDot(initial_res, "FGMRES residual norm is not valid: initial_res = ");
-      eps = std::max(rel_tol * initial_res, abs_tol);
+      eps = epsilon.value_or(std::max(rel_tol * initial_res, abs_tol));
     }
     else if (beta > 0.0 && std::abs(beta - true_beta) > 0.1 * true_beta &&
              print_opts.warnings)
@@ -936,6 +965,7 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
     s[0] = beta;
 
     int j = 0;
+    bool discarded_column = false;
     for (;; j++, it++)
     {
       if (print_opts.iterations)
@@ -949,6 +979,19 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
         Update(j);
       }
       ApplyBA(PreconditionerSide::RIGHT, A, B, V[j], w, Z[j], this->use_timer);
+      if (matvecs)
+      {
+        ++*matvecs;
+      }
+      if (stop && stop())
+      {
+        // The preconditioner may have requested a switch. Discard this column while
+        // accounting for its work and keep the previous complete columns.
+        it++;
+        j--;
+        discarded_column = true;
+        break;
+      }
 
       ScalarType *Hj = H.data() + j * (max_dim + 1);
       Hj[j + 1] =
@@ -964,9 +1007,17 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
       ApplyPlaneRotation(s[j], s[j + 1], cs[j], sn[j]);
 
       beta = std::abs(s[j + 1]);
+      if (stop && (!std::isfinite(beta) || !std::isfinite(std::abs(Hj[j])) || Hj[j] == 0.0))
+      {
+        // Reject this column if it cannot produce a finite update.
+        it++;
+        j--;
+        discarded_column = true;
+        break;
+      }
       CheckDot(beta, "FGMRES residual norm is not valid: beta = ");
       converged = (beta <= eps);
-      if (converged || j + 1 == max_dim || it + 1 == max_it)
+      if (converged || j + 1 == max_dim || it + 1 == iteration_limit || (stop && stop()))
       {
         it++;
         break;
@@ -987,7 +1038,7 @@ void FgmresSolver<OperType>::Mult(const VecType &b, VecType &x) const
     {
       x.Add(s[k], Z[k]);
     }
-    if (converged)
+    if (converged || discarded_column || (stop && stop()))
     {
       break;
     }

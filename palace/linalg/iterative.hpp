@@ -4,6 +4,8 @@
 #ifndef PALACE_LINALG_ITERATIVE_HPP
 #define PALACE_LINALG_ITERATIVE_HPP
 
+#include <functional>
+#include <optional>
 #include <type_traits>
 #include <vector>
 #include <mfem.hpp>
@@ -295,6 +297,12 @@ public:
   }
 
   void Mult(const VecType &b, VecType &x) const override;
+
+  // Stop cooperatively at Krylov boundaries. A continuation keeps the supplied iterate
+  // and the caller's frozen absolute stopping threshold.
+  void MultBounded(const VecType &b, VecType &x, int iteration_limit,
+                   std::optional<double> epsilon, bool continuation,
+                   const std::function<bool()> &stop, std::size_t *matvecs = nullptr) const;
 };
 
 }  // namespace palace
