@@ -51,6 +51,8 @@ public:
   bool HasCorrection() const { return static_cast<bool>(correction); }
   bool HasRequestedClassical() const { return op && !correction && !classical_allowed; }
   int GetRank() const;
+  std::size_t GetNumApplications() const { return num_applications; }
+  double GetClassicalSetupSeconds() const { return classical_setup_seconds; }
   const char *GetSetupReason() const { return setup_reason; }
   const char *GetLastApplyReason() const { return apply_reason; }
   std::size_t GetGuardRejections() const { return guard_rejections; }
@@ -69,7 +71,8 @@ private:
   mutable std::unique_ptr<Solver<ComplexOperator>> classical;
   const char *setup_reason = "operator_unset";
   mutable const char *apply_reason = "not_applied";
-  mutable std::size_t guard_rejections = 0;
+  mutable std::size_t guard_rejections = 0, num_applications = 0;
+  mutable double classical_setup_seconds = 0.0;
 };
 
 }  // namespace palace

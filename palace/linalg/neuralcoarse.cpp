@@ -17,6 +17,7 @@
 #include "linalg/hypre.hpp"
 #include "linalg/jacobi.hpp"
 #include "linalg/rap.hpp"
+#include "utils/timer.hpp"
 
 namespace palace
 {
@@ -316,6 +317,8 @@ void NeuralCoarseSolver::SetOperator(const ComplexOperator &next)
   width = next.Width();
   apply_reason = "not_applied";
   guard_rejections = 0;
+  num_applications = 0;
+  classical_setup_seconds = 0.0;
   const auto *par = dynamic_cast<const ComplexParOperator *>(op);
   setup_reason = "unsupported_operator";
   if (Mpi::Size(comm) != 1 || !par || Mpi::Size(par->GetComm()) != 1 || !build_basis ||
@@ -423,9 +426,11 @@ void NeuralCoarseSolver::ApplyClassical(const ComplexVector &rhs, ComplexVector 
   if (!classical)
   {
     MFEM_VERIFY(make_classical, "Neural coarse solver requires a classical fallback!");
+    const auto start = Timer::Now();
     auto solver = make_classical();
     MFEM_VERIFY(solver, "Neural coarse classical factory returned no solver!");
     solver->SetOperator(*op);
+    classical_setup_seconds = Timer::Duration(Timer::Now() - start).count();
     classical = std::move(solver);
   }
   classical->SetInitialGuess(initial_guess);
@@ -438,6 +443,7 @@ void NeuralCoarseSolver::Mult(const ComplexVector &rhs, ComplexVector &y) const
 {
   MFEM_VERIFY(op && rhs.Size() == height && y.Size() == width,
               "Neural coarse solver requires a compatible operator and vectors!");
+  num_applications++;
   if (!correction)
   {
     if (apply_reason == std::string_view("not_applied"))
