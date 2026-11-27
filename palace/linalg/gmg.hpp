@@ -4,6 +4,7 @@
 #ifndef PALACE_LINALG_GEOMETRIC_MULTIGRID_HPP
 #define PALACE_LINALG_GEOMETRIC_MULTIGRID_HPP
 
+#include <functional>
 #include <memory>
 #include <vector>
 #include "linalg/operator.hpp"
@@ -53,6 +54,7 @@ private:
 
   // Enable timer contribution for Timer::KSP_COARSE_SOLVE.
   bool use_timer;
+  std::function<void(const VecType &)> coarse_rhs_observer;
 
   // Optional subdomain correction at the finest level, Y += S A_S⁻¹ Sᵀ (X - A Y), with S
   // the selection of the subdomain true DOFs of the multigrid operator and A_S = Sᵀ A S the
@@ -100,6 +102,11 @@ public:
   void Mult(const VecType &x, VecType &y) const override;
 
   void EnableTimer() { use_timer = true; }
+
+  void SetCoarseRhsObserver(std::function<void(const VecType &)> observer)
+  {
+    coarse_rhs_observer = std::move(observer);
+  }
 };
 
 }  // namespace palace

@@ -89,6 +89,7 @@ public:
   void SetAbsTol(double tol) { ksp->SetAbsTol(tol); }
 
   void SetOperators(const OperType &op, const OperType &pc_op);
+  void SetCoarseRhsObserver(std::function<void(const VecType &)> observer);
 
   // Whether the iterative solver uses the given solution vector as initial guess.
   void SetInitialGuess(bool guess) { ksp->SetInitialGuess(guess); }

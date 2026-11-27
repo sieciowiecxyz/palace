@@ -589,6 +589,15 @@ void BaseKspSolver<OperType>::SetOperators(const OperType &op, const OperType &p
 }
 
 template <OperatorType OperType>
+void BaseKspSolver<OperType>::SetCoarseRhsObserver(
+    std::function<void(const VecType &)> observer)
+{
+  auto *mg = dynamic_cast<GeometricMultigridSolver<OperType> *>(pc.get());
+  MFEM_VERIFY(mg, "Coarse RHS capture requires geometric multigrid!");
+  mg->SetCoarseRhsObserver(std::move(observer));
+}
+
+template <OperatorType OperType>
 void BaseKspSolver<OperType>::SetMaxRelativeCorrection(double tol)
 {
   if (auto *gmres = dynamic_cast<GmresSolver<OperType> *>(ksp.get()))

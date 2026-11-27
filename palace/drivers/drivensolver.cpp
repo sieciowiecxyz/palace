@@ -4,6 +4,7 @@
 #include "drivensolver.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <complex>
 #include <cstddef>
@@ -13,8 +14,10 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <iterator>
 #include <numbers>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <Eigen/Dense>
 #include <fmt/core.h>
@@ -30,6 +33,7 @@
 #include "linalg/complexcsr.hpp"
 #include "linalg/neuraldata.hpp"
 #include "linalg/neuralmodel.hpp"
+#include "linalg/rap.hpp"
 #endif
 #include "linalg/operator.hpp"
 #include "linalg/vector.hpp"
@@ -107,8 +111,7 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
       Mpi::Warning("Neural coarse setup could not query available CUDA memory!\n");
       return false;
     }
-    // Leave headroom for Palace, library workspaces and allocator reserves.
-    working_bytes = std::min(working_bytes, free_bytes / 2);
+    working_bytes = std::min(working_bytes, free_bytes);
     device = {NeuralModel::Backend::Cuda, mfem::Device::GetId()};
   }
 #endif
@@ -136,6 +139,68 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
       device);
   basis = {NeuralModel::BasisColumns, std::move(learned.real), std::move(learned.imag)};
   return !expired();
+}
+
+struct CaptureOptions
+{
+  std::filesystem::path directory;
+  NeuralCaptureMetadata metadata;
+  NeuralCaptureLimits limits;
+  std::size_t bytes_remaining;
+  int excitation;
+};
+
+CaptureOptions ConfigureNeuralCapture(const char *directory, const IoData &iodata,
+                                      const PortExcitations &ports, std::size_t first_solve)
+{
+  const std::filesystem::path requested(directory);
+  MFEM_VERIFY(
+      requested.is_relative() &&
+          std::ranges::none_of(requested, [](const auto &part) { return part == ".."; }),
+      "PALACE_NEURAL_CAPTURE_DIR must be a relative directory within Problem/Output!");
+  const auto output =
+      std::filesystem::weakly_canonical(std::filesystem::absolute(iodata.problem.output));
+  const auto path = std::filesystem::weakly_canonical(std::filesystem::absolute(requested));
+  const auto relative = path.lexically_relative(output);
+  MFEM_VERIFY(!relative.empty() && relative != "." && *relative.begin() != "..",
+              "PALACE_NEURAL_CAPTURE_DIR must be a subdirectory of Problem/Output!");
+
+  MFEM_VERIFY(!ports.Empty(), "Neural capture requires a driven excitation!");
+  int excitation = ports.begin()->first;
+  if (const char *value = std::getenv("PALACE_NEURAL_CAPTURE_EXCITATION"))
+  {
+    const std::string_view raw(value);
+    const auto [ptr, err] = std::from_chars(raw.begin(), raw.end(), excitation);
+    MFEM_VERIFY(err == std::errc{} && ptr == raw.end() && excitation >= 0,
+                "Invalid PALACE_NEURAL_CAPTURE_EXCITATION: " << raw);
+  }
+  const auto entry = ports.excitations.find(excitation);
+  MFEM_VERIFY(entry != ports.end() &&
+                  static_cast<std::size_t>(std::distance(ports.begin(), entry)) + 1 >=
+                      first_solve,
+              "Requested neural capture excitation " << excitation
+                                                     << " is absent from this sweep!");
+  auto require_env = [](const char *name)
+  {
+    const char *value = std::getenv(name);
+    MFEM_VERIFY(value && *value, "Neural capture requires " << name << "!");
+    return std::string(value);
+  };
+  const auto &linear = iodata.solver.linear;
+  NeuralCaptureMetadata metadata{require_env("PALACE_NEURAL_GEOMETRY_ID"),
+                                 require_env("PALACE_NEURAL_MESH_SHA256"),
+                                 require_env("PALACE_NEURAL_SOURCE_SHA"),
+                                 require_env("PALACE_NEURAL_CONFIG_SHA256"),
+                                 0.0,
+                                 bool(linear.pc_mat_shifted),
+                                 linear.pc_mat_real};
+  std::filesystem::create_directories(path);
+  return {
+      path,
+      std::move(metadata),
+      {linear.neural_coarse.max_rows, linear.neural_coarse.max_nnz, 64 * 1024 * 1024, 8},
+      256 * 1024 * 1024,
+      excitation};
 }
 #endif
 
@@ -178,6 +243,11 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
   }
 
   // Main frequency sweep loop.
+  if (const char *capture_dir = std::getenv("PALACE_NEURAL_CAPTURE_DIR");
+      capture_dir && *capture_dir)
+  {
+    MFEM_VERIFY(!adaptive, "Neural capture requires a uniform sweep!");
+  }
   if (adaptive && (iodata.solver.linear.neural_coarse.Enabled() ||
                    iodata.solver.linear.max_solve_seconds > 0.0))
   {
@@ -311,6 +381,25 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   const std::size_t freq_restart_idx =
       (iodata.solver.driven.restart - 1) % omega_sample.size();
 
+#if defined(PALACE_WITH_ML)
+  std::optional<CaptureOptions> capture_options;
+#endif
+  if (const char *capture_dir = std::getenv("PALACE_NEURAL_CAPTURE_DIR");
+      capture_dir && *capture_dir)
+  {
+#if defined(PALACE_WITH_ML)
+    MFEM_VERIFY(!settings.Enabled() && linear.max_solve_seconds == 0.0 &&
+                    Mpi::Size(comm) == 1 && space_op.GetNDSpaces().GetNumLevels() > 1,
+                "Neural capture requires an unbounded classical single-rank GMG sweep!");
+    capture_options = ConfigureNeuralCapture(capture_dir, iodata, port_excitations,
+                                             excitation_restart_counter);
+    Mpi::Print(comm, "PALACE_NEURAL_CAPTURE: excitation={} directory={} benchmark=false\n",
+               capture_options->excitation, capture_options->directory.string());
+#else
+    MFEM_ABORT("Neural capture requires a PALACE_WITH_ML build!");
+#endif
+  }
+
   // With an initial guess, each solve of an excitation after the first starts from the
   // combination of its solutions at up to num_guess previous frequencies which minimizes
   // ||RHS - A E|| (for the second, the previous solution), which the iterative solver then
@@ -374,6 +463,29 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
 #if defined(PALACE_WITH_ML)
       coarse_omega = omega;
+      std::unique_ptr<NeuralCapture> capture;
+      std::size_t samples = 0;
+      if (capture_options && excitation_idx == capture_options->excitation)
+      {
+        const auto &mg = dynamic_cast<const ComplexMultigridOperator &>(*P);
+        const auto &bc = dynamic_cast<const ComplexParOperator &>(mg.GetOperatorAtLevel(0));
+        auto &options = *capture_options;
+        options.metadata.omega = omega;
+        auto limits = options.limits;
+        limits.max_bytes = std::min(limits.max_bytes, options.bytes_remaining);
+        MFEM_VERIFY(limits.max_bytes >= 4096,
+                    "Neural capture exhausted its per-run byte budget!");
+        capture = std::make_unique<NeuralCapture>(
+            bc, space_op.GetNDSpaces().GetFESpaceAtLevel(0), options.metadata, limits);
+        ksp->SetCoarseRhsObserver(
+            [&, limit = options.limits.max_samples](const ComplexVector &coarse_rhs)
+            {
+              if (samples < limit && capture->AppendRhs(coarse_rhs, excitation_idx))
+              {
+                ++samples;
+              }
+            });
+      }
 #endif
       ksp->SetOperators(*A, *P);
       const double setup_s = bounded ? elapsed(solve_started) : 0.0;
@@ -413,7 +525,8 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         int trial_iterations = 0, classical_iterations = 0;
         double trial_s = 0.0, continuation_s = 0.0, residual_s = 0.0,
                classical_setup_s = 0.0;
-        std::size_t matvecs = guess_matvecs, coarse_apps = 0;
+        std::size_t matvecs = guess_matvecs;
+        std::optional<std::size_t> coarse_apps;
         int residual_checks = 0;
         auto measure = [&]()
         {
@@ -495,10 +608,6 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         {
           measure();
         }
-        if (!neural && space_op.GetNDSpaces().GetNumLevels() > 1)
-        {
-          coarse_apps = static_cast<std::size_t>(classical_iterations) * linear.mg_cycle_it;
-        }
 #if defined(PALACE_WITH_ML)
         if (neural)
         {
@@ -518,7 +627,8 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
             "deadline_expired={}\n",
             settings.mode, trial_iterations, classical_iterations,
             trial_iterations + classical_iterations, setup_s, trial_s, classical_setup_s,
-            continuation_s, residual_s, elapsed(solve_started), coarse_apps,
+            continuation_s, residual_s, elapsed(solve_started),
+            coarse_apps ? std::to_string(*coarse_apps) : "unknown",
             matvecs + residual_checks, residual_checks, reason.empty() ? "none" : reason,
             !in_time);
 #if defined(PALACE_WITH_ML)
@@ -561,6 +671,29 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         std::fflush(stdout);
       }
       MFEM_VERIFY(in_time, "Linear solve exceeded MaxSolveSeconds!");
+#if defined(PALACE_WITH_ML)
+      if (capture)
+      {
+        ksp->SetCoarseRhsObserver({});
+        if (samples > 0)
+        {
+          auto &options = *capture_options;
+          const auto path =
+              options.directory /
+              fmt::format("frequency-{}-excitation-{}.json", omega_i + 1, excitation_idx);
+          capture->Write(path);
+          options.bytes_remaining -= std::filesystem::file_size(path);
+          Mpi::Print(comm, "PALACE_NEURAL_CAPTURE: samples={} path={}\n", samples,
+                     path.string());
+        }
+        else
+        {
+          Mpi::Warning(comm,
+                       "No coarse RHS to capture for excitation {}, frequency index {}!\n",
+                       excitation_idx, omega_i + 1);
+        }
+      }
+#endif
       E_prev.Push(E);
 
       if (omega_i + 1 == omega_sample.size() &&

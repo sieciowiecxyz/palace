@@ -352,6 +352,12 @@ void GeometricMultigridSolver<OperType>::VCycle(int l, bool initial_guess) const
   B[l]->SetInitialGuess(initial_guess);
   if (l == 0)
   {
+#if defined(PALACE_WITH_ML)
+    if (coarse_rhs_observer)
+    {
+      coarse_rhs_observer(X[l]);
+    }
+#endif
     BlockTimer bt(Timer::KSP_COARSE_SOLVE, use_timer);
     B[l]->Mult(X[l], Y[l]);
     return;

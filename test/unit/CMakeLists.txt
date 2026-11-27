@@ -93,6 +93,13 @@ add_executable(unit-tests
   ${CMAKE_CURRENT_SOURCE_DIR}/regression/cases.cpp
 )
 
+if(PALACE_WITH_ML)
+  target_sources(unit-tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/test-neuralcoarse.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/test-neuralmodel.cpp
+  )
+endif()
+
 if(PALACE_WITH_ENZYME)
   # Enzyme-differentiated sources are compiled into their own object library so the Enzyme
   # Clang plugin (ClangEnzymeFlags) applies only here, not to the rest of unit-tests.
