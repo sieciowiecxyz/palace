@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 #include "linalg/iterative.hpp"
+#include "linalg/neuralcoarse.hpp"
 #include "linalg/operator.hpp"
 #include "linalg/solver.hpp"
 #include "utils/labels.hpp"
@@ -57,12 +58,21 @@ protected:
   // Enable timer contribution for Timer::KSP_PRECONDITIONER.
   bool use_timer;
 
+private:
+  BaseKspSolver(const config::LinearSolverData &linear, MatrixSymmetry pc_mat_sym,
+                int verbose, FiniteElementSpaceHierarchy &fespaces,
+                FiniteElementSpaceHierarchy *aux_fespaces,
+                NeuralCoarseSolver::BasisBuilder basis, NeuralCoarseSolver **neural);
+
 public:
   BaseKspSolver(const config::LinearSolverData &linear, MatrixSymmetry pc_mat_sym,
                 int verbose, FiniteElementSpaceHierarchy &fespaces,
                 FiniteElementSpaceHierarchy *aux_fespaces = nullptr);
   BaseKspSolver(const IoData &iodata, FiniteElementSpaceHierarchy &fespaces,
                 FiniteElementSpaceHierarchy *aux_fespaces = nullptr);
+  BaseKspSolver(const IoData &iodata, FiniteElementSpaceHierarchy &fespaces,
+                FiniteElementSpaceHierarchy *aux_fespaces,
+                NeuralCoarseSolver::BasisBuilder basis, NeuralCoarseSolver **neural);
   BaseKspSolver(std::unique_ptr<IterativeSolver<OperType>> &&ksp,
                 std::unique_ptr<Solver<OperType>> &&pc);
 
@@ -92,6 +102,14 @@ public:
   bool GetCorrectionExceeded() const;
 
   void Mult(const VecType &x, VecType &y) const;
+  int MultFgmresPhase(const VecType &x, VecType &y, int limit,
+                      std::optional<double> epsilon, bool continuation,
+                      const std::function<bool()> &stop, std::size_t &matvecs) const;
+  void RecordFgmresSolve(int iterations) const
+  {
+    ksp_mult++;
+    ksp_mult_it += iterations;
+  }
 };
 
 using KspSolver = BaseKspSolver<Operator>;

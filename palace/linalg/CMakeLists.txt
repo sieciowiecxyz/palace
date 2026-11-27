@@ -45,6 +45,7 @@ target_sources(${LIB_TARGET_NAME}
 if(PALACE_WITH_ML)
   target_sources(${LIB_TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/neuralcoarse.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/neuraldata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/neuralmodel.cpp
   )
 endif()

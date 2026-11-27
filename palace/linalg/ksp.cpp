@@ -226,10 +226,10 @@ ConfigurePMLSubdomainSolver(const config::LinearSolverData &linear,
 
 template <OperatorType OperType>
 std::unique_ptr<Solver<OperType>>
-ConfigurePreconditionerSolver(const config::LinearSolverData &linear,
-                              MatrixSymmetry pc_mat_sym, int verbose, MPI_Comm comm,
-                              FiniteElementSpaceHierarchy &fespaces,
-                              FiniteElementSpaceHierarchy *aux_fespaces)
+ConfigureClassicalCoarseSolver(const config::LinearSolverData &linear,
+                               MatrixSymmetry pc_mat_sym, int verbose, MPI_Comm comm,
+                               FiniteElementSpaceHierarchy &fespaces,
+                               FiniteElementSpaceHierarchy *aux_fespaces)
 {
   // Create the real-valued solver first.
   std::unique_ptr<Solver<OperType>> pc;
@@ -406,6 +406,42 @@ ConfigurePreconditionerSolver(const config::LinearSolverData &linear,
     }
   }
 
+  return pc;
+}
+
+template <OperatorType OperType>
+std::unique_ptr<Solver<OperType>> ConfigurePreconditionerSolver(
+    const config::LinearSolverData &linear, MatrixSymmetry pc_mat_sym, int verbose,
+    MPI_Comm comm, FiniteElementSpaceHierarchy &fespaces,
+    FiniteElementSpaceHierarchy *aux_fespaces, NeuralCoarseSolver::BasisBuilder basis,
+    NeuralCoarseSolver **neural)
+{
+  auto make_classical = [pc_mat_sym, verbose, comm, &fespaces,
+                         aux_fespaces](const config::LinearSolverData &settings)
+  {
+    return ConfigureClassicalCoarseSolver<OperType>(settings, pc_mat_sym, verbose, comm,
+                                                    fespaces, aux_fespaces);
+  };
+  std::unique_ptr<Solver<OperType>> pc;
+#if defined(PALACE_WITH_ML)
+  if constexpr (std::is_same_v<OperType, ComplexOperator>)
+  {
+    if (neural && basis)
+    {
+      const auto &n = linear.neural_coarse;
+      auto coarse = std::make_unique<NeuralCoarseSolver>(
+          comm, NeuralCoarseSolver::Limits{n.max_rows, n.max_nnz}, std::move(basis),
+          [make_classical, linear]() { return make_classical(linear); }, true);
+      *neural = coarse.get();
+      pc = std::move(coarse);
+    }
+  }
+#endif
+  if (!pc)
+  {
+    pc = make_classical(linear);
+  }
+
   // Construct the actual solver, which has the right value type.
   if (fespaces.GetNumLevels() > 1)
   {
@@ -482,11 +518,22 @@ BaseKspSolver<OperType>::BaseKspSolver(const config::LinearSolverData &linear,
                                        MatrixSymmetry pc_mat_sym, int verbose,
                                        FiniteElementSpaceHierarchy &fespaces,
                                        FiniteElementSpaceHierarchy *aux_fespaces)
+  : BaseKspSolver(linear, pc_mat_sym, verbose, fespaces, aux_fespaces, {}, nullptr)
+{
+}
+
+template <OperatorType OperType>
+BaseKspSolver<OperType>::BaseKspSolver(const config::LinearSolverData &linear,
+                                       MatrixSymmetry pc_mat_sym, int verbose,
+                                       FiniteElementSpaceHierarchy &fespaces,
+                                       FiniteElementSpaceHierarchy *aux_fespaces,
+                                       NeuralCoarseSolver::BasisBuilder basis,
+                                       NeuralCoarseSolver **neural)
   : BaseKspSolver(ConfigureKrylovSolver<OperType>(linear, verbose,
                                                   fespaces.GetFinestFESpace().GetComm()),
                   ConfigurePreconditionerSolver<OperType>(
                       linear, pc_mat_sym, verbose, fespaces.GetFinestFESpace().GetComm(),
-                      fespaces, aux_fespaces))
+                      fespaces, aux_fespaces, std::move(basis), neural))
 {
   use_timer = true;
 }
@@ -495,8 +542,18 @@ template <OperatorType OperType>
 BaseKspSolver<OperType>::BaseKspSolver(const IoData &iodata,
                                        FiniteElementSpaceHierarchy &fespaces,
                                        FiniteElementSpaceHierarchy *aux_fespaces)
+  : BaseKspSolver(iodata, fespaces, aux_fespaces, {}, nullptr)
+{
+}
+
+template <OperatorType OperType>
+BaseKspSolver<OperType>::BaseKspSolver(const IoData &iodata,
+                                       FiniteElementSpaceHierarchy &fespaces,
+                                       FiniteElementSpaceHierarchy *aux_fespaces,
+                                       NeuralCoarseSolver::BasisBuilder basis,
+                                       NeuralCoarseSolver **neural)
   : BaseKspSolver(iodata.solver.linear, GetPreconditionerMatrixSymmetry(iodata),
-                  iodata.problem.verbose, fespaces, aux_fespaces)
+                  iodata.problem.verbose, fespaces, aux_fespaces, std::move(basis), neural)
 {
 }
 
@@ -561,6 +618,20 @@ void BaseKspSolver<OperType>::Mult(const VecType &x, VecType &y) const
   }
   ksp_mult++;
   ksp_mult_it += ksp->GetNumIterations();
+}
+
+template <OperatorType OperType>
+int BaseKspSolver<OperType>::MultFgmresPhase(const VecType &x, VecType &y, int limit,
+                                             std::optional<double> epsilon,
+                                             bool continuation,
+                                             const std::function<bool()> &stop,
+                                             std::size_t &matvecs) const
+{
+  BlockTimer bt(Timer::KSP, use_timer);
+  auto *fgmres = dynamic_cast<FgmresSolver<OperType> *>(ksp.get());
+  MFEM_VERIFY(fgmres, "A bounded FGMRES solve requires FGMRES!");
+  fgmres->MultBounded(x, y, limit, epsilon, continuation, stop, &matvecs);
+  return fgmres->GetNumIterations();
 }
 
 template class BaseKspSolver<Operator>;

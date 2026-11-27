@@ -7,10 +7,14 @@
 #include <cmath>
 #include <complex>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
+#include <filesystem>
 #include <iostream>
 #include <numbers>
+#include <optional>
 #include <string_view>
 #include <Eigen/Dense>
 #include <fmt/core.h>
@@ -22,6 +26,11 @@
 #include "linalg/floquetcorrection.hpp"
 #include "linalg/initialguess.hpp"
 #include "linalg/ksp.hpp"
+#if defined(PALACE_WITH_ML)
+#include "linalg/complexcsr.hpp"
+#include "linalg/neuraldata.hpp"
+#include "linalg/neuralmodel.hpp"
+#endif
 #include "linalg/operator.hpp"
 #include "linalg/vector.hpp"
 #include "models/floquetportoperator.hpp"
@@ -41,6 +50,96 @@ namespace palace
 {
 
 using namespace std::complex_literals;
+
+namespace
+{
+
+double PhysicalResidual(MPI_Comm comm, const ComplexOperator &A, const ComplexVector &rhs,
+                        const ComplexVector &solution)
+{
+  ComplexVector residual(rhs.Size());
+  residual.UseDevice(true);
+  A.Mult(solution, residual);
+  residual.Add(-1.0, rhs);
+  return linalg::Norml2(comm, residual);
+}
+
+bool ResidualPasses(double norm, double rhs_norm, double epsilon)
+{
+  return std::isfinite(rhs_norm) && std::isfinite(epsilon) && std::isfinite(norm) &&
+         norm <= epsilon;
+}
+
+#if defined(PALACE_WITH_ML)
+bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData &linear,
+                      const ComplexLocalCSR &csr, std::span<const int> essential,
+                      double omega, const std::function<bool()> &expired,
+                      std::unique_ptr<NeuralModel> &model, NeuralCoarseSolver::Basis &basis)
+{
+  const auto &settings = linear.neural_coarse;
+  if (expired())
+  {
+    return false;
+  }
+  if (settings.mode == "S")
+  {
+    return true;
+  }
+  auto phi = ProjectNeuralProbeFields(space, essential);
+  if (expired())
+  {
+    return false;
+  }
+  if (settings.mode == "Phi")
+  {
+    basis = {NeuralModel::PhiColumns, std::move(phi.real), std::move(phi.imag)};
+    return true;
+  }
+
+  auto device = NeuralModel::Device{NeuralModel::Backend::Cpu, 0};
+  auto working_bytes = settings.max_working_bytes;
+#if defined(MFEM_USE_CUDA)
+  if (mfem::Device::Allows(mfem::Backend::CUDA_MASK))
+  {
+    std::size_t free_bytes, total_bytes;
+    if (cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess)
+    {
+      Mpi::Warning("Neural coarse setup could not query available CUDA memory!\n");
+      return false;
+    }
+    // Leave headroom for Palace, library workspaces and allocator reserves.
+    working_bytes = std::min(working_bytes, free_bytes / 2);
+    device = {NeuralModel::Backend::Cuda, mfem::Device::GetId()};
+  }
+#endif
+  if (!model)
+  {
+    model = std::make_unique<NeuralModel>(
+        std::filesystem::path(settings.model_manifest).parent_path());
+  }
+  if (expired())
+  {
+    return false;
+  }
+  const std::vector<std::int64_t> row(csr.I.begin(), csr.I.end()),
+      col(csr.J.begin(), csr.J.end());
+  auto learned = model->Infer(
+      {row,
+       col,
+       csr.V,
+       essential,
+       phi.real,
+       phi.imag,
+       {omega * phi.bbox_length, double(linear.pc_mat_shifted),
+        double(linear.pc_mat_real)}},
+      {static_cast<std::size_t>(settings.max_rows), settings.max_nnz, working_bytes},
+      device);
+  basis = {NeuralModel::BasisColumns, std::move(learned.real), std::move(learned.imag)};
+  return !expired();
+}
+#endif
+
+}  // namespace
 
 std::pair<ErrorIndicator, long long int>
 DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
@@ -79,6 +178,11 @@ DrivenSolver::Solve(const std::vector<std::unique_ptr<Mesh>> &mesh) const
   }
 
   // Main frequency sweep loop.
+  if (adaptive && (iodata.solver.linear.neural_coarse.Enabled() ||
+                   iodata.solver.linear.max_solve_seconds > 0.0))
+  {
+    Mpi::Warning("Neural coarse correction and MaxSolveSeconds require a uniform sweep!\n");
+  }
   return {adaptive ? SweepAdaptive(space_op) : SweepUniform(space_op),
           space_op.GlobalTrueVSize()};
 }
@@ -89,8 +193,19 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
   const auto &omega_sample = iodata.solver.driven.sample_f;
   const auto comm = space_op.GetComm();
   const char *verify_env = std::getenv("PALACE_VERIFY_RESIDUAL");
-  int verify_residual = verify_env && std::string_view(verify_env) == "1";
+  const auto &linear = iodata.solver.linear;
+  const auto &settings = linear.neural_coarse;
+  int verify_residual =
+      settings.Enabled() || (verify_env && std::string_view(verify_env) == "1");
   Mpi::Broadcast(1, &verify_residual, 0, comm);
+  const bool right_fgmres = linear.krylov_solver == KrylovSolver::FGMRES &&
+                            linear.pc_side != PreconditionerSide::LEFT;
+  const bool bounded =
+      right_fgmres && Mpi::Size(comm) == 1 && linear.max_solve_seconds > 0.0;
+  if (linear.max_solve_seconds > 0.0 && !bounded)
+  {
+    Mpi::Warning(comm, "MaxSolveSeconds requires single-rank right FGMRES!\n");
+  }
 
   // Initialize postprocessing for measurement and printers.
   // Initialize write directory with default path; will be changed for multi-excitations.
@@ -106,8 +221,65 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
   // Set up the linear solver.
   // The operators are constructed for each frequency step and used to initialize the ksp.
+  Timer::TimePoint solve_started{};
+  const auto elapsed = [&](Timer::TimePoint start)
+  { return Timer::Duration(Timer::Now() - start).count(); };
+  const auto deadline_expired = [&]()
+  { return elapsed(solve_started) >= linear.max_solve_seconds; };
+  const auto trial_expired = [&]()
+  { return elapsed(solve_started) >= 0.25 * linear.max_solve_seconds; };
+  NeuralCoarseSolver *neural = nullptr;
+  NeuralCoarseSolver::BasisBuilder build_basis;
+#if defined(PALACE_WITH_ML)
+  std::unique_ptr<NeuralModel> model;
+  double coarse_omega = 0.0;
+  std::string_view unsupported_reason;
+  if (settings.Enabled())
+  {
+    auto &spaces = space_op.GetNDSpaces();
+    auto &coarse = spaces.GetFESpaceAtLevel(0);
+    if (!bounded || linear.max_it < 2)
+    {
+      unsupported_reason = "right_fgmres_or_budget";
+    }
+    else if (spaces.GetNumLevels() < 2 || coarse.IsBroken() ||
+             !coarse.GetParMesh().Conforming() || coarse.GetMaxElementOrder() != 1 ||
+             !dynamic_cast<const mfem::ND_FECollection *>(&coarse.GetFEColl()))
+    {
+      unsupported_reason = "coarse_space";
+    }
+    else if (mfem::Device::Allows(mfem::Backend::HIP_MASK))
+    {
+      unsupported_reason = "hip_backend";
+    }
+    else
+    {
+      build_basis = [&](const ComplexParOperator &, const ComplexLocalCSR &csr,
+                        std::span<const int> essential, NeuralCoarseSolver::Basis &basis)
+      {
+        try
+        {
+          return BuildNeuralBasis(coarse, linear, csr, essential, coarse_omega,
+                                  trial_expired, model, basis);
+        }
+        catch (const std::exception &e)
+        {
+          Mpi::Warning(comm, "Neural coarse basis setup failed: {}\n", e.what());
+          return false;
+        }
+      };
+    }
+  }
+#else
+  const std::string_view unsupported_reason = settings.Enabled() ? "build_off" : "";
+#endif
+  if (!unsupported_reason.empty())
+  {
+    Mpi::Warning(comm, "Neural coarse fallback: {}\n", unsupported_reason);
+  }
   auto ksp = std::make_unique<ComplexKspSolver>(iodata, space_op.GetNDSpaces(),
-                                                &space_op.GetH1Spaces());
+                                                &space_op.GetH1Spaces(),
+                                                std::move(build_basis), &neural);
 
   // Set up RHS vector for the incident field at port boundaries, and the vector for the
   // first frequency step.
@@ -196,7 +368,15 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         A = space_op.GetSystemMatrix(1.0 + 0.0i, 1i * omega, -omega * omega + 0.0i, K.get(),
                                      C.get(), M.get(), A2.get());
       }
+      if (bounded)
+      {
+        solve_started = Timer::Now();
+      }
+#if defined(PALACE_WITH_ML)
+      coarse_omega = omega;
+#endif
       ksp->SetOperators(*A, *P);
+      const double setup_s = bounded ? elapsed(solve_started) : 0.0;
 
       Mpi::Print(
           "\nIt {:d}/{:d}: ω/2π = {:.3e} GHz (total elapsed time = {:.2e} s{})\n",
@@ -215,23 +395,149 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       const double rhs_norm = verify_residual ? linalg::Norml2(comm, RHS) : 0.0;
       const double epsilon =
           verify_residual ? std::max(ksp->GetAbsTol(), ksp->GetRelTol() * rhs_norm) : 0.0;
-      if (E_prev.Size() > 1)
+      const std::size_t guess_matvecs = E_prev.Size() > 1 ? E_prev.Size() : 0;
+      if (guess_matvecs)
       {
         BlockTimer bt(Timer::KSP_INITIAL_GUESS);
         E_prev.MinimalResidualCombination(space_op.GetComm(), *A, RHS, E);
       }
 
       Mpi::Print("\n");
-      ksp->Mult(RHS, E);
+      std::optional<double> measured;
+      bool in_time = true;
+      if (bounded)
+      {
+        // With verification, both phases target the same physical threshold.
+        const std::optional<double> threshold =
+            verify_residual ? std::optional{epsilon} : std::nullopt;
+        int trial_iterations = 0, classical_iterations = 0;
+        double trial_s = 0.0, continuation_s = 0.0, residual_s = 0.0,
+               classical_setup_s = 0.0;
+        std::size_t matvecs = guess_matvecs, coarse_apps = 0;
+        int residual_checks = 0;
+        auto measure = [&]()
+        {
+          const auto start = Timer::Now();
+          measured = PhysicalResidual(comm, *A, RHS, E);
+          residual_s += elapsed(start);
+          residual_checks++;
+        };
+        std::string_view reason = unsupported_reason;
+#if defined(PALACE_WITH_ML)
+        const auto *setup_reason = neural ? neural->GetSetupReason() : "classical";
+        const int rank = neural ? neural->GetRank() : 0;
+        const auto apps_before = neural ? neural->GetNumApplications() : 0;
+        const auto classical_setup_before =
+            neural ? neural->GetClassicalSetupSeconds() : 0.0;
+        bool trial_passed = false, continuation = false;
+        if (neural && neural->HasCorrection() && !trial_expired())
+        {
+          const auto start = Timer::Now();
+          if (!linear.initial_guess)
+          {
+            E = 0.0;
+          }
+          const ComplexVector initial(E);
+          const int limit = std::min(20, std::max(1, linear.max_it / 4));
+          const auto guarded_stop = [&]()
+          {
+            return trial_expired() || neural->HasRequestedClassical() ||
+                   neural->GetGuardRejections() >= 2;
+          };
+          trial_iterations =
+              ksp->MultFgmresPhase(RHS, E, limit, epsilon, false, guarded_stop, matvecs);
+          trial_s = elapsed(start);
+          measure();
+          trial_passed = !trial_expired() && ResidualPasses(*measured, rhs_norm, epsilon) &&
+                         !neural->HasRequestedClassical() &&
+                         neural->GetGuardRejections() < 2;
+          if (!trial_passed)
+          {
+            reason = neural->HasRequestedClassical()     ? neural->GetLastApplyReason()
+                     : neural->GetGuardRejections() >= 2 ? "repeated_guard_rejection"
+                     : trial_expired()                   ? "trial_deadline"
+                                                         : "trial_residual";
+            if (!std::isfinite(*measured))
+            {
+              E = initial;
+              measured.reset();
+            }
+            continuation = true;
+          }
+        }
+        else if (neural)
+        {
+          reason = trial_expired() ? "trial_deadline" : setup_reason;
+        }
+        if (!trial_passed)
+#endif
+        {
+#if defined(PALACE_WITH_ML)
+          if (neural)
+          {
+            neural->UseClassical();
+          }
+#else
+          constexpr bool continuation = false;
+#endif
+          if (!deadline_expired())
+          {
+            const auto start = Timer::Now();
+            classical_iterations =
+                ksp->MultFgmresPhase(RHS, E, linear.max_it - trial_iterations, threshold,
+                                     continuation, deadline_expired, matvecs);
+            continuation_s = elapsed(start);
+            measured.reset();
+          }
+        }
+        ksp->RecordFgmresSolve(trial_iterations + classical_iterations);
+        if (verify_residual && !measured)
+        {
+          measure();
+        }
+        if (!neural && space_op.GetNDSpaces().GetNumLevels() > 1)
+        {
+          coarse_apps = static_cast<std::size_t>(classical_iterations) * linear.mg_cycle_it;
+        }
+#if defined(PALACE_WITH_ML)
+        if (neural)
+        {
+          coarse_apps = neural->GetNumApplications() - apps_before;
+          classical_setup_s = neural->GetClassicalSetupSeconds() - classical_setup_before;
+          continuation_s = std::max(0.0, continuation_s - classical_setup_s);
+        }
+#endif
+        in_time = !deadline_expired();
+        Mpi::Print(
+            comm,
+            "PALACE_NEURAL_COARSE: mode={} trial_iterations={} classical_iterations={} "
+            "total_iterations={} setup_s={:.9e} trial_s={:.9e} "
+            "lazy_classical_setup_s={:.9e} classical_continuation_s={:.9e} "
+            "true_residual_s={:.9e} elapsed_s={:.9e} coarse_applications={} "
+            "original_A_matvecs={} physical_check_matvecs={} fallback_reason={} "
+            "deadline_expired={}\n",
+            settings.mode, trial_iterations, classical_iterations,
+            trial_iterations + classical_iterations, setup_s, trial_s, classical_setup_s,
+            continuation_s, residual_s, elapsed(solve_started), coarse_apps,
+            matvecs + residual_checks, residual_checks, reason.empty() ? "none" : reason,
+            !in_time);
+#if defined(PALACE_WITH_ML)
+        if (neural)
+        {
+          Mpi::Print(comm, "PALACE_NEURAL_SETUP: reason={} rank={} guard_rejections={}\n",
+                     setup_reason, rank, neural->GetGuardRejections());
+        }
+#endif
+      }
+      else
+      {
+        ksp->Mult(RHS, E);
+      }
       if (verify_residual)
       {
-        ComplexVector residual(RHS.Size());
-        residual.UseDevice(true);
-        A->Mult(E, residual);
-        residual.Add(-1.0, RHS);
-        const double residual_norm = linalg::Norml2(comm, residual);
-        const bool passed = std::isfinite(rhs_norm) && std::isfinite(epsilon) &&
-                            std::isfinite(residual_norm) && residual_norm <= epsilon;
+        const double residual_norm =
+            measured ? *measured : PhysicalResidual(comm, *A, RHS, E);
+        const bool passed = ResidualPasses(residual_norm, rhs_norm, epsilon);
         // The legacy marker requires a number in relative=. For a zero RHS the ratio
         // is undefined, and the results reader derives a missing ratio from norm_b=0.
         const bool relative_defined = rhs_norm > 0.0;
@@ -241,7 +547,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                    "relative={:.17e} relative_defined={} epsilon={:.17e} "
                    "qualified_linear_solve={}\n",
                    residual_norm, rhs_norm, relative, relative_defined, epsilon, passed);
-        if (!passed && Mpi::Root(comm))
+        if ((!passed || !in_time) && Mpi::Root(comm))
         {
           std::fflush(stdout);
         }
@@ -250,6 +556,11 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
                                 << ": ||b - A x|| = " << residual_norm
                                 << ", epsilon = " << epsilon);
       }
+      if (!in_time && !verify_residual)
+      {
+        std::fflush(stdout);
+      }
+      MFEM_VERIFY(in_time, "Linear solve exceeded MaxSolveSeconds!");
       E_prev.Push(E);
 
       if (omega_i + 1 == omega_sample.size() &&
