@@ -209,17 +209,7 @@ void ValidateInput(const NeuralModel::Input &input, const NeuralModel::Limits &l
   Require(input.indptr.size() > 1, "Empty model CSR");
   const auto rows = input.indptr.size() - 1;
   const auto nnz = input.indices.size();
-  Require(rows <= limits.max_rows && nnz <= limits.max_nnz,
-          "Model input exceeds size limits");
-
-  // Include host and device copies, output and dense intermediates. The caller must
-  // leave additional headroom for allocator reserves and backend-specific workspace.
-  constexpr std::size_t Fixed = 4 * WeightBytes, PerRow = 4096, PerEntry = 64;
-  std::size_t budget = limits.max_working_bytes;
-  Require(budget >= Fixed && rows <= (budget - Fixed) / PerRow,
-          "Model input exceeds working memory budget");
-  budget -= Fixed + rows * PerRow;
-  Require(nnz <= budget / PerEntry, "Model input exceeds working memory budget");
+  limits.Check(rows, nnz);
 
   Require(nnz == input.values.size() && input.indptr.front() == 0 &&
               input.indptr.back() == static_cast<std::int64_t>(nnz) &&
@@ -354,6 +344,21 @@ at::Device SelectDevice(NeuralModel::Device requested)
 }
 
 }  // namespace
+
+void NeuralModel::Limits::Check(std::size_t rows, std::size_t nnz) const
+{
+  Require(rows <= max_rows && nnz <= max_nnz,
+          "Model input exceeds size limits");
+
+  // Include host and device copies, output and dense intermediates. The caller must
+  // leave additional headroom for allocator reserves and backend-specific workspace.
+  constexpr std::size_t Fixed = 4 * WeightBytes, PerRow = 4096, PerEntry = 64;
+  std::size_t budget = max_working_bytes;
+  Require(budget >= Fixed && rows <= (budget - Fixed) / PerRow,
+          "Model input exceeds working memory budget");
+  budget -= Fixed + rows * PerRow;
+  Require(nnz <= budget / PerEntry, "Model input exceeds working memory budget");
+}
 
 struct NeuralModel::Impl
 {

@@ -129,6 +129,27 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
   {
     return true;
   }
+  auto device = NeuralModel::Device{NeuralModel::Backend::Cpu, 0};
+  NeuralModel::Limits limits{static_cast<std::size_t>(settings.max_rows), settings.max_nnz,
+                             settings.max_working_bytes};
+#if defined(MFEM_USE_CUDA)
+  if (settings.mode == "Learned" && mfem::Device::Allows(mfem::Backend::CUDA_MASK))
+  {
+    std::size_t free_bytes, total_bytes;
+    if (const auto status = cudaMemGetInfo(&free_bytes, &total_bytes);
+        status != cudaSuccess)
+    {
+      throw NeuralModel::CudaHandoffError(
+          std::string("Cannot query available CUDA memory: ") + cudaGetErrorString(status));
+    }
+    limits.max_working_bytes = std::min(limits.max_working_bytes, free_bytes);
+    device = {NeuralModel::Backend::Cuda, mfem::Device::GetId()};
+  }
+#endif
+  if (settings.mode == "Learned")
+  {
+    limits.Check(csr.n_loc, csr.J.size());
+  }
   auto phi = ProjectNeuralProbeFields(space, essential);
   if (expired())
   {
@@ -140,21 +161,6 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
     return true;
   }
 
-  auto device = NeuralModel::Device{NeuralModel::Backend::Cpu, 0};
-  auto working_bytes = settings.max_working_bytes;
-#if defined(MFEM_USE_CUDA)
-  if (mfem::Device::Allows(mfem::Backend::CUDA_MASK))
-  {
-    std::size_t free_bytes, total_bytes;
-    if (const auto status = cudaMemGetInfo(&free_bytes, &total_bytes); status != cudaSuccess)
-    {
-      throw NeuralModel::CudaHandoffError(std::string("Cannot query available CUDA memory: ") +
-                                         cudaGetErrorString(status));
-    }
-    working_bytes = std::min(working_bytes, free_bytes);
-    device = {NeuralModel::Backend::Cuda, mfem::Device::GetId()};
-  }
-#endif
   if (!model)
   {
     model = std::make_unique<NeuralModel>(
@@ -166,17 +172,15 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
   }
   const std::vector<std::int64_t> row(csr.I.begin(), csr.I.end()),
       col(csr.J.begin(), csr.J.end());
-  auto learned = model->Infer(
-      {row,
-       col,
-       csr.V,
-       essential,
-       phi.real,
-       phi.imag,
-       {omega * phi.bbox_length, double(linear.pc_mat_shifted),
-        double(linear.pc_mat_real)}},
-      {static_cast<std::size_t>(settings.max_rows), settings.max_nnz, working_bytes},
-      device);
+  auto learned = model->Infer({row,
+                               col,
+                               csr.V,
+                               essential,
+                               phi.real,
+                               phi.imag,
+                               {omega * phi.bbox_length, double(linear.pc_mat_shifted),
+                                double(linear.pc_mat_real)}},
+                              limits, device);
   basis = {NeuralModel::BasisColumns, std::move(learned.real), std::move(learned.imag)};
   return !expired();
 }

@@ -49,6 +49,7 @@ public:
   struct Limits
   {
     std::size_t max_rows, max_nnz, max_working_bytes;
+    void Check(std::size_t rows, std::size_t nnz) const;
   };
 
   struct Input
