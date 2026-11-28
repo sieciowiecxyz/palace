@@ -69,7 +69,7 @@ def read_run(path, arm, vary_linear):
     log = next((file for subdir in ("", "result", "results", "modal-results", "input")
                 if (file := path / subdir / "palace.log").is_file()), None)
     residual_ports = []
-    reasons = []
+    observations = []
     port = None
     if log:
         with log.open(errors="replace") as lines:
@@ -81,10 +81,15 @@ def read_run(path, arm, vary_linear):
                 if mode != "Off" and "PALACE_NEURAL_COARSE:" in line:
                     fields = dict(field.split("=", 1) for field in line.split() if "=" in field)
                     if fields.get("mode") == mode and "fallback_reason" in fields:
-                        reasons.append(fields["fallback_reason"])
+                        observations.append({
+                            "port": port, "trial_iterations": int(fields["trial_iterations"]),
+                            "classical_iterations": int(fields["classical_iterations"]),
+                            "fallback_reason": fields["fallback_reason"],
+                        })
     eligible = (
         report.get("exit_code") == 0 and report.get("qualification") == "qualified"
         and residual_ports == [1, 2] and len(report.get("true_residuals", [])) == 2
+        and (mode == "Off" or [row["port"] for row in observations] == [1, 2])
         and total is not None
     )
 
@@ -104,7 +109,8 @@ def read_run(path, arm, vary_linear):
         "max_physical_relative_residual": report.get("true_rhs_max"),
         "palace_total_s": total, "process_wall_s": report.get("process_wall_s"),
         "orchestration_wall_s": report.get("orchestration_wall_s"),
-        "fallback_reasons": reasons,
+        "coarse_rhs": observations,
+        "fallback_reasons": [row["fallback_reason"] for row in observations],
     }
 
 
