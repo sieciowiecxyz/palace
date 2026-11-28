@@ -19,6 +19,33 @@ namespace palace
 namespace
 {
 
+class HypreHostRead
+{
+  const mfem::HypreParMatrix *matrix = nullptr;
+
+public:
+  HypreHostRead() = default;
+  HypreHostRead(const HypreHostRead &) = delete;
+  HypreHostRead &operator=(const HypreHostRead &) = delete;
+
+  void Read(const mfem::HypreParMatrix *part)
+  {
+    matrix = part;
+    if (matrix)
+    {
+      matrix->HostRead();
+    }
+  }
+
+  ~HypreHostRead()
+  {
+    if (matrix)
+    {
+      matrix->HypreRead();
+    }
+  }
+};
+
 const mfem::HypreParMatrix *GetAssembled(const Operator *op)
 {
   if (!op)
@@ -58,13 +85,9 @@ ComplexLocalCSR::ComplexLocalCSR(const ComplexOperator &op, bool drop_small_entr
   // counted before they are stored, so that the matrix is the only allocation of its size.
   const std::pair<const mfem::HypreParMatrix *, std::complex<double>> parts[] = {
       {hAr, {1.0, 0.0}}, {hAi, {0.0, 1.0}}};
-  for (const auto &[part, s] : parts)
-  {
-    if (part)
-    {
-      part->HostRead();
-    }
-  }
+  HypreHostRead real_read, imag_read;
+  real_read.Read(hAr);
+  imag_read.Read(hAi);
 
   // Entries of a local row sorted by global column index, with the entries of the two parts
   // in the same column added, and without the small entries if they are dropped (the test
@@ -151,13 +174,6 @@ ComplexLocalCSR::ComplexLocalCSR(const ComplexOperator &op, bool drop_small_entr
       V[I[i] + k] = row[k].second;
     }
   }
-  for (const auto &[part, s] : parts)
-  {
-    if (part)
-    {
-      part->HypreRead();
-    }
-  }
 }
 
 bool ComplexLocalCSR::SamePattern(MPI_Comm comm, std::size_t &hash) const
@@ -185,17 +201,19 @@ bool HasZeroImag(const ComplexOperator &op)
 
   // The test is exact (not a number counts as nonzero), so that the real part alone is the
   // same matrix as the operator.
-  hAi->HostRead();
-  auto *A = (hypre_ParCSRMatrix *)const_cast<mfem::HypreParMatrix &>(*hAi);
   bool nonzero = false;
-  for (const hypre_CSRMatrix *block :
-       {hypre_ParCSRMatrixDiag(A), hypre_ParCSRMatrixOffd(A)})
   {
-    const auto *data = hypre_CSRMatrixData(block);
-    nonzero = nonzero || std::any_of(data, data + hypre_CSRMatrixNumNonzeros(block),
-                                     [](double v) { return v != 0.0; });
+    HypreHostRead imag_read;
+    imag_read.Read(hAi);
+    auto *A = (hypre_ParCSRMatrix *)const_cast<mfem::HypreParMatrix &>(*hAi);
+    for (const hypre_CSRMatrix *block :
+         {hypre_ParCSRMatrixDiag(A), hypre_ParCSRMatrixOffd(A)})
+    {
+      const auto *data = hypre_CSRMatrixData(block);
+      nonzero = nonzero || std::any_of(data, data + hypre_CSRMatrixNumNonzeros(block),
+                                       [](double v) { return v != 0.0; });
+    }
   }
-  hAi->HypreRead();
   Mpi::GlobalOr(1, &nonzero, hAi->GetComm());
   return !nonzero;
 }

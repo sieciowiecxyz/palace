@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <numbers>
 #include <optional>
 #include <string>
@@ -58,6 +59,45 @@ using namespace std::complex_literals;
 namespace
 {
 
+double PhysicalNorm(MPI_Comm comm, const ComplexVector &vector)
+{
+  // Keep the device reduction for ordinary solves. Fall back to scaling when squaring
+  // entries can underflow at the scale of the answer or when the reduction overflows.
+  const double norm = linalg::Norml2(comm, vector);
+  if (std::isfinite(norm) && norm >= 0x1p-480)
+  {
+    return norm;
+  }
+
+  const auto *real = vector.Real().HostRead();
+  const auto *imag = vector.Imag().HostRead();
+  const int n = vector.Size();
+  double scale = 0.0;
+  for (int i = 0; i < n; i++)
+  {
+    if (!std::isfinite(real[i]) || !std::isfinite(imag[i]))
+    {
+      scale = std::numeric_limits<double>::infinity();
+      break;
+    }
+    scale = std::max({scale, std::abs(real[i]), std::abs(imag[i])});
+  }
+  Mpi::GlobalMax(1, &scale, comm);
+  if (scale == 0.0 || !std::isfinite(scale))
+  {
+    return scale;
+  }
+  auto [sum] = linalg::HostSums<1>(0, n,
+                                   [&](int i)
+                                   {
+                                     const double re = real[i] / scale,
+                                                  im = imag[i] / scale;
+                                     return std::array{re * re + im * im};
+                                   });
+  Mpi::GlobalSum(1, &sum, comm);
+  return scale * std::sqrt(sum);
+}
+
 double PhysicalResidual(MPI_Comm comm, const ComplexOperator &A, const ComplexVector &rhs,
                         const ComplexVector &solution)
 {
@@ -65,7 +105,7 @@ double PhysicalResidual(MPI_Comm comm, const ComplexOperator &A, const ComplexVe
   residual.UseDevice(true);
   A.Mult(solution, residual);
   residual.Add(-1.0, rhs);
-  return linalg::Norml2(comm, residual);
+  return PhysicalNorm(comm, residual);
 }
 
 bool ResidualPasses(double norm, double rhs_norm, double epsilon)
@@ -504,7 +544,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       // Solve linear system.
       space_op.GetExcitationVector(excitation_idx, omega, RHS);
-      const double rhs_norm = verify_residual ? linalg::Norml2(comm, RHS) : 0.0;
+      const double rhs_norm = verify_residual ? PhysicalNorm(comm, RHS) : 0.0;
       const double epsilon =
           verify_residual ? std::max(ksp->GetAbsTol(), ksp->GetRelTol() * rhs_norm) : 0.0;
       const std::size_t guess_matvecs = E_prev.Size() > 1 ? E_prev.Size() : 0;
@@ -580,7 +620,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         }
         else if (neural)
         {
-          reason = trial_expired() ? "trial_deadline" : setup_reason;
+          reason = neural->HasCorrection() ? "trial_deadline" : setup_reason;
         }
         if (!trial_passed)
 #endif

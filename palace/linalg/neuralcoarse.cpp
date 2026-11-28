@@ -298,7 +298,8 @@ struct NeuralCoarseSolver::Correction
 
 NeuralCoarseSolver::NeuralCoarseSolver(MPI_Comm comm, Limits limits,
                                        BasisBuilder build_basis,
-                                       ClassicalFactory make_classical, bool defer_classical)
+                                       ClassicalFactory make_classical,
+                                       bool defer_classical)
   : comm(comm), limits(limits), build_basis(std::move(build_basis)),
     make_classical(std::move(make_classical)), defer_classical(defer_classical),
     classical_allowed(!defer_classical)
@@ -390,7 +391,8 @@ void NeuralCoarseSolver::SetOperator(const ComplexOperator &next)
     }
     state->jacobi.SetOperator(next);
     setup_reason = state->BuildQR(next, basis);
-    if (setup_reason != std::string_view("invalid_basis"))
+    const std::string_view status(setup_reason);
+    if (status == "ready" || status == "rank_zero")
     {
       correction = std::move(state);
     }
