@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,13 @@ struct NeuralCaptureLimits
   std::size_t max_nnz, max_bytes, max_samples;
 };
 
+// A configured quota can skip a capture without invalidating the solve.
+class NeuralCaptureBudgetExceeded : public std::length_error
+{
+public:
+  using std::length_error::length_error;
+};
+
 // One snapshot per SetOperator. Capture is opt-in and excluded from timed runs.
 class NeuralCapture
 {
@@ -53,8 +61,8 @@ public:
   // cap.
   bool AppendRhs(const ComplexVector &rhs, int excitation_id);
 
-  // Publish one A06 capture to a fresh output path after the solve.
-  void Write(const std::filesystem::path &path) const;
+  // Publish one complete capture to a fresh output path and return its size in bytes.
+  std::size_t Write(const std::filesystem::path &path) const;
 
 private:
   struct Data;

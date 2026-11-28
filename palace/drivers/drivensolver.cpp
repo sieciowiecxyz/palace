@@ -192,6 +192,26 @@ struct CaptureOptions
   NeuralCaptureLimits limits;
   std::size_t bytes_remaining;
   int excitation;
+
+  std::string_view BudgetReason(const NeuralCaptureBudgetExceeded &error) const
+  {
+    const std::string_view reason(error.what());
+    return reason == "byte_limit" && bytes_remaining < limits.max_bytes
+               ? "cumulative_byte_limit"
+               : reason;
+  }
+};
+
+struct ResetCoarseRhsObserver
+{
+  ComplexKspSolver *solver;
+  ~ResetCoarseRhsObserver()
+  {
+    if (solver)
+    {
+      solver->SetCoarseRhsObserver({});
+    }
+  }
 };
 
 CaptureOptions ConfigureNeuralCapture(const char *directory, const IoData &iodata,
@@ -513,6 +533,14 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       coarse_omega = omega;
       std::unique_ptr<NeuralCapture> capture;
       std::size_t samples = 0;
+      bool sample_limit_hit = false;
+      const auto log_capture_skip = [&](const NeuralCaptureBudgetExceeded &error)
+      {
+        Mpi::Print(comm,
+                   "PALACE_NEURAL_CAPTURE: status=skipped reason={} frequency_index={} "
+                   "excitation={}\n",
+                   capture_options->BudgetReason(error), omega_i + 1, excitation_idx);
+      };
       if (capture_options && excitation_idx == capture_options->excitation)
       {
         const auto &mg = dynamic_cast<const ComplexMultigridOperator &>(*P);
@@ -521,18 +549,15 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         options.metadata.omega = omega;
         auto limits = options.limits;
         limits.max_bytes = std::min(limits.max_bytes, options.bytes_remaining);
-        MFEM_VERIFY(limits.max_bytes >= 4096,
-                    "Neural capture exhausted its per-run byte budget!");
-        capture = std::make_unique<NeuralCapture>(
-            bc, space_op.GetNDSpaces().GetFESpaceAtLevel(0), options.metadata, limits);
-        ksp->SetCoarseRhsObserver(
-            [&, limit = options.limits.max_samples](const ComplexVector &coarse_rhs)
-            {
-              if (samples < limit && capture->AppendRhs(coarse_rhs, excitation_idx))
-              {
-                ++samples;
-              }
-            });
+        try
+        {
+          capture = std::make_unique<NeuralCapture>(
+              bc, space_op.GetNDSpaces().GetFESpaceAtLevel(0), options.metadata, limits);
+        }
+        catch (const NeuralCaptureBudgetExceeded &error)
+        {
+          log_capture_skip(error);
+        }
       }
 #endif
       ksp->SetOperators(*A, *P);
@@ -689,6 +714,21 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
       }
       else
       {
+#if defined(PALACE_WITH_ML)
+        const ResetCoarseRhsObserver observer{capture ? ksp.get() : nullptr};
+        if (capture)
+        {
+          ksp->SetCoarseRhsObserver(
+              [&](const ComplexVector &coarse_rhs)
+              {
+                if (!sample_limit_hit)
+                {
+                  sample_limit_hit = !capture->AppendRhs(coarse_rhs, excitation_idx);
+                  samples += !sample_limit_hit;
+                }
+              });
+        }
+#endif
         ksp->Mult(RHS, E);
       }
       if (verify_residual)
@@ -722,17 +762,29 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 #if defined(PALACE_WITH_ML)
       if (capture)
       {
-        ksp->SetCoarseRhsObserver({});
         if (samples > 0)
         {
           auto &options = *capture_options;
           const auto path =
               options.directory /
               fmt::format("frequency-{}-excitation-{}.json", omega_i + 1, excitation_idx);
-          capture->Write(path);
-          options.bytes_remaining -= std::filesystem::file_size(path);
-          Mpi::Print(comm, "PALACE_NEURAL_CAPTURE: samples={} path={}\n", samples,
-                     path.string());
+          try
+          {
+            options.bytes_remaining -= capture->Write(path);
+            Mpi::Print(comm, "PALACE_NEURAL_CAPTURE: samples={} path={}\n", samples,
+                       path.string());
+            if (sample_limit_hit)
+            {
+              Mpi::Print(comm,
+                         "PALACE_NEURAL_CAPTURE: status=limited reason=sample_limit "
+                         "frequency_index={} excitation={}\n",
+                         omega_i + 1, excitation_idx);
+            }
+          }
+          catch (const NeuralCaptureBudgetExceeded &error)
+          {
+            log_capture_skip(error);
+          }
         }
         else
         {

@@ -17,21 +17,35 @@
 namespace palace
 {
 
-NeuralProbeFields ProjectNeuralProbeFields(FiniteElementSpace &space,
-                                           std::span<const int> essential_tdofs)
+namespace
 {
-  constexpr int width = 8;
+
+void RequireNeuralProbeSpace(const FiniteElementSpace &space)
+{
   const int n = space.GetTrueVSize();
   if (Mpi::Size(space.GetComm()) != 1 || space.IsBroken() ||
       !space.GetParMesh().Conforming() || space.SpaceDimension() != 3 ||
       space.GetMaxElementOrder() != 1 ||
       !dynamic_cast<const mfem::ND_FECollection *>(&space.GetFEColl()) || n <= 0 ||
-      n != space.GlobalTrueVSize() ||
-      std::any_of(essential_tdofs.begin(), essential_tdofs.end(),
-                  [=](int i) { return i < 0 || i >= n; }))
+      n != space.GlobalTrueVSize())
   {
     throw std::invalid_argument(
         "Neural probes require conforming single-rank ND1 true DOFs");
+  }
+}
+
+}  // namespace
+
+NeuralProbeFields ProjectNeuralProbeFields(FiniteElementSpace &space,
+                                           std::span<const int> essential_tdofs)
+{
+  constexpr int width = 8;
+  RequireNeuralProbeSpace(space);
+  const int n = space.GetTrueVSize();
+  if (std::any_of(essential_tdofs.begin(), essential_tdofs.end(),
+                  [=](int i) { return i < 0 || i >= n; }))
+  {
+    throw std::invalid_argument("Neural probe essential true DOFs are out of range");
   }
 
   mfem::Vector lo, hi;
@@ -181,11 +195,11 @@ NeuralCapture::NeuralCapture(const ComplexParOperator &bc, FiniteElementSpace &c
                              const NeuralCaptureLimits &limits)
 {
   constexpr std::size_t max_capture_bytes = 64 * 1024 * 1024;
+  constexpr std::size_t capture_overhead = 4096;
   const int n = bc.Height();
   if (limits.max_rows <= 0 || !limits.max_nnz || limits.max_bytes > max_capture_bytes ||
-      limits.max_bytes < 4096 || !limits.max_samples || limits.max_samples > 8 || n <= 0 ||
-      n > limits.max_rows || bc.Width() != n ||
-      &bc.TrialFiniteElementSpace() != &coarse_space ||
+      !limits.max_samples || limits.max_samples > 8 || n <= 0 || bc.Width() != n ||
+      (!bc.Real() && !bc.Imag()) || &bc.TrialFiniteElementSpace() != &coarse_space ||
       &bc.TestFiniteElementSpace() != &coarse_space || Mpi::Size(bc.GetComm()) != 1 ||
       metadata.geometry_id.empty() || metadata.geometry_id.size() > 128 ||
       metadata.geometry_id.find_first_not_of(
@@ -197,6 +211,15 @@ NeuralCapture::NeuralCapture(const ComplexParOperator &bc, FiniteElementSpace &c
   {
     throw std::invalid_argument("Invalid neural capture scope, identity or limits");
   }
+  RequireNeuralProbeSpace(coarse_space);
+  if (n > limits.max_rows)
+  {
+    throw NeuralCaptureBudgetExceeded("row_limit");
+  }
+  if (limits.max_bytes < capture_overhead)
+  {
+    throw NeuralCaptureBudgetExceeded("byte_limit");
+  }
 
   // Bound JSON before allocating CSR copies, projected fields and sample
   // storage. The two parts may share columns. Their sum still bounds the merged
@@ -204,13 +227,16 @@ NeuralCapture::NeuralCapture(const ComplexParOperator &bc, FiniteElementSpace &c
   const std::size_t real_nnz = StoredEntries(bc.Real());
   const std::size_t imag_nnz = StoredEntries(bc.Imag());
   const auto row_bytes = std::size_t(640) + 64 * limits.max_samples;
-  const auto bytes = limits.max_bytes - 4096;
-  if (real_nnz > limits.max_nnz || imag_nnz > limits.max_nnz - real_nnz ||
-      static_cast<std::size_t>(n) > bytes / row_bytes || real_nnz > bytes / 96 ||
+  const auto bytes = limits.max_bytes - capture_overhead;
+  if (real_nnz > limits.max_nnz || imag_nnz > limits.max_nnz - real_nnz)
+  {
+    throw NeuralCaptureBudgetExceeded("nnz_limit");
+  }
+  if (static_cast<std::size_t>(n) > bytes / row_bytes || real_nnz > bytes / 96 ||
       imag_nnz > bytes / 96 - real_nnz ||
       real_nnz + imag_nnz > (bytes - n * row_bytes) / 96)
   {
-    throw std::length_error("Neural capture exceeds the configured CSR or byte limit");
+    throw NeuralCaptureBudgetExceeded("byte_limit");
   }
 
   std::vector<int> essential;
@@ -320,7 +346,7 @@ bool NeuralCapture::AppendRhs(const ComplexVector &rhs, int excitation_id)
   return true;
 }
 
-void NeuralCapture::Write(const std::filesystem::path &path) const
+std::size_t NeuralCapture::Write(const std::filesystem::path &path) const
 {
   if (path.filename().empty() || data->payload["samples"].empty())
   {
@@ -334,12 +360,14 @@ void NeuralCapture::Write(const std::filesystem::path &path) const
   file.exceptions(std::ios::badbit | std::ios::failbit);
   file << data->payload << '\n';
   file.close();
-  if (std::filesystem::file_size(temp) > data->limits.max_bytes)
+  const auto size = std::filesystem::file_size(temp);
+  if (size > data->limits.max_bytes)
   {
-    throw std::length_error("Neural capture exceeds byte limit");
+    throw NeuralCaptureBudgetExceeded("byte_limit");
   }
   // Publish atomically; an existing capture is never overwritten.
   std::filesystem::create_hard_link(temp, path);
+  return static_cast<std::size_t>(size);
 }
 
 }  // namespace palace
