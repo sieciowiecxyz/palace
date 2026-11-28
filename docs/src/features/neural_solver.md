@@ -58,8 +58,12 @@ with CUDA managed memory and retains ordinary host allocation. Leave
 `MFEM_MEMORY` and `MFEM_DEVICE` unset when using this profile. Use the
 same allocation profile for every arm in a timing comparison.
 
-The standalone ATen replay compared C++ and Python basis outputs on CPU and
-RTX 5070 Ti with PyTorch 2.10.0+cu128. The real-probe coax case had maximum
-absolute differences of `3.74e-17` on CPU and `4.22e-17` on CUDA. This is
-inference parity on a captured operator. Combined Palace/MFEM/ATen execution,
-end-to-end speed and RF equivalence require matched FEM comparisons.
+On the 3.8 GHz coax development case, the stock ML-enabled Palace build
+`582c95256` on one RTX 5070 Ti completed three runs of each arm. The
+median Palace times were 7.577 s for classical right FGMRES, 8.154 s for
+Jacobi, 8.820 s for the untrained basis and 11.098 s for the learned basis.
+Both ports met the original-system tolerance in all 12 runs. In all six
+learned RHS solves, setup produced rank eight and Palace used classical
+continuation after the 20-iteration trial. The largest absolute difference
+in a complex S entry between paired classical and learned runs was
+1.15e-8. These results apply to the coax development case.
