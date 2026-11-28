@@ -146,10 +146,10 @@ bool BuildNeuralBasis(FiniteElementSpace &space, const config::LinearSolverData 
   if (mfem::Device::Allows(mfem::Backend::CUDA_MASK))
   {
     std::size_t free_bytes, total_bytes;
-    if (cudaMemGetInfo(&free_bytes, &total_bytes) != cudaSuccess)
+    if (const auto status = cudaMemGetInfo(&free_bytes, &total_bytes); status != cudaSuccess)
     {
-      Mpi::Warning("Neural coarse setup could not query available CUDA memory!\n");
-      return false;
+      throw NeuralModel::CudaHandoffError(std::string("Cannot query available CUDA memory: ") +
+                                         cudaGetErrorString(status));
     }
     working_bytes = std::min(working_bytes, free_bytes);
     device = {NeuralModel::Backend::Cuda, mfem::Device::GetId()};
