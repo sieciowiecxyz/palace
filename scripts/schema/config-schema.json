@@ -3111,6 +3111,16 @@
           "exclusiveMinimum": 0,
           "default": 1
         },
+        "CollectWarmStart": {
+          "type": "boolean",
+          "default": false,
+          "description": "Collect up to 32 residual-qualified fine-space fields per uniform sweep in the warmstart subdirectory of Problem/Output (experimental ML build)."
+        },
+        "WarmStartModel": {
+          "type": "string",
+          "default": "",
+          "description": "Path to an experimental POD-MLP bundle for a compatible uniform Driven sweep. Empty disables inference."
+        },
         "AdaptiveTol": {
           "type": "number",
           "description": "Relative error convergence tolerance for adaptive fast frequency sweep. A value of `0` disables adaptive sweep and the full-order model is solved at each frequency step. A positive value ensures the reduced-order model is reliable relative to the full-order model in the frequency band of interest.",

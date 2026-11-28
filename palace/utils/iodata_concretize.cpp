@@ -167,7 +167,9 @@ void ConcretizeTransient(const config::TransientSolverData &transient, json &j_t
 
 void ConcretizeDriven(const config::DrivenSolverData &driven, json &j_driven)
 {
-  ApplyEntries(j_driven, {{"Restart", driven.restart},
+  ApplyEntries(j_driven, {{"CollectWarmStart", driven.collect_warm_start},
+                          {"WarmStartModel", driven.warm_start_model},
+                          {"Restart", driven.restart},
                           {"AdaptiveTol", driven.adaptive_tol},
                           {"AdaptiveMaxSamples", driven.adaptive_max_size},
                           {"AdaptiveConvergenceMemory", driven.adaptive_memory},

@@ -31,10 +31,13 @@
 #include "linalg/initialguess.hpp"
 #include "linalg/ksp.hpp"
 #if defined(PALACE_WITH_ML)
+#include <openssl/sha.h>
 #include "linalg/complexcsr.hpp"
 #include "linalg/neuraldata.hpp"
 #include "linalg/neuralmodel.hpp"
 #include "linalg/rap.hpp"
+#include "linalg/warmstartdata.hpp"
+#include "linalg/warmstartmodel.hpp"
 #endif
 #include "linalg/operator.hpp"
 #include "linalg/vector.hpp"
@@ -468,6 +471,54 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 #endif
   }
 
+#if defined(PALACE_WITH_ML)
+  const auto &driven = iodata.solver.driven;
+  bool collect_warm = driven.collect_warm_start;
+  std::unique_ptr<WarmStartModel> warm_model;
+  std::string warm_space;
+  int warm_samples = 0;
+  if (collect_warm || !driven.warm_start_model.empty())
+  {
+    try
+    {
+      if (Mpi::Size(comm) != 1)
+      {
+        throw std::invalid_argument("single MPI rank required");
+      }
+      const auto &dbc = space_op.GetNDDbcTDofLists().back();
+      const auto key =
+          WarmStartSpaceId(space_op.GetNDSpace(),
+                           {dbc.HostRead(), static_cast<std::size_t>(dbc.Size())}) +
+          driven.warm_start_physics;
+      unsigned char digest[SHA256_DIGEST_LENGTH];
+      if (!SHA256(reinterpret_cast<const unsigned char *>(key.data()), key.size(), digest))
+      {
+        throw std::runtime_error("warm-start fingerprint failed");
+      }
+      for (auto byte : digest)
+      {
+        warm_space += fmt::format("{:02x}", byte);
+      }
+    }
+    catch (const std::exception &error)
+    {
+      Mpi::Warning(comm, "Warm-start disabled: {}\n", error.what());
+      collect_warm = false;
+    }
+    if (!warm_space.empty() && !driven.warm_start_model.empty())
+    {
+      try
+      {
+        warm_model =
+            std::make_unique<WarmStartModel>(driven.warm_start_model, warm_space, E.Size());
+      }
+      catch (const std::exception &error)
+      {
+        Mpi::Warning(comm, "Warm-start model disabled: {}\n", error.what());
+      }
+    }
+  }
+#endif
   // With an initial guess, each solve of an excitation after the first starts from the
   // combination of its solutions at up to num_guess previous frequencies which minimizes
   // ||RHS - A E|| (for the second, the previous solution), which the iterative solver then
@@ -577,9 +628,13 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 
       // Solve linear system.
       space_op.GetExcitationVector(excitation_idx, omega, RHS);
-      const double rhs_norm = verify_residual ? PhysicalNorm(comm, RHS) : 0.0;
+      bool check_norms = verify_residual;
+#if defined(PALACE_WITH_ML)
+      check_norms = check_norms || collect_warm || warm_model;
+#endif
+      const double rhs_norm = check_norms ? PhysicalNorm(comm, RHS) : 0.0;
       const double epsilon =
-          verify_residual ? std::max(ksp->GetAbsTol(), ksp->GetRelTol() * rhs_norm) : 0.0;
+          check_norms ? std::max(ksp->GetAbsTol(), ksp->GetRelTol() * rhs_norm) : 0.0;
       const std::size_t guess_matvecs = E_prev.Size() > 1 ? E_prev.Size() : 0;
       if (guess_matvecs)
       {
@@ -587,6 +642,46 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         E_prev.MinimalResidualCombination(space_op.GetComm(), *A, RHS, E);
       }
 
+      std::size_t warm_matvecs = 0;
+#if defined(PALACE_WITH_ML)
+      bool use_initial_guess = linear.initial_guess;
+      double initial_residual = 0.0;
+      if (collect_warm || warm_model)
+      {
+        warm_matvecs += use_initial_guess;
+        initial_residual =
+            use_initial_guess ? PhysicalResidual(comm, *A, RHS, E) : rhs_norm;
+      }
+      if (warm_model)
+      {
+        ComplexVector candidate(E.Size());
+        candidate.UseDevice(true);
+        bool accepted = false;
+        if (warm_model->Predict(omega, excitation_idx, rhs_norm, candidate))
+        {
+          const auto &dbc = space_op.GetNDDbcTDofLists().back();
+          linalg::SetSubVector(candidate.Real(), dbc, 0.0);
+          linalg::SetSubVector(candidate.Imag(), dbc, 0.0);
+          ++warm_matvecs;
+          const double norm = PhysicalResidual(comm, *A, RHS, candidate);
+          accepted = std::isfinite(norm) && norm < initial_residual;
+          if (accepted)
+          {
+            E = candidate;
+            use_initial_guess = true;
+          }
+          Mpi::Print(comm,
+                     "PALACE_WARM_START: baseline={:.17e} candidate={:.17e} "
+                     "accepted={}\n",
+                     initial_residual, norm, accepted);
+        }
+        else
+        {
+          Mpi::Print(comm, "PALACE_WARM_START: prediction_unavailable\n");
+        }
+        ksp->SetInitialGuess(use_initial_guess);
+      }
+#endif
       Mpi::Print("\n");
       std::optional<double> measured;
       bool in_time = true;
@@ -598,7 +693,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         int trial_iterations = 0, classical_iterations = 0;
         double trial_s = 0.0, continuation_s = 0.0, residual_s = 0.0,
                classical_setup_s = 0.0;
-        std::size_t matvecs = guess_matvecs;
+        std::size_t matvecs = guess_matvecs + warm_matvecs;
         std::optional<std::size_t> coarse_apps;
         int residual_checks = 0;
         auto measure = [&]()
@@ -619,7 +714,7 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
         if (neural && neural->HasCorrection() && !trial_expired())
         {
           const auto start = Timer::Now();
-          if (!linear.initial_guess)
+          if (!use_initial_guess)
           {
             E = 0.0;
           }
@@ -731,6 +826,42 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
 #endif
         ksp->Mult(RHS, E);
       }
+#if defined(PALACE_WITH_ML)
+      // Collect only solutions certified on the original equation. A missing label
+      // does not invalidate a classical solve with a different stopping criterion.
+      if ((collect_warm || warm_model) && !measured)
+      {
+        measured = PhysicalResidual(comm, *A, RHS, E);
+      }
+      if (warm_model)
+      {
+        MFEM_VERIFY(ResidualPasses(*measured, rhs_norm, epsilon),
+                    "Neural warm-start solve failed the physical residual check!");
+      }
+      if (collect_warm && in_time && rhs_norm > 0.0 && epsilon > 0.0 &&
+          ResidualPasses(*measured, rhs_norm, epsilon))
+      {
+        try
+        {
+          WriteWarmStartSample(std::filesystem::path(iodata.problem.output) / "warmstart",
+                               warm_space, omega_i + 1, omega, excitation_idx, rhs_norm,
+                               initial_residual, *measured, epsilon, E);
+          collect_warm = ++warm_samples < 32;
+        }
+        catch (const std::exception &error)
+        {
+          Mpi::Warning(comm, "Warm-start collection disabled: {}\n", error.what());
+          collect_warm = false;
+        }
+      }
+      else if (collect_warm)
+      {
+        Mpi::Print(comm,
+                   "PALACE_WARM_START: sample_skipped residual={:.17e} "
+                   "epsilon={:.17e}\n",
+                   *measured, epsilon);
+      }
+#endif
       if (verify_residual)
       {
         const double residual_norm =

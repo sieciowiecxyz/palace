@@ -291,6 +291,16 @@ IoData::IoData(const nlohmann::json &config, bool print) : units(1.0, 1.0), init
   if (auto solver_it = config.find("Solver"); solver_it != config.end())
   {
     solver = config::SolverData(*solver_it);
+    if (solver.driven.collect_warm_start || !solver.driven.warm_start_model.empty())
+    {
+#if !defined(PALACE_WITH_ML)
+      MFEM_ABORT("Warm-start collection and inference require PALACE_WITH_ML!");
+#endif
+      MFEM_VERIFY(problem.type == ProblemType::DRIVEN && solver.driven.adaptive_tol == 0.0,
+                  "Neural warm-start requires a uniform Driven sweep!");
+      solver.driven.warm_start_physics =
+          json::array({*model_it, *domains_it, *boundaries_it}).dump();
+    }
   }
 
   // Check for unsupported sections. Work on a copy since we don't own the input.

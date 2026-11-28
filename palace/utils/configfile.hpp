@@ -1115,6 +1115,11 @@ public:
 struct DrivenSolverData
 {
 public:
+  bool collect_warm_start = false;
+  std::string warm_start_model;
+  // Physical inputs contributing to the warm-start compatibility fingerprint.
+  std::string warm_start_physics;
+
   // Explicit frequency samples [GHz].
   std::vector<double> sample_f = {};
 

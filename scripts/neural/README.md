@@ -62,3 +62,52 @@ anteny --root "$anteny_root" --json bench capture-lineage \
 The canonical design recipe groups remeshed captures together. The recorded
 source SHA comes from capture staging. Check it against the runtime build
 receipt when selecting a training corpus.
+
+## Experimental fine-field warm start
+
+An ML-enabled Palace build can collect and reuse converged electric fields on
+a single-rank uniform Driven sweep. To collect while using the classical
+solver, set `Solver.Driven.CollectWarmStart` to `true` in the case config.
+Each eligible solve checks the final residual on the physical operator. Up to
+32 qualified snapshots per invocation go under `Problem.Output/warmstart/`.
+Keep that directory with the input config, mesh, Palace revision and solver
+report. Leaving the setting enabled in a case opts future runs of that case
+into collection. Archive output before reusing a case's output directory.
+
+Each snapshot stores the complex fine-space field, nondimensional angular
+frequency, excitation ID, RHS norm, classical starting residual, final residual
+and solver tolerance. The compatibility hash covers the discretization,
+essential constraints and the input Model, Domains and Boundaries sections.
+Use a fixed source of external material or port data throughout a dataset.
+This first implementation supports straight-sided 3D conforming ND1 spaces
+with at most 16,384 true DOFs. Collection does not require a trained model.
+Coarse-grid training captures have a different field layout and purpose.
+
+Select distinct frequencies from the same configuration for training and
+validation. Pass the sample paths explicitly, for example:
+
+```sh
+python scripts/neural/warmstart.py \
+  --train "$train_sample_1" "$train_sample_2" \
+  --validation "$validation_sample" \
+  --output model.json --rank 32 --epochs 200 > training-report.json
+```
+
+The CPU trainer builds one real POD basis from the real and imaginary parts
+of training fields. The effective rank is at most 32 and is reduced for
+rank-deficient training data. Frequency, excitation ID and log-scaled RHS
+norm are available before each solve. Four 128-unit SiLU layers predict
+real and imaginary coefficients in this basis. The report includes the split
+digests, coefficient loss, reconstructed-field error and a previous-field
+comparison on eligible validation points. Frequencies held out from one
+geometry test interpolation or extrapolation within that fixed space.
+
+To run inference, set `Solver.Driven.WarmStartModel` to the bundle path
+(relative to the solver's working directory or absolute). The default is an
+empty path. For each supported excitation Palace forms its ordinary starting
+guess, including the configured history, then evaluates the learned candidate
+with the current physical operator and RHS. It uses the candidate only if
+its residual is finite and strictly smaller. The solver still has to meet
+the final physical residual tolerance. The log reports both starting norms
+and the selection. Compare end-to-end runs with collection disabled and
+identical mesh, sources, sweep order, solver, tolerances and hardware.

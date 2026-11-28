@@ -1704,6 +1704,8 @@ auto FindNearestValue(const std::vector<double> &vec, double x, double tol)
 
 DrivenSolverData::DrivenSolverData(const json &driven)
 {
+  collect_warm_start = driven.value("CollectWarmStart", false);
+  warm_start_model = driven.value("WarmStartModel", std::string{});
   restart = driven.value("Restart", restart);
   adaptive_tol = driven.value("AdaptiveTol", adaptive_tol);
   adaptive_max_size = driven.value("AdaptiveMaxSamples", adaptive_max_size);

@@ -47,6 +47,8 @@ if(PALACE_WITH_ML)
     ${CMAKE_CURRENT_SOURCE_DIR}/neuralcoarse.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/neuraldata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/neuralmodel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/warmstartdata.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/warmstartmodel.cpp
   )
 endif()
 
