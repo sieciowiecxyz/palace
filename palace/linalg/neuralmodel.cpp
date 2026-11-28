@@ -7,6 +7,7 @@
 #include <bit>
 #include <cmath>
 #include <cstring>
+#include <exception>
 #include <fstream>
 #include <limits>
 #include <set>
@@ -15,9 +16,13 @@
 #include <utility>
 #include <ATen/ATen.h>
 #include <c10/core/InferenceMode.h>
-#include <c10/core/StreamGuard.h>
-#include <c10/core/impl/VirtualGuardImpl.h>
 #include <openssl/sha.h>
+#if defined(PALACE_WITH_ML_CUDA)
+#include <ATen/core/CachingHostAllocator.h>
+#include <ATen/cuda/CUDAContextLight.h>
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#endif
 #include <nlohmann/json.hpp>
 
 namespace palace
@@ -422,26 +427,69 @@ NeuralModel::Basis NeuralModel::Infer(const Input &input, const Limits &limits,
   ValidateInput(input, limits);
   const c10::InferenceMode inference;
   const auto device = SelectDevice(requested);
-  c10::OptionalStreamGuard stream_guard;
-  if (device.is_cuda())
-  {
-    const c10::impl::VirtualGuardImpl cuda(at::kCUDA);
-    Require(device.index() < cuda.deviceCount(), "CUDA model device unavailable");
-    stream_guard.reset_stream(cuda.getDefaultStream(device));
-  }
-  try
+  if (device.is_cpu())
   {
     return impl->Evaluate(input, device);
   }
+
+#if defined(PALACE_WITH_ML_CUDA)
+  int count = 0;
+  const auto status = cudaGetDeviceCount(&count);
+  Require(status != cudaErrorNoDevice, "CUDA model device unavailable");
+  if (status != cudaSuccess)
+  {
+    throw CudaHandoffError(std::string("Cannot query CUDA model devices: ") +
+                           cudaGetErrorString(status));
+  }
+  Require(device.index() < count, "CUDA model device unavailable");
+  c10::cuda::OptionalCUDAStreamGuard guard;
+  NeuralModel::Basis basis;
+  std::exception_ptr inference_error;
+  try
+  {
+    guard.reset_stream(c10::cuda::getDefaultCUDAStream(device.index()));
+  }
+  catch (const std::exception &e)
+  {
+    throw CudaHandoffError(std::string("Cannot select CUDA model stream: ") + e.what());
+  }
+
+  try
+  {
+    basis = impl->Evaluate(input, device);
+  }
   catch (...)
   {
-    // Let the caller begin a fallback only after queued model work has finished.
-    if (const auto stream = stream_guard.current_stream())
-    {
-      stream->synchronize();
-    }
-    throw;
+    inference_error = std::current_exception();
   }
+
+  // Evaluate has released all temporary tensor owners, including on exception.
+  // Clear Torch-owned workspace references before releasing cached blocks.
+  try
+  {
+    const auto pending = cudaGetLastError();
+    if (pending != cudaSuccess && pending != cudaErrorMemoryAllocation)
+    {
+      throw std::runtime_error(cudaGetErrorString(pending));
+    }
+    guard.current_stream()->synchronize();
+    at::cuda::clearCublasWorkspaces();
+    at::getHostAllocator(at::kCUDA)->empty_cache();
+    c10::cuda::CUDACachingAllocator::emptyCache();
+  }
+  catch (const std::exception &e)
+  {
+    throw CudaHandoffError(std::string("CUDA model handoff failed: ") + e.what());
+  }
+
+  if (inference_error)
+  {
+    std::rethrow_exception(inference_error);
+  }
+  return basis;
+#else
+  throw std::runtime_error("CUDA model inference is unavailable in this build");
+#endif
 }
 
 }  // namespace palace

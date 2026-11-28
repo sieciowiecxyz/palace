@@ -370,9 +370,13 @@ if(PALACE_WITH_ML)
   if(PALACE_WITH_CUDA)
     find_library(PALACE_TORCH_CUDA torch_cuda PATHS "${PALACE_LIBTORCH_ROOT}/lib"
       NO_DEFAULT_PATH NO_CACHE REQUIRED)
+    find_library(PALACE_TORCH_C10_CUDA c10_cuda PATHS "${PALACE_LIBTORCH_ROOT}/lib"
+      NO_DEFAULT_PATH NO_CACHE REQUIRED)
+    target_compile_definitions(${LIB_TARGET_NAME} PRIVATE PALACE_WITH_ML_CUDA)
     # Preserve the shared library that registers ATen CUDA operators.
     target_link_libraries(${LIB_TARGET_NAME} PRIVATE
-      "-Wl,--push-state,--no-as-needed" "${PALACE_TORCH_CUDA}" "-Wl,--pop-state")
+      "-Wl,--push-state,--no-as-needed" "${PALACE_TORCH_CUDA}" "-Wl,--pop-state"
+      "${PALACE_TORCH_C10_CUDA}" CUDA::cudart)
   endif()
 endif()
 
@@ -436,7 +440,8 @@ if(NOT "${TARGET_SOURCES_DEVICE}" STREQUAL "" AND (PALACE_WITH_CUDA OR PALACE_WI
 endif()
 
 if(PALACE_WITH_CUDA)
-  if (BUILD_SHARED_LIBS)
+  # ATen and Palace must share the CUDA runtime and cuBLAS in an ML build.
+  if(BUILD_SHARED_LIBS OR PALACE_WITH_ML)
     target_link_libraries(${LIB_TARGET_NAME} PUBLIC CUDA::cudart CUDA::cublas)
   else()
     target_link_libraries(${LIB_TARGET_NAME} PUBLIC CUDA::cudart_static CUDA::cublas_static)

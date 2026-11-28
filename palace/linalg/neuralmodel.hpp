@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <vector>
 
 namespace palace
@@ -21,6 +22,13 @@ namespace palace
 class NeuralModel
 {
 public:
+  // Failed to establish a safe CUDA handoff. This must propagate past the fallback.
+  class CudaHandoffError : public std::runtime_error
+  {
+  public:
+    using std::runtime_error::runtime_error;
+  };
+
   static constexpr int PhiColumns = 8;
   static constexpr int BasisColumns = 8;
 
@@ -64,6 +72,7 @@ public:
   NeuralModel(const NeuralModel &) = delete;
   NeuralModel &operator=(const NeuralModel &) = delete;
 
+  // CUDA inference requires exclusive ATen use in this process during the call.
   // Synchronous. All spans must refer to host-valid buffers. Retains no input pointers.
   // Throws on invalid input, budget rejection or inference failure, so that the caller can
   // select the classical fallback.

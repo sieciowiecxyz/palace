@@ -372,6 +372,10 @@ ErrorIndicator DrivenSolver::SweepUniform(SpaceOperator &space_op) const
           return BuildNeuralBasis(coarse, linear, csr, essential, coarse_omega,
                                   trial_expired, model, basis);
         }
+        catch (const NeuralModel::CudaHandoffError &)
+        {
+          throw;
+        }
         catch (const std::exception &e)
         {
           Mpi::Warning(comm, "Neural coarse basis setup failed: {}\n", e.what());
