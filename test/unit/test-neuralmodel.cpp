@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <complex>
@@ -13,6 +14,9 @@
 #include <nlohmann/json.hpp>
 #include "fixtures.hpp"
 #include "linalg/neuralmodel.hpp"
+#if defined(PALACE_WITH_ML_CUDA)
+#include "linalg/vector.hpp"
+#endif
 
 namespace palace
 {
@@ -177,6 +181,55 @@ TEST_CASE_METHOD(ModelFixture,
     }
   }
 }
+
+#if defined(PALACE_WITH_ML_CUDA)
+TEST_CASE_METHOD(ModelFixture, "Neural model cold CUDA inference hands off to MFEM",
+                 "[Serial][GPU][NeuralModel]")
+{
+  if (!mfem::Device::Allows(mfem::Backend::CUDA_MASK))
+  {
+    SKIP("Requires the CUDA device");
+  }
+
+  NeuralModel model(temp_dir);
+  // Let Infer initialize ATen CUDA on its first call in the isolated test process.
+  const NeuralModel::Device cuda{NeuralModel::Backend::Cuda, mfem::Device::GetId()};
+  const auto gpu = model.Infer(Input(), limits, cuda);
+  REQUIRE(gpu.real.size() == Rows * Basis);
+  REQUIRE(gpu.imag.size() == Rows * Basis);
+
+  // Consume the returned host basis through MFEM's device memory and kernel paths
+  // immediately after Infer. HostRead also checks the device-to-host handoff.
+  ComplexVector handed_off(Rows * Basis);
+  handed_off.UseDevice(true);
+  std::copy(gpu.real.begin(), gpu.real.end(), handed_off.Real().HostWrite());
+  std::copy(gpu.imag.begin(), gpu.imag.end(), handed_off.Imag().HostWrite());
+  const Complex factor(0.6, -0.8);
+  handed_off *= factor;
+  const auto *result_real = handed_off.Real().HostRead();
+  const auto *result_imag = handed_off.Imag().HostRead();
+
+  const auto cpu = model.Infer(Input(), limits, Cpu);
+  REQUIRE(cpu.real.size() == Rows * Basis);
+  REQUIRE(cpu.imag.size() == Rows * Basis);
+  for (int row = 0; row < Rows; ++row)
+  {
+    for (int col = 0; col < Basis; ++col)
+    {
+      CAPTURE(row, col);
+      const int i = row * Basis + col;
+      const Complex reference = At(cpu, row, col);
+      CHECK(std::abs(At(gpu, row, col) - reference) < 1.0e-12);
+      CHECK(std::abs(Complex(result_real[i], result_imag[i]) - factor * reference) <
+            1.0e-12);
+      if (row == essential.front())
+      {
+        CHECK(At(gpu, row, col) == Complex{});
+      }
+    }
+  }
+}
+#endif
 
 TEST_CASE_METHOD(ModelFixture, "Neural model rejects invalid bundles",
                  "[Serial][NeuralModel]")
