@@ -46,3 +46,19 @@ The versioned manifest records the training inputs, tensor shapes and digest
 of the adjacent 73,984-byte little-endian FP64 payload. Pin both files
 independently when transporting the bundle. The A07 standalone parity replay
 used the earlier A06 assembly-capture bundle, with a different weights digest.
+
+For antenna captures, generate lineage from the retained worker archive and
+the saved prepared evaluation in the same Anteny Store. Repeat `--pair` for
+each run in the dataset. From the Palace checkout, pass the export alongside
+the dataset manifest:
+
+```sh
+anteny --root "$anteny_root" --json bench capture-lineage \
+  --pair "$run_dir" "$evaluation_json" > "$out/lineage.json"
+"$python" scripts/neural/train.py "$dataset_json" "$out/model" \
+  --verified-lineage "$out/lineage.json"
+```
+
+The canonical design recipe groups remeshed captures together. The recorded
+source SHA comes from capture staging. Check it against the runtime build
+receipt when selecting a training corpus.
