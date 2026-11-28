@@ -18,8 +18,11 @@ from model import COMPLEX, K, PHI, REAL, OperatorNetwork, fixed_csr
 EPS = torch.finfo(REAL).eps
 TINY = torch.finfo(REAL).tiny
 COAX_CAPTURE = "d48a1ab698d95580dc4013be956b0547a5f24195af2f4faa6115baa46d0abf9a"
+COAX_CYCLE_CAPTURE = "c967c25bae1805651e02991acc54dc8d275a849c5673f25eb8e0e13889fee2c9"
+COAX_GEOMETRY = "palace-coaxial-dev"
 COAX_MESH = "0a3a2ffcc69f64b9e0d5bce3a0d6e6f83a3d670b8bdedd8f6fadf05af278bdfe"
-# Frozen L-G02 benchmark mesh, including when the capture uses an alias.
+# The frozen L-G02 design also identifies its aliases and remeshes.
+WITHHELD_DESIGN = "eddbc13f288e05ea5787d94ff6abd09c4b5158b80c336a5cad7a8348c99efdd9"
 WITHHELD_MESH = "293da2decbbd1507f4ac52a357d77e9b52a9e9cc1f9e1ce292e868233f732c66"
 SPLITS = ("train", "validation", "test")
 SOURCES = {"observed_coarse_rhs", "observed_coarse_residual",
@@ -56,7 +59,7 @@ def norm(x):
 
 def coax_adapter(data, digest, record):
     require(digest == COAX_CAPTURE and record["mesh_sha256"] == COAX_MESH
-            and record["geometry_id"] == "palace-coaxial-dev", "unrecognized coax identity")
+            and record["geometry_id"] == COAX_GEOMETRY, "unrecognized coax identity")
     require(data["phi_imag_implicit_zero"] is True, "unexpected coax Phi representation")
     n = data["n_local"]
     phi = real(data["phi_cols_real"], (PHI, n), "Phi").T.contiguous()
@@ -188,7 +191,43 @@ class Capture:
         return model(self.phi, self.normalized, self.features, self.context, self.free)
 
 
-def load_dataset(path):
+def digest_string(value, size=64):
+    return isinstance(value, str) and re.fullmatch(f"[0-9a-f]{{{size}}}", value) is not None
+
+
+def read_verified_lineage(path):
+    raw = bounded_read(path, 1 << 20)
+    lineage = strict_json(raw)
+    require(lineage["schema"] == "anteny-neural-design-lineage" and lineage["version"] == 1
+            and isinstance(lineage["captures"], dict), "unsupported verified lineage export")
+    return lineage["captures"], sha256(raw).hexdigest()
+
+
+def canonical_design(record, digest, data, verified):
+    # These are exact A05 observations from one pinned Palace example source mesh.
+    if digest in (COAX_CAPTURE, COAX_CYCLE_CAPTURE):
+        require(record["mesh_sha256"] == COAX_MESH and record["geometry_id"] == COAX_GEOMETRY,
+                "pinned coax capture has conflicting geometry identity")
+        return "palace-example:coaxial"
+
+    evidence = verified.get(digest)
+    require(isinstance(evidence, dict), "capture requires a verified Anteny design lineage export")
+    for field in ("design_id", "case_id", "case_manifest_sha256", "mesh_sha256", "config_sha256"):
+        require(digest_string(evidence[field]), f"invalid verified lineage {field}")
+    require(digest_string(evidence["source_sha"], 40), "invalid verified lineage source_sha")
+    for field in ("design_link", "archive"):
+        obj = evidence[field]
+        require(digest_string(obj["sha256"]) and type(obj["bytes"]) is int and obj["bytes"] > 0,
+                f"invalid verified lineage {field} reference")
+    require(evidence["design_id"] != WITHHELD_DESIGN, "L-G02 design is withheld from development")
+    require(evidence["mesh_sha256"] == record["mesh_sha256"] != COAX_MESH
+            and all(data.get(field) == evidence[field]
+                    for field in ("mesh_sha256", "config_sha256", "source_sha")),
+            "capture does not match verified Anteny case mesh, config and source")
+    return "anteny-design:" + evidence["design_id"]
+
+
+def load_dataset(path, verified=None):
     raw = bounded_read(path, 1 << 20)
     dataset = strict_json(raw)
     require(dataset["schema"] == "palace-neural-dataset" and dataset["version"] == 1,
@@ -210,12 +249,20 @@ def load_dataset(path):
         for key, value in (("geometry_id", geometry), ("mesh_sha256", record["mesh_sha256"]),
                            ("capture_sha256", record["capture_sha256"])):
             require(seen.setdefault((key, value), split) == split, f"{key} crosses splits")
+    if verified is None:
+        verified = {}
     captures = []
     for record in records:
         capture_raw = bounded_read(path.parent / record["path"], 64 << 20)
         digest = sha256(capture_raw).hexdigest()
         require(digest == record["capture_sha256"], "capture SHA-256 mismatch")
-        capture = Capture(strict_json(capture_raw), digest, record)
+        data = strict_json(capture_raw)
+        design = canonical_design(record, digest, data, verified)
+        split = record["split"]
+        require(seen.setdefault(("canonical_design", design), split) == split,
+                "canonical design crosses splits")
+        capture = Capture(data, digest, record)
+        capture.canonical_design = design
         group = ("operator_sha256", capture.operator_sha256)
         require(seen.setdefault(group, record["split"]) == record["split"],
                 "operator crosses splits")
@@ -352,6 +399,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", type=Path)
     parser.add_argument("output", type=Path, help="new directory for weights and manifest")
+    parser.add_argument("--verified-lineage", type=Path,
+                        help="separately generated Anteny Store lineage export for antenna captures")
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -360,7 +409,10 @@ def main():
         torch.set_num_threads(1)
         torch.use_deterministic_algorithms(True)
         torch.manual_seed(args.seed)
-        captures, digest = load_dataset(args.dataset)
+        verified, lineage_digest = {}, None
+        if args.verified_lineage is not None:
+            verified, lineage_digest = read_verified_lineage(args.verified_lineage)
+        captures, digest = load_dataset(args.dataset, verified)
         model = OperatorNetwork()
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
         steps, skips = 0, {}
@@ -382,10 +434,13 @@ def main():
                 steps += 1
         elapsed = perf_counter() - start
         require(steps > 0, f"no usable training steps ({skips})")
-        manifest = export_weights(model, args.output, dict(
+        provenance = dict(
             dataset_sha256=digest, captures=[r for r, _ in captures],
             torch_version=str(torch.__version__), seed=args.seed, epochs=args.epochs,
-            optimizer="Adam", learning_rate=1e-3, steps=steps, skipped=skips))
+            optimizer="Adam", learning_rate=1e-3, steps=steps, skipped=skips)
+        if lineage_digest is not None:
+            provenance["verified_lineage_sha256"] = lineage_digest
+        manifest = export_weights(model, args.output, provenance)
         exported, _ = load_weights(args.output)
         results = []
         with torch.no_grad():
@@ -394,6 +449,7 @@ def main():
                         "weight roundtrip changed the basis")
                 results.append(dict(**record, n=capture.n, normalization_scale=capture.scale,
                                     operator_sha256=capture.operator_sha256,
+                                    canonical_design=capture.canonical_design,
                                     comparison=evaluate(capture, exported)))
         print(json.dumps(dict(model=manifest["weights"], training_steps=steps, skipped=skips,
                               train_seconds=elapsed, comparisons=results), indent=2, allow_nan=False))
