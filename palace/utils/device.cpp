@@ -98,7 +98,18 @@ bool IsSerialHost()
 
 void ConfigureMemory(const std::string &device_str, int device_id)
 {
+  const char *managed_env = std::getenv("PALACE_NATIVE_MANAGED_POOL");
+  const bool managed_pool = managed_env && std::strcmp(managed_env, "1") == 0;
+#if !defined(MFEM_USE_CUDA) || !defined(MFEM_USE_UMPIRE)
+  MFEM_VERIFY(!managed_pool, "Managed device pool requires CUDA-enabled MFEM and Umpire");
+#endif
 #if defined(MFEM_USE_UMPIRE)
+  MFEM_VERIFY(!managed_pool || (device_str.find("debug") == std::string::npos &&
+                                (device_str.find("cuda") != std::string::npos ||
+                                 device_str.find("gpu") != std::string::npos)),
+              "Managed device pool requires the CUDA device backend");
+  MFEM_VERIFY(!managed_pool || (!std::getenv("MFEM_MEMORY") && !std::getenv("MFEM_DEVICE")),
+              "Managed device pool requires MFEM_MEMORY and MFEM_DEVICE unset");
   // MFEM built with Umpire defaults to the Umpire host allocator (HOST_UMPIRE), which is
   // slow (mfem/mfem#5122), and to its own device pool, while hypre creates a second device
   // pool. Select plain host memory and, on GPUs, one device pool shared with hypre (see
@@ -119,9 +130,14 @@ void ConfigureMemory(const std::string &device_str, int device_id)
     auto &rm = umpire::ResourceManager::getInstance();
     if (!rm.isAllocator(UMPIRE_DEVICE_POOL_NAME))
     {
-      rm.makeAllocator<umpire::strategy::QuickPool>(
-          UMPIRE_DEVICE_POOL_NAME, rm.getAllocator("DEVICE::" + std::to_string(device_id)));
+      const auto resource =
+          managed_pool ? std::string("UM") : "DEVICE::" + std::to_string(device_id);
+      rm.makeAllocator<umpire::strategy::QuickPool>(UMPIRE_DEVICE_POOL_NAME,
+                                                    rm.getAllocator(resource));
     }
+    auto pool = rm.getAllocator(UMPIRE_DEVICE_POOL_NAME);
+    MFEM_VERIFY(!managed_pool || pool.getAllocationStrategy()->getTraits().unified,
+                "Existing device pool does not match the requested managed-memory profile");
     mfem::MemoryManager::SetUmpireDeviceAllocatorName(UMPIRE_DEVICE_POOL_NAME);
     mfem::Device::SetMemoryTypes(mfem::MemoryType::HOST, mfem::MemoryType::DEVICE_UMPIRE);
   }

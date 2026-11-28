@@ -52,6 +52,12 @@ for the classical controls. Retain the per-RHS residual, fallback reason,
 iteration counts and timing alongside total Palace time, peak memory and RF
 observables. Use matched physics, mesh, excitations and tolerances.
 
+For a single-GPU run built with CUDA and Umpire, the opt-in environment
+setting `PALACE_NATIVE_MANAGED_POOL=1` backs the MFEM/HYPRE device pool
+with CUDA managed memory and retains ordinary host allocation. Leave
+`MFEM_MEMORY` and `MFEM_DEVICE` unset when using this profile. Use the
+same allocation profile for every arm in a timing comparison.
+
 The standalone ATen replay compared C++ and Python basis outputs on CPU and
 RTX 5070 Ti with PyTorch 2.10.0+cu128. The real-probe coax case had maximum
 absolute differences of `3.74e-17` on CPU and `4.22e-17` on CUDA. This is
